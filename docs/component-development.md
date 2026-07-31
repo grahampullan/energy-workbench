@@ -62,7 +62,9 @@ fix the exact return shapes for compile, limits, and evaluation.
   useful editor ranges.
 - Ports declare compatibility. A connection does not redefine a port's medium
   or direction.
-- `validate` checks engineering meaning that JSON Schema cannot express.
+- `validate` checks engineering meaning that JSON Schema cannot express. It
+  returns an array of `{ severity, code, message, path }` diagnostics, or
+  `undefined` when there are none; omitted severity means `error`.
 - `compile` resolves parameters and precomputes run-local coefficients.
 - `initialise` creates state for one run; it does not modify the persisted
   component.

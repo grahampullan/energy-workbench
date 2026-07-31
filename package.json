@@ -1,0 +1,15 @@
+{
+  "name": "energy-workbench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Interactive engineering environment for approximate, time-resolved energy models",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "npm test"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:energy-workbench:schema:run-provenance:0.1.0",
+  "title": "Energy Workbench run provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "createdAt", "model", "scenario", "policy", "runtime"],
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "runId": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+    },
+    "createdAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/documentReference"
+    },
+    "scenario": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/documentReference"
+    },
+    "variant": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/documentReference"
+    },
+    "policy": {
+      "$ref": "#/$defs/policyReference"
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtimeReference"
+    },
+    "options": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "policyReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "version": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/semanticVersion"
+        }
+      }
+    },
+    "runtimeReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "environment"],
+      "properties": {
+        "name": {
+          "const": "energy-workbench"
+        },
+        "version": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/semanticVersion"
+        },
+        "environment": {
+          "enum": ["browser", "node"]
+        }
+      }
+    }
+  }
+}

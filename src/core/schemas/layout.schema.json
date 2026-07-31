@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:energy-workbench:schema:layout:0.1.0",
+  "title": "Energy Workbench layout",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "modelId", "components"],
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "id": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+    },
+    "modelId": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/componentLayout"
+      }
+    }
+  },
+  "$defs": {
+    "componentLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["componentId", "x", "y"],
+      "properties": {
+        "componentId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

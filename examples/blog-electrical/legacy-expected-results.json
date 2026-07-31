@@ -1,0 +1,364 @@
+{
+  "formatVersion": 1,
+  "description": "Headless numeric output from the preserved Visual Energy Modeller blog demo.",
+  "provenance": {
+    "capturedOn": "2026-07-31",
+    "nodeVersion": "v22.22.0",
+    "visualModellerEnergy": {
+      "tag": "blog-demo-2024",
+      "commit": "5a1bb8415ce0e006f95c72fe183ba0abf826eeae",
+      "modelPath": "examples/domestic-solar/PV-battery.json"
+    },
+    "visualModellerCore": {
+      "tag": "blog-demo-2024",
+      "commit": "3368981528de63178aed9d145c565252aa54a754"
+    },
+    "boardBox": {
+      "tag": "v0.2.43",
+      "commit": "448ca9b4d7f0532b6bb95e506c823bb00838e63b"
+    }
+  },
+  "numericContract": {
+    "timeStepCount": 1440,
+    "timeStepSeconds": 60,
+    "powerUnit": "W",
+    "integratedEnergyUnit": "kWh",
+    "batteryChargeUnit": "kWh",
+    "integrationMethod": "trapezoidal",
+    "sampleCountPerSeries": 1440,
+    "checkpointStepIndices": [
+      0,
+      180,
+      360,
+      540,
+      720,
+      900,
+      1080,
+      1260,
+      1439
+    ]
+  },
+  "cases": {
+    "baseline": {
+      "overrides": [],
+      "series": {
+        "solar supply": {
+          "minimumW": 0.0000032104561103712235,
+          "maximumW": 2000,
+          "integratedEnergyKwh": 9.453087202915237,
+          "checkpointsW": [
+            0.0000032104561103712235,
+            0.022601872086292614,
+            12.659430854971493,
+            564.125903387631,
+            2000,
+            564.125903387631,
+            12.659430854971493,
+            0.022601872086292614,
+            0.000003396087232668781
+          ]
+        },
+        "from battery": {
+          "minimumW": 0,
+          "maximumW": 1418.5083510164227,
+          "integratedEnergyKwh": 5.007288715901211,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            435.22588521164516,
+            1128.5209575749832,
+            0,
+            0
+          ]
+        },
+        "grid supply": {
+          "minimumW": 0,
+          "maximumW": 997.9654443127723,
+          "integratedEnergyKwh": 7.341660397010437,
+          "checkpointsW": [
+            500.00038736401433,
+            552.6770104088458,
+            772.2319815109335,
+            0,
+            0,
+            0,
+            0,
+            509.1233451663416,
+            500.0015371050545
+          ]
+        },
+        "load": {
+          "minimumW": 500.00039057447043,
+          "maximumW": 1500,
+          "integratedEnergyKwh": 16.718209794847088,
+          "checkpointsW": [
+            500.00039057447043,
+            552.6996122809321,
+            784.8914123659049,
+            500.0621201273965,
+            504.32023947462955,
+            999.3517885992761,
+            1141.1803884299547,
+            509.1459470384279,
+            500.00154050114173
+          ]
+        },
+        "to battery": {
+          "minimumW": 0,
+          "maximumW": 1495.7667100190256,
+          "integratedEnergyKwh": 5.005396375970209,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            64.06378326023446,
+            1495.6797605253705,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "grid export": {
+          "minimumW": 0,
+          "maximumW": 368.353350233509,
+          "integratedEnergyKwh": 0.07843014500963484,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "finalBatteryChargeKwh": -0.00728871590120975,
+      "maximumBalanceResidualW": 2.2737367544323206e-13
+    },
+    "doublePv": {
+      "overrides": [
+        {
+          "modelComponentName": "Solar PV",
+          "parameter": "socketMultiplier",
+          "value": 2
+        }
+      ],
+      "series": {
+        "solar supply": {
+          "minimumW": 0.000006420912220742447,
+          "maximumW": 4000,
+          "integratedEnergyKwh": 18.906174405830473,
+          "checkpointsW": [
+            0.000006420912220742447,
+            0.04520374417258523,
+            25.318861709942986,
+            1128.251806775262,
+            4000,
+            1128.251806775262,
+            25.318861709942986,
+            0.04520374417258523,
+            0.000006792174465337562
+          ]
+        },
+        "from battery": {
+          "minimumW": 0,
+          "maximumW": 1353.6876115717134,
+          "integratedEnergyKwh": 5.00541530266987,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1115.8615267200119,
+            0,
+            0
+          ]
+        },
+        "grid supply": {
+          "minimumW": 0,
+          "maximumW": 995.9842745000457,
+          "integratedEnergyKwh": 6.426265292429882,
+          "checkpointsW": [
+            500.00038415355823,
+            552.6544085367595,
+            759.5725506559619,
+            0,
+            0,
+            0,
+            0,
+            509.1007432942553,
+            500.00153370896726
+          ]
+        },
+        "load": {
+          "minimumW": 500.00039057447043,
+          "maximumW": 1500,
+          "integratedEnergyKwh": 16.718209794847088,
+          "checkpointsW": [
+            500.00039057447043,
+            552.6996122809321,
+            784.8914123659049,
+            500.0621201273965,
+            504.32023947462955,
+            999.3517885992761,
+            1141.1803884299547,
+            509.1459470384279,
+            500.00154050114173
+          ]
+        },
+        "to battery": {
+          "minimumW": 0,
+          "maximumW": 3000,
+          "integratedEnergyKwh": 5.042798083429548,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            628.1896866478654,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "grid export": {
+          "minimumW": 0,
+          "maximumW": 3495.688586544885,
+          "integratedEnergyKwh": 8.576847122653632,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            0,
+            3495.6797605253705,
+            128.9000181759858,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "finalBatteryChargeKwh": -0.005415302669864149,
+      "maximumBalanceResidualW": 4.547473508864641e-13
+    },
+    "doubleBatteryCapacity": {
+      "overrides": [
+        {
+          "modelComponentName": "Battery",
+          "parameter": "capacity",
+          "value": 10
+        }
+      ],
+      "series": {
+        "solar supply": {
+          "minimumW": 0.0000032104561103712235,
+          "maximumW": 2000,
+          "integratedEnergyKwh": 9.453087202915237,
+          "checkpointsW": [
+            0.0000032104561103712235,
+            0.022601872086292614,
+            12.659430854971493,
+            564.125903387631,
+            2000,
+            564.125903387631,
+            12.659430854971493,
+            0.022601872086292614,
+            0.000003396087232668781
+          ]
+        },
+        "from battery": {
+          "minimumW": 0,
+          "maximumW": 1418.5083510164227,
+          "integratedEnergyKwh": 5.085524484131463,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            435.22588521164516,
+            1128.5209575749832,
+            0,
+            0
+          ]
+        },
+        "grid supply": {
+          "minimumW": 0,
+          "maximumW": 997.9654443127723,
+          "integratedEnergyKwh": 7.263424628780185,
+          "checkpointsW": [
+            500.00038736401433,
+            552.6770104088458,
+            772.2319815109335,
+            0,
+            0,
+            0,
+            0,
+            509.1233451663416,
+            500.0015371050545
+          ]
+        },
+        "load": {
+          "minimumW": 500.00039057447043,
+          "maximumW": 1500,
+          "integratedEnergyKwh": 16.718209794847088,
+          "checkpointsW": [
+            500.00039057447043,
+            552.6996122809321,
+            784.8914123659049,
+            500.0621201273965,
+            504.32023947462955,
+            999.3517885992761,
+            1141.1803884299547,
+            509.1459470384279,
+            500.00154050114173
+          ]
+        },
+        "to battery": {
+          "minimumW": 0,
+          "maximumW": 1495.7667100190256,
+          "integratedEnergyKwh": 5.083826520979843,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            64.06378326023446,
+            1495.6797605253705,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "grid export": {
+          "minimumW": 0,
+          "maximumW": 0,
+          "integratedEnergyKwh": 0,
+          "checkpointsW": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "finalBatteryChargeKwh": -0.001697963151619384,
+      "maximumBalanceResidualW": 2.2737367544323206e-13
+    }
+  }
+}

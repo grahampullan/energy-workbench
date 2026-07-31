@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:energy-workbench:schema:model:0.1.0",
+  "title": "Energy Workbench model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "components", "connections"],
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "id": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+    },
+    "name": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/nonEmptyString"
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/modelComponent"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/connection"
+      }
+    }
+  },
+  "$defs": {
+    "modelComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "definitionVersion", "name", "parameters", "initialState"],
+      "properties": {
+        "id": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "type": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "definitionVersion": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/semanticVersion"
+        },
+        "name": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/nonEmptyString"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "initialState": {
+          "type": "object"
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "from", "to"],
+      "properties": {
+        "id": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "name": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/nonEmptyString"
+        },
+        "from": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/portReference"
+        },
+        "to": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/portReference"
+        }
+      }
+    }
+  }
+}

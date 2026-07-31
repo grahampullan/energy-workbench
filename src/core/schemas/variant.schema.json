@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:energy-workbench:schema:variant:0.1.0",
+  "title": "Energy Workbench parameter variant",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "baseModelId", "parameterOverrides"],
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "id": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+    },
+    "name": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/nonEmptyString"
+    },
+    "baseModelId": {
+      "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+    },
+    "parameterOverrides": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/parameterOverride"
+      }
+    }
+  },
+  "$defs": {
+    "parameterOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["componentId", "parameter", "value"],
+      "properties": {
+        "componentId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "parameter": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/fieldName"
+        },
+        "value": {}
+      }
+    }
+  }
+}

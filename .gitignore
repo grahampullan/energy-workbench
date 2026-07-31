@@ -1,1 +1,5 @@
 dev_notes/
+node_modules/
+coverage/
+results/
+.DS_Store

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:energy-workbench:schema:common:0.1.0",
+  "title": "Energy Workbench common definitions",
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$"
+    },
+    "fieldName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\.\\.).+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "documentReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentId", "sha256"],
+      "properties": {
+        "documentId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "sha256": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/sha256"
+        }
+      }
+    },
+    "portReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["componentId", "portId"],
+      "properties": {
+        "componentId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "portId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        }
+      }
+    }
+  }
+}

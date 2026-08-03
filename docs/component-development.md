@@ -23,7 +23,7 @@ export const exampleComponentDefinition = {
   },
 
   initialState: {
-    storedEnergyKwh: {
+    generatedEnergyKwh: {
       unit: "kWh",
       default: 0
     }
@@ -31,9 +31,9 @@ export const exampleComponentDefinition = {
 
   ports: [
     {
-      id: "electricity-in",
+      id: "electricity-out",
       medium: "electricity.active-power",
-      direction: "in"
+      direction: "out"
     }
   ],
 
@@ -53,16 +53,35 @@ export const exampleComponentDefinition = {
     prepare(modelComponent, context) {
       return { conversionFactor: 1 };
     },
-    initialise(runtimeComponent, scenario) {},
-    getOperatingLimits(runtimeComponent, stepContext) {},
-    evaluate(runtimeComponent, actualCommand, stepContext) {}
+    initialise(runtimeComponent) {
+      return { ...runtimeComponent.initialState };
+    },
+    getOperatingLimits(runtimeComponent) {
+      return {
+        minimumPowerKw: 0,
+        maximumPowerKw: runtimeComponent.parameters.ratedPowerKw
+      };
+    },
+    evaluate(runtimeComponent, actualCommand, stepContext) {
+      return {
+        portFlows: {
+          "electricity-out": { powerKw: actualCommand.powerKw }
+        },
+        outputs: { powerKw: actualCommand.powerKw },
+        nextState: {
+          generatedEnergyKwh:
+            stepContext.state.generatedEnergyKwh +
+            actualCommand.powerKw * stepContext.durationHours
+        },
+        diagnostics: []
+      };
+    }
   }
 };
 ```
 
-This template illustrates the contract. Runtime preparation fixes the return
-shape for `prepare`; the first implemented components will fix the exact return
-shapes for initialisation, limits, and evaluation.
+This template illustrates the active-electrical-power contract established by
+the first runtime slice.
 
 ## Responsibilities
 
@@ -106,6 +125,31 @@ do not prevent preparation.
 Preparation does not mutate inputs, load external series, initialise timestep
 state, cache work, generate code, or simulate. Those responsibilities remain at
 their explicit boundaries.
+
+## Fixed-timestep execution
+
+`runScenario({ model, scenario, policy, registry, options })` prepares the model,
+initialises isolated state, and runs every scenario step synchronously.
+
+- `policy.request(runtimeModel, stepContext)` returns an object keyed by
+  component ID, with commands shaped as `{ powerKw }`.
+- Positive command power exports from a component; negative power imports into
+  it.
+- `getOperatingLimits` returns finite `minimumPowerKw` and `maximumPowerKw`
+  values. Clamping a request produces the feasible command; the resolver then
+  produces the balance-constrained actual command.
+- `stepContext` contains `stepIndex`, `timeStepSeconds`, `durationHours`,
+  `elapsedSeconds`, current `seriesValues`, and isolated component state.
+- `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. Electrical
+  port flow is non-negative in the port's declared direction.
+- The runtime commits all proposed next states only after every connection has
+  passed its balance check.
+- External series must be loaded and materialised before calling `runScenario`.
+
+The first resolver intentionally accepts only independent, direct
+source-to-fixed-load electrical connections. Each component has one connected
+electrical port. Branching, buses, storage, and multi-source dispatch will
+extend or replace this resolver when their components are introduced.
 
 ## Definition checklist
 

@@ -86,6 +86,10 @@ policy request
 Requested, feasible, and actual operation must never be conflated. Policies do
 not assign independent physical flows.
 
+For active electrical power commands, positive `powerKw` exports from a
+component and negative `powerKw` imports into it. A port flow is non-negative in
+the port's declared direction.
+
 ## Data and state rules
 
 - JSON is the canonical portable project format; large time series stay in

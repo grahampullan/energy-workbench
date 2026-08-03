@@ -1,4 +1,8 @@
-import { cloneJsonValue, NonJsonValueError } from "../core/json-value.js";
+import {
+  cloneJsonValue,
+  freezeJsonValue,
+  NonJsonValueError
+} from "../core/json-value.js";
 import {
   validateModel,
   validateScenario
@@ -7,16 +11,6 @@ import { createDiagnostic } from "../core/validation/validation-result.js";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function freezeJsonValue(value) {
-  if (value !== null && typeof value === "object") {
-    for (const child of Object.values(value)) {
-      freezeJsonValue(child);
-    }
-    Object.freeze(value);
-  }
-  return value;
 }
 
 function failure(diagnostics) {

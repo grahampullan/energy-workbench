@@ -16,6 +16,10 @@ Visual Energy Modeller followed by a simple electrical–thermal extension.
 
 JSON Schemas for the initial study documents live in `src/core/schemas`.
 
+The first executable runtime slice supports deterministic fixed-timestep runs
+for independent, direct electrical source-to-load connections. Branching buses,
+storage, and the complete legacy example follow in later Push 1A slices.
+
 ## Development
 
 ```sh

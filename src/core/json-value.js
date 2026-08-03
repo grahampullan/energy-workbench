@@ -40,3 +40,13 @@ export function cloneJsonValue(value, ancestors = new WeakSet()) {
   }
   throw new NonJsonValueError(`Unsupported JSON value type: ${typeof value}`);
 }
+
+export function freezeJsonValue(value) {
+  if (value !== null && typeof value === "object") {
+    for (const child of Object.values(value)) {
+      freezeJsonValue(child);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}

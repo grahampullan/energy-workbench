@@ -7,7 +7,8 @@ export function createTestComponentDefinition({
   ports = [],
   outputs = {},
   editor = {},
-  validate = () => []
+  validate = () => [],
+  model = {}
 } = {}) {
   return {
     type,
@@ -20,10 +21,10 @@ export function createTestComponentDefinition({
     editor,
     validate,
     model: {
-      compile() {},
-      initialise() {},
-      getOperatingLimits() {},
-      evaluate() {}
+      prepare: model.prepare ?? (() => ({})),
+      initialise: model.initialise ?? (() => ({})),
+      getOperatingLimits: model.getOperatingLimits ?? (() => ({})),
+      evaluate: model.evaluate ?? (() => ({}))
     }
   };
 }

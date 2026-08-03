@@ -22,7 +22,12 @@ export const exampleComponentDefinition = {
     }
   },
 
-  initialState: {},
+  initialState: {
+    storedEnergyKwh: {
+      unit: "kWh",
+      default: 0
+    }
+  },
 
   ports: [
     {
@@ -45,7 +50,9 @@ export const exampleComponentDefinition = {
   validate(modelComponent, context) {},
 
   model: {
-    compile(modelComponent, context) {},
+    prepare(modelComponent, context) {
+      return { conversionFactor: 1 };
+    },
     initialise(runtimeComponent, scenario) {},
     getOperatingLimits(runtimeComponent, stepContext) {},
     evaluate(runtimeComponent, actualCommand, stepContext) {}
@@ -53,19 +60,25 @@ export const exampleComponentDefinition = {
 };
 ```
 
-This template illustrates the contract; the first implemented components will
-fix the exact return shapes for compile, limits, and evaluation.
+This template illustrates the contract. Runtime preparation fixes the return
+shape for `prepare`; the first implemented components will fix the exact return
+shapes for initialisation, limits, and evaluation.
 
 ## Responsibilities
 
 - Parameter declarations own units, defaults, hard bounds, model validity, and
   useful editor ranges.
+- Initial-state declarations own units and defaults. Component validation owns
+  state constraints that depend on parameters or other state fields.
 - Ports declare compatibility. A connection does not redefine a port's medium
   or direction.
 - `validate` checks engineering meaning that JSON Schema cannot express. It
   returns an array of `{ severity, code, message, path }` diagnostics, or
   `undefined` when there are none; omitted severity means `error`.
-- `compile` resolves parameters and precomputes run-local coefficients.
+- `prepare` receives a detached `ModelComponent` with parameter and
+  initial-state defaults filled. It returns a JSON-compatible plain object,
+  stored as `RuntimeComponent.modelData`, for run-local coefficients and other
+  component-owned prepared data.
 - `initialise` creates state for one run; it does not modify the persisted
   component.
 - `getOperatingLimits` reports what is feasible from current state.
@@ -75,6 +88,24 @@ fix the exact return shapes for compile, limits, and evaluation.
 
 The policy requests operation. It does not set independent port flows or bypass
 component limits.
+
+## Runtime preparation
+
+`prepareRuntimeModel({ model, scenario, registry })` is the deterministic
+boundary between persisted study documents and runtime objects. It:
+
+- validates detached model and scenario snapshots;
+- resolves exact component definitions, defaults, ports, and connections; and
+- calls each definition's `model.prepare` function.
+
+A successful result contains `{ prepared: true, runtimeModel, diagnostics }`.
+Validation or component-contract failures contain
+`{ prepared: false, runtimeModel: null, diagnostics }`. Model-validity warnings
+do not prevent preparation.
+
+Preparation does not mutate inputs, load external series, initialise timestep
+state, cache work, generate code, or simulate. Those responsibilities remain at
+their explicit boundaries.
 
 ## Definition checklist
 

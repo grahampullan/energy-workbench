@@ -115,6 +115,18 @@ function validateComponentParameters(component, definition, componentIndex, diag
   }
 }
 
+function validateComponentInitialState(component, definition, componentIndex, diagnostics) {
+  for (const stateField of Object.keys(component.initialState)) {
+    if (!Object.hasOwn(definition.initialState, stateField)) {
+      diagnostics.push(createDiagnostic({
+        code: "model.unknown-initial-state",
+        message: `${definition.type} does not declare initial-state field: ${stateField}`,
+        path: `/components/${componentIndex}/initialState/${stateField}`
+      }));
+    }
+  }
+}
+
 function appendComponentDiagnostics(component, definition, componentIndex, model, registry, diagnostics) {
   let returnedDiagnostics;
   try {
@@ -225,6 +237,7 @@ export function validateModel(model, { registry } = {}) {
 
     definitionsByComponentId.set(component.id, definition);
     validateComponentParameters(component, definition, componentIndex, diagnostics);
+    validateComponentInitialState(component, definition, componentIndex, diagnostics);
     appendComponentDiagnostics(component, definition, componentIndex, model, registry, diagnostics);
   });
 

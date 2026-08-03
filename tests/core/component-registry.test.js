@@ -38,6 +38,28 @@ test("component registry rejects incomplete engineering definitions", () => {
   );
 });
 
+test("component registry requires declared initial-state units and defaults", () => {
+  const missingUnit = createTestComponentDefinition({
+    initialState: {
+      storedEnergyKwh: { default: 0 }
+    }
+  });
+  assert.throws(
+    () => createComponentRegistry([missingUnit]),
+    /initialState\.storedEnergyKwh\.unit is required/u
+  );
+
+  const missingDefault = createTestComponentDefinition({
+    initialState: {
+      storedEnergyKwh: { unit: "kWh" }
+    }
+  });
+  assert.throws(
+    () => createComponentRegistry([missingDefault]),
+    /initialState\.storedEnergyKwh\.default is required/u
+  );
+});
+
 test("component registry rejects duplicate ports and malformed parameter ranges", () => {
   const duplicatePorts = createTestComponentDefinition({
     ports: [

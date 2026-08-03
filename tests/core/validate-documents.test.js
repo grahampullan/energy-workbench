@@ -159,6 +159,7 @@ test("component-specific validators contribute diagnostics without owning runtim
   const result = validateModel(invalid, { registry: checkedRegistry });
 
   assert.equal(result.valid, false);
+  assert.ok(diagnosticCodes(result).includes("model.unknown-initial-state"));
   assert.ok(diagnosticCodes(result).includes("load.initial-state"));
 });
 

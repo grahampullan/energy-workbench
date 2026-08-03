@@ -33,7 +33,7 @@ UI and file handling sit outside the engineering calculation.
 
 ### `src/runtime`
 
-- Compiles a validated model and runs fixed-timestep simulations.
+- Prepares a validated model and runs fixed-timestep simulations.
 - Owns operating-limit resolution, balance checks, state advancement, and
   results.
 - May import `core`; it receives the component registry explicitly.
@@ -67,7 +67,7 @@ Keep these representations distinct:
 
 - `ModelComponent`: persisted JSON instance with parameters and initial state.
 - `ComponentDefinition`: registered specification and deterministic behaviour.
-- `RuntimeComponent`: compiled, run-specific data and state allocation.
+- `RuntimeComponent`: prepared, run-specific data and state allocation.
 
 Use the engineering vocabulary `Component`, `Port`, and `Connection`, qualified
 in code where needed. Do not export an ambiguous bare `Component` class.

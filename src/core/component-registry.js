@@ -1,3 +1,5 @@
+import { cloneJsonValue } from "./json-value.js";
+
 const STABLE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
 const FIELD_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*$/u;
 const SEMANTIC_VERSION_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
@@ -50,6 +52,14 @@ function assertNumericRange(range, label) {
   }
 }
 
+function assertJsonValue(value, label) {
+  try {
+    cloneJsonValue(value);
+  } catch (error) {
+    throw new TypeError(`${label} must be JSON-compatible: ${error.message}`);
+  }
+}
+
 function assertParameterSpecifications(parameters, definitionType) {
   for (const [parameter, specification] of Object.entries(parameters)) {
     assertFieldName(parameter, `${definitionType} parameter`);
@@ -60,6 +70,7 @@ function assertParameterSpecifications(parameters, definitionType) {
     if (!Object.hasOwn(specification, "default")) {
       throw new TypeError(`${definitionType}.parameters.${parameter}.default is required`);
     }
+    assertJsonValue(specification.default, `${definitionType}.parameters.${parameter}.default`);
     assertNumericRange(specification.hardBounds, `${definitionType}.parameters.${parameter}.hardBounds`);
     assertNumericRange(specification.validityRange, `${definitionType}.parameters.${parameter}.validityRange`);
     if (specification.hardBounds) {
@@ -79,6 +90,23 @@ function assertParameterSpecifications(parameters, definitionType) {
         throw new TypeError(`${definitionType}.parameters.${parameter}.default is above its hard maximum`);
       }
     }
+  }
+}
+
+function assertInitialStateSpecifications(initialState, definitionType) {
+  for (const [stateField, specification] of Object.entries(initialState)) {
+    assertFieldName(stateField, `${definitionType} initial-state field`);
+    assertRecord(specification, `${definitionType}.initialState.${stateField}`);
+    if (typeof specification.unit !== "string" || specification.unit.length === 0) {
+      throw new TypeError(`${definitionType}.initialState.${stateField}.unit is required`);
+    }
+    if (!Object.hasOwn(specification, "default")) {
+      throw new TypeError(`${definitionType}.initialState.${stateField}.default is required`);
+    }
+    assertJsonValue(
+      specification.default,
+      `${definitionType}.initialState.${stateField}.default`
+    );
   }
 }
 
@@ -125,13 +153,14 @@ function assertComponentDefinition(definition) {
   assertRecord(definition.parameters, `${definition.type}.parameters`);
   assertParameterSpecifications(definition.parameters, definition.type);
   assertRecord(definition.initialState, `${definition.type}.initialState`);
+  assertInitialStateSpecifications(definition.initialState, definition.type);
   assertPorts(definition.ports, definition.type);
   assertRecord(definition.outputs, `${definition.type}.outputs`);
   assertOutputs(definition.outputs, definition.type);
   assertRecord(definition.editor, `${definition.type}.editor`);
   assertFunction(definition.validate, `${definition.type}.validate`);
   assertRecord(definition.model, `${definition.type}.model`);
-  assertFunction(definition.model.compile, `${definition.type}.model.compile`);
+  assertFunction(definition.model.prepare, `${definition.type}.model.prepare`);
   assertFunction(definition.model.initialise, `${definition.type}.model.initialise`);
   assertFunction(definition.model.getOperatingLimits, `${definition.type}.model.getOperatingLimits`);
   assertFunction(definition.model.evaluate, `${definition.type}.model.evaluate`);

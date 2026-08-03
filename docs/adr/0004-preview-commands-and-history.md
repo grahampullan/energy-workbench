@@ -13,7 +13,12 @@ history serve different purposes.
 ## Decision
 
 - Preview overrides are temporary and do not mutate project documents.
-- Apply changes the working model through a small command layer.
+- Apply changes the working model through a small command layer. A command is a
+  pure transformation: it returns a new validated model and an inverse command,
+  leaving its input unchanged.
+- Push 1 supports parameter set/unset, component add/remove, and connection
+  connect/disconnect commands. Removing a connected component is rejected;
+  connections must be removed explicitly first.
 - A saved variant records an intentional alternative; Push 1 variants contain
   parameter overrides only.
 - Workbench undo/redo reverses applied commands.

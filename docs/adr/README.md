@@ -16,3 +16,4 @@ rather than rewriting its history.
 | [0005](0005-runtime-preparation.md) | Runtime preparation | Accepted |
 | [0006](0006-fixed-timestep-electrical-runtime.md) | Fixed-timestep electrical runtime | Accepted |
 | [0007](0007-single-electrical-bus.md) | Single electrical bus | Accepted |
+| [0008](0008-residual-grid-and-fixed-pv.md) | Residual grid and fixed PV | Accepted |

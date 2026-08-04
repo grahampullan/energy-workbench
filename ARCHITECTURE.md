@@ -92,6 +92,13 @@ non-negative flow in their declared direction; bidirectional ports report
 positive export and negative import. Connection power is signed from the
 persisted `from` endpoint towards `to`.
 
+A fixed component reports equal minimum and maximum operating power and needs
+no policy request. A non-grid component with variable limits requires an
+explicit policy request. In the single-bus electrical runtime, exactly one grid
+boundary is resolver-owned: it receives no policy request and its actual power
+removes the residual after all fixed and policy-controlled operation. Positive
+grid power imports energy into the model; negative grid power exports it.
+
 ## Data and state rules
 
 - JSON is the canonical portable project format; large time series stay in

@@ -2,6 +2,7 @@ import { createDiagnostic } from "../core/validation/validation-result.js";
 
 const ACTIVE_POWER_MEDIUM = "electricity.active-power";
 const BUS_TYPE = "electrical.bus";
+const GRID_TYPE = "electrical.grid";
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -27,6 +28,18 @@ function prepareFeasibleCommands({
   for (const component of runtimeModel.components) {
     const limits = limitsByComponentId.get(component.id);
     const request = requests[component.id];
+    if (component.type === GRID_TYPE) {
+      if (request) {
+        diagnostics.push(resolverDiagnostic(
+          "runtime.grid-policy-request",
+          "The grid is the residual balancing component and must not receive a policy request",
+          stepIndex,
+          `/components/${component.id}`
+        ));
+      }
+      feasibleCommands.set(component.id, null);
+      continue;
+    }
     if (!request) {
       if (limits.minimumPowerKw !== limits.maximumPowerKw) {
         diagnostics.push(resolverDiagnostic(
@@ -64,6 +77,16 @@ function validateBusTopology(runtimeModel, stepIndex, diagnostics) {
     return null;
   }
   const [bus] = buses;
+  const grids = runtimeModel.components.filter((component) => component.type === GRID_TYPE);
+  if (grids.length !== 1) {
+    diagnostics.push(resolverDiagnostic(
+      "runtime.electrical-grid-count",
+      `Electrical bus runtime requires exactly one grid boundary; received ${grids.length}`,
+      stepIndex
+    ));
+    return null;
+  }
+  const [grid] = grids;
 
   for (const connection of runtimeModel.connections) {
     if (connection.medium !== ACTIVE_POWER_MEDIUM) {
@@ -110,12 +133,13 @@ function validateBusTopology(runtimeModel, stepIndex, diagnostics) {
     }
   }
 
-  return bus;
+  return { bus, grid };
 }
 
 function allocateBalancedCommands({
   runtimeModel,
   bus,
+  grid,
   feasibleCommands,
   limitsByComponentId,
   toleranceKw,
@@ -126,62 +150,35 @@ function allocateBalancedCommands({
   const externalComponents = runtimeModel.components.filter((component) => component !== bus);
 
   for (const component of externalComponents) {
-    actualCommands.set(component.id, { ...feasibleCommands.get(component.id) });
+    actualCommands.set(
+      component.id,
+      component === grid ? { powerKw: 0 } : { ...feasibleCommands.get(component.id) }
+    );
   }
 
-  let residualPowerKw = externalComponents.reduce(
-    (total, component) => total + actualCommands.get(component.id).powerKw,
+  const nonGridPowerKw = externalComponents.reduce(
+    (total, component) => component === grid
+      ? total
+      : total + actualCommands.get(component.id).powerKw,
     0
   );
-  const controllableComponents = externalComponents.filter((component) => {
-    const limits = limitsByComponentId.get(component.id);
-    return limits.minimumPowerKw !== limits.maximumPowerKw;
-  });
-
-  if (controllableComponents.length > 1) {
-    diagnostics.push(resolverDiagnostic(
-      "runtime.unsupported-electrical-dispatch",
-      "Electrical bus runtime currently permits only one controllable balancing component",
-      stepIndex,
-      `/components/${bus.id}`
-    ));
-    return { actualCommands, residualPowerKw };
-  }
-
-  if (residualPowerKw > toleranceKw) {
-    for (const component of controllableComponents) {
-      const actual = actualCommands.get(component.id);
-      const minimum = limitsByComponentId.get(component.id).minimumPowerKw;
-      const reduction = Math.min(residualPowerKw, actual.powerKw - minimum);
-      actual.powerKw -= reduction;
-      residualPowerKw -= reduction;
-      if (residualPowerKw <= toleranceKw) {
-        break;
-      }
-    }
-  } else if (residualPowerKw < -toleranceKw) {
-    for (const component of controllableComponents) {
-      const actual = actualCommands.get(component.id);
-      const maximum = limitsByComponentId.get(component.id).maximumPowerKw;
-      const increase = Math.min(-residualPowerKw, maximum - actual.powerKw);
-      actual.powerKw += increase;
-      residualPowerKw += increase;
-      if (residualPowerKw >= -toleranceKw) {
-        break;
-      }
-    }
-  }
-
-  if (Math.abs(residualPowerKw) > toleranceKw) {
+  const requiredGridPowerKw = nonGridPowerKw === 0 ? 0 : -nonGridPowerKw;
+  const gridLimits = limitsByComponentId.get(grid.id);
+  if (
+    requiredGridPowerKw < gridLimits.minimumPowerKw - toleranceKw ||
+    requiredGridPowerKw > gridLimits.maximumPowerKw + toleranceKw
+  ) {
     diagnostics.push(resolverDiagnostic(
       "runtime.electrical-balance-infeasible",
-      `Electrical bus cannot resolve a ${residualPowerKw} kW power residual within component limits`,
+      `Electrical bus requires grid power ${requiredGridPowerKw} kW but ${grid.id} permits ${gridLimits.minimumPowerKw} to ${gridLimits.maximumPowerKw} kW`,
       stepIndex,
-      `/components/${bus.id}`
+      `/components/${grid.id}`
     ));
+  } else {
+    actualCommands.set(grid.id, { powerKw: requiredGridPowerKw });
   }
 
-  return { actualCommands, residualPowerKw };
+  return { actualCommands };
 }
 
 function bindConnectionFlows(runtimeModel, bus, actualCommands) {
@@ -215,7 +212,7 @@ export function resolveElectricalBus({
   toleranceKw
 }) {
   const diagnostics = [];
-  const bus = validateBusTopology(runtimeModel, stepIndex, diagnostics);
+  const topology = validateBusTopology(runtimeModel, stepIndex, diagnostics);
   const feasibleCommands = prepareFeasibleCommands({
     runtimeModel,
     requests,
@@ -224,13 +221,15 @@ export function resolveElectricalBus({
     diagnostics
   });
 
-  if (!bus || diagnostics.length > 0) {
+  if (!topology || diagnostics.length > 0) {
     return { resolved: false, diagnostics };
   }
+  const { bus, grid } = topology;
 
   const { actualCommands } = allocateBalancedCommands({
     runtimeModel,
     bus,
+    grid,
     feasibleCommands,
     limitsByComponentId,
     toleranceKw,

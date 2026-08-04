@@ -132,12 +132,12 @@ their explicit boundaries.
 initialises isolated state, and runs every scenario step synchronously.
 
 - `policy.request(runtimeModel, stepContext)` returns an object keyed by
-  component ID, with commands shaped as `{ powerKw }`.
+  non-grid controllable component ID, with commands shaped as `{ powerKw }`.
 - Positive command power exports from a component; negative power imports into
   it.
 - `getOperatingLimits` returns finite `minimumPowerKw` and `maximumPowerKw`
-  values. Clamping a request produces the feasible command; the resolver then
-  produces the balance-constrained actual command.
+  values. Equal values prescribe fixed operation and need no policy request.
+  Otherwise, clamping an explicit request produces the feasible command.
 - `stepContext` contains `stepIndex`, `timeStepSeconds`, `durationHours`,
   `elapsedSeconds`, current `seriesValues`, and isolated component state.
 - `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. Electrical
@@ -150,9 +150,16 @@ initialises isolated state, and runs every scenario step synchronously.
 Connection `powerKw` is signed from its persisted `from` endpoint towards `to`.
 The current resolver accepts one `electrical.bus` with four bidirectional
 terminals. Each external component has one electrical connection, and each bus
-terminal has at most one. Branching fixed loads are supported, but only one
-controllable component may balance the bus. This avoids treating component
-array order as an implicit dispatch policy.
+terminal has at most one. Exactly one `electrical.grid` is the residual
+boundary: its requested and feasible commands are `null`, and the resolver sets
+its actual command after fixed and explicitly policy-controlled operation.
+Positive grid power is import into the model; negative grid power is export.
+The grid limits can make a timestep infeasible. This keeps balancing separate
+from policy and avoids treating component array order as dispatch priority.
+
+The current `electrical.pv` is prescribed by its scenario series: equal limits
+make all available generation actual generation. Curtailment is not inferred by
+the resolver; it would require an explicit controllable-component contract.
 
 ## Definition checklist
 

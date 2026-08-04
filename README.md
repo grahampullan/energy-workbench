@@ -17,9 +17,10 @@ Visual Energy Modeller followed by a simple electrical–thermal extension.
 JSON Schemas for the initial study documents live in `src/core/schemas`.
 
 The executable runtime currently supports deterministic fixed-timestep runs on
-one four-terminal electrical bus with branching fixed loads and one
-controllable balancing component. Storage, full dispatch, and the complete
-legacy example follow in later Push 1A slices.
+one four-terminal electrical bus with fixed load and PV profiles, branching,
+explicit policy-controlled generation, and a residual grid boundary with
+import and export limits. Storage, legacy dispatch, and the complete legacy
+example follow in later Push 1A slices.
 
 ## Development
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { electricalBusDefinition } from "../../src/components/electrical/bus.js";
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
 import { electricalSourceDefinition } from "../../src/components/electrical/source.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
@@ -34,6 +35,14 @@ function createFixture({
         initialState: sourceInitialState
       },
       {
+        id: "bus",
+        type: electricalBusDefinition.type,
+        definitionVersion: electricalBusDefinition.version,
+        name: "Electrical bus",
+        parameters: {},
+        initialState: {}
+      },
+      {
         id: "load",
         type: loadDefinition.type,
         definitionVersion: loadDefinition.version,
@@ -44,9 +53,15 @@ function createFixture({
     ],
     connections: [
       {
-        id: "source-to-load",
-        name: "Source to load",
+        id: "source-to-bus",
+        name: "Source to bus",
         from: { componentId: "source", portId: "electricity-out" },
+        to: { componentId: "bus", portId: "terminal-1" }
+      },
+      {
+        id: "bus-to-load",
+        name: "Bus to load",
+        from: { componentId: "bus", portId: "terminal-2" },
         to: { componentId: "load", portId: "electricity-in" }
       }
     ]
@@ -70,7 +85,11 @@ function createFixture({
     model,
     scenario,
     policy,
-    registry: createComponentRegistry([sourceDefinition, loadDefinition])
+    registry: createComponentRegistry([
+      electricalBusDefinition,
+      sourceDefinition,
+      loadDefinition
+    ])
   };
 }
 
@@ -91,6 +110,7 @@ test("runScenario records requested, feasible, and balanced actual operation", (
   assert.deepEqual(fixture.scenario, originalScenario);
   assert.deepEqual(result.results.initialStates, [
     { componentId: "source", state: {} },
+    { componentId: "bus", state: {} },
     { componentId: "load", state: {} }
   ]);
 
@@ -98,7 +118,7 @@ test("runScenario records requested, feasible, and balanced actual operation", (
   assert.equal(firstStep.elapsedSeconds, 0);
   assert.equal(secondStep.elapsedSeconds, 900);
 
-  const [source, load] = firstStep.components;
+  const [source, bus, load] = firstStep.components;
   assert.deepEqual(source.requestedCommand, { powerKw: 100 });
   assert.deepEqual(source.operatingLimits, {
     minimumPowerKw: 0,
@@ -108,6 +128,18 @@ test("runScenario records requested, feasible, and balanced actual operation", (
   assert.deepEqual(source.actualCommand, { powerKw: 15 });
   assert.deepEqual(source.outputs, { powerKw: 15 });
 
+  assert.equal(bus.requestedCommand, null);
+  assert.deepEqual(bus.actualCommand, {
+    powerKw: 0,
+    portPowerKw: {
+      "terminal-1": -15,
+      "terminal-2": 15,
+      "terminal-3": 0,
+      "terminal-4": 0
+    }
+  });
+  assert.deepEqual(bus.outputs, { balanceResidualPowerKw: 0 });
+
   assert.equal(load.requestedCommand, null);
   assert.deepEqual(load.feasibleCommand, { powerKw: -15 });
   assert.deepEqual(load.actualCommand, { powerKw: -15 });
@@ -115,14 +147,23 @@ test("runScenario records requested, feasible, and balanced actual operation", (
     demandPowerKw: 15,
     suppliedPowerKw: 15
   });
-  assert.deepEqual(firstStep.connections, [{
-    connectionId: "source-to-load",
-    medium: "electricity.active-power",
-    powerKw: 15,
-    residualPowerKw: 0
-  }]);
+  assert.deepEqual(firstStep.connections, [
+    {
+      connectionId: "source-to-bus",
+      medium: "electricity.active-power",
+      powerKw: 15,
+      residualPowerKw: 0
+    },
+    {
+      connectionId: "bus-to-load",
+      medium: "electricity.active-power",
+      powerKw: 15,
+      residualPowerKw: 0
+    }
+  ]);
 
   assert.equal(secondStep.connections[0].powerKw, 30);
+  assert.equal(secondStep.connections[1].powerKw, 30);
   assert.deepEqual(runScenario(fixture), result);
 });
 
@@ -280,7 +321,7 @@ test("connection balance is checked against component-evaluated port flows", () 
   assert.ok(diagnosticCodes(result).includes("runtime.connection-balance"));
 });
 
-test("the first resolver rejects branching electrical topology explicitly", () => {
+test("the bus resolver balances branching electrical topology", () => {
   const fixture = createFixture();
   fixture.model.components.push({
     id: "second-load",
@@ -291,14 +332,55 @@ test("the first resolver rejects branching electrical topology explicitly", () =
     initialState: {}
   });
   fixture.model.connections.push({
-    id: "source-to-second-load",
-    name: "Source to second load",
-    from: { componentId: "source", portId: "electricity-out" },
+    id: "bus-to-second-load",
+    name: "Bus to second load",
+    from: { componentId: "bus", portId: "terminal-3" },
     to: { componentId: "second-load", portId: "electricity-in" }
   });
 
   const result = runScenario(fixture);
 
+  assert.equal(result.completed, true);
+  assert.equal(result.results.steps[0].components[0].actualCommand.powerKw, 25);
+  assert.deepEqual(
+    result.results.steps[0].connections.map((connection) => connection.powerKw),
+    [25, 15, 10]
+  );
+  assert.equal(
+    result.results.steps[0].components[1].outputs.balanceResidualPowerKw,
+    0
+  );
+});
+
+test("the bus resolver does not infer dispatch priority from component order", () => {
+  const fixture = createFixture();
+  fixture.model.components.push({
+    id: "second-source",
+    type: electricalSourceDefinition.type,
+    definitionVersion: electricalSourceDefinition.version,
+    name: "Second source",
+    parameters: { maximumPowerKw: 50 },
+    initialState: {}
+  });
+  fixture.model.connections.push({
+    id: "second-source-to-bus",
+    name: "Second source to bus",
+    from: { componentId: "second-source", portId: "electricity-out" },
+    to: { componentId: "bus", portId: "terminal-3" }
+  });
+  fixture.policy = {
+    request() {
+      return {
+        source: { powerKw: 50 },
+        "second-source": { powerKw: 50 }
+      };
+    }
+  };
+
+  const result = runScenario(fixture);
+
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.unsupported-electrical-topology"));
+  assert.ok(
+    diagnosticCodes(result).includes("runtime.unsupported-electrical-dispatch")
+  );
 });

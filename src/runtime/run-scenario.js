@@ -8,7 +8,7 @@ import {
 } from "./component-execution.js";
 import { requestPolicyOperation } from "./policy-request.js";
 import { prepareRuntimeModel } from "./prepare-runtime-model.js";
-import { resolveDirectElectrical } from "./resolve-direct-electrical.js";
+import { resolveElectricalBus } from "./resolve-electrical-bus.js";
 
 const DEFAULT_BALANCE_TOLERANCE_KW = 1e-9;
 
@@ -81,19 +81,23 @@ function checkConnectionBalances(
 ) {
   return runtimeModel.connections.map((connection) => {
     const expectedPowerKw = connectionPowerKw.get(connection.id);
-    const fromFlow = evaluationsByComponentId.get(connection.from.component.id)
+    const reportedFromPowerKw = evaluationsByComponentId.get(connection.from.component.id)
       .portFlows[connection.from.port.id].powerKw;
-    const toFlow = evaluationsByComponentId.get(connection.to.component.id)
+    const reportedToPowerKw = evaluationsByComponentId.get(connection.to.component.id)
       .portFlows[connection.to.port.id].powerKw;
-    const residualPowerKw = fromFlow - toFlow;
+    const fromPowerKw = reportedFromPowerKw;
+    const toPowerKw = connection.to.port.direction === "bidirectional"
+      ? -reportedToPowerKw
+      : reportedToPowerKw;
+    const residualPowerKw = fromPowerKw - toPowerKw;
 
     if (
-      Math.abs(fromFlow - expectedPowerKw) > toleranceKw ||
-      Math.abs(toFlow - expectedPowerKw) > toleranceKw
+      Math.abs(fromPowerKw - expectedPowerKw) > toleranceKw ||
+      Math.abs(toPowerKw - expectedPowerKw) > toleranceKw
     ) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.connection-balance",
-        `Connection ${connection.id} expected ${expectedPowerKw} kW but components evaluated ${fromFlow} and ${toFlow} kW`,
+        `Connection ${connection.id} expected ${expectedPowerKw} kW but endpoints evaluated ${fromPowerKw} and ${toPowerKw} kW`,
         `/steps/${stepIndex}/connections/${connection.id}`
       ));
     }
@@ -196,7 +200,7 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       return failure(diagnostics);
     }
 
-    const resolution = resolveDirectElectrical({
+    const resolution = resolveElectricalBus({
       runtimeModel,
       requests,
       limitsByComponentId,

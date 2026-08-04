@@ -191,10 +191,18 @@ function validateEvaluationShape(evaluation, component, stepIndex, diagnostics) 
     ));
   }
   for (const [portId, flow] of Object.entries(evaluation.portFlows)) {
-    if (!isRecord(flow) || !Number.isFinite(flow.powerKw) || flow.powerKw < 0) {
+    const port = component.ports.find((candidate) => candidate.id === portId);
+    const permitsSignedFlow = port?.direction === "bidirectional";
+    if (
+      !isRecord(flow) ||
+      !Number.isFinite(flow.powerKw) ||
+      (!permitsSignedFlow && flow.powerKw < 0)
+    ) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.component-port-flow-contract",
-        `Port ${portId} must return a finite, non-negative powerKw flow`,
+        permitsSignedFlow
+          ? `Bidirectional port ${portId} must return a finite signed powerKw flow`
+          : `Directed port ${portId} must return a finite, non-negative powerKw flow`,
         `${path}/portFlows/${portId}`
       ));
     }

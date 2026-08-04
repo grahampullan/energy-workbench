@@ -87,8 +87,10 @@ Requested, feasible, and actual operation must never be conflated. Policies do
 not assign independent physical flows.
 
 For active electrical power commands, positive `powerKw` exports from a
-component and negative `powerKw` imports into it. A port flow is non-negative in
-the port's declared direction.
+component and negative `powerKw` imports into it. Directed ports report
+non-negative flow in their declared direction; bidirectional ports report
+positive export and negative import. Connection power is signed from the
+persisted `from` endpoint towards `to`.
 
 ## Data and state rules
 

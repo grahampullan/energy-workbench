@@ -15,3 +15,4 @@ rather than rewriting its history.
 | [0004](0004-preview-commands-and-history.md) | Preview, commands, and history | Accepted |
 | [0005](0005-runtime-preparation.md) | Runtime preparation | Accepted |
 | [0006](0006-fixed-timestep-electrical-runtime.md) | Fixed-timestep electrical runtime | Accepted |
+| [0007](0007-single-electrical-bus.md) | Single electrical bus | Accepted |

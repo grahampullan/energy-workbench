@@ -141,15 +141,18 @@ initialises isolated state, and runs every scenario step synchronously.
 - `stepContext` contains `stepIndex`, `timeStepSeconds`, `durationHours`,
   `elapsedSeconds`, current `seriesValues`, and isolated component state.
 - `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. Electrical
-  port flow is non-negative in the port's declared direction.
+  directed-port flow is non-negative in the declared direction. Bidirectional
+  port flow is signed: positive export and negative import.
 - The runtime commits all proposed next states only after every connection has
   passed its balance check.
 - External series must be loaded and materialised before calling `runScenario`.
 
-The first resolver intentionally accepts only independent, direct
-source-to-fixed-load electrical connections. Each component has one connected
-electrical port. Branching, buses, storage, and multi-source dispatch will
-extend or replace this resolver when their components are introduced.
+Connection `powerKw` is signed from its persisted `from` endpoint towards `to`.
+The current resolver accepts one `electrical.bus` with four bidirectional
+terminals. Each external component has one electrical connection, and each bus
+terminal has at most one. Branching fixed loads are supported, but only one
+controllable component may balance the bus. This avoids treating component
+array order as an implicit dispatch policy.
 
 ## Definition checklist
 

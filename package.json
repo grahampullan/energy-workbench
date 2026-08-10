@@ -5,6 +5,7 @@
   "description": "Interactive engineering environment for approximate, time-resolved energy models",
   "type": "module",
   "scripts": {
+    "generate:blog-example": "node scripts/generate-blog-electrical-example.js",
     "test": "node --test",
     "check": "npm test"
   },

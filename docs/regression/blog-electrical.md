@@ -105,6 +105,46 @@ so the last discharge step can overshoot. This is a captured legacy defect, not
 target behaviour. The new runtime must enforce its stated battery limits and
 document any resulting numerical difference from the old output.
 
+## New-contract headless port
+
+The Push 1A engineering model now lives in:
+
+- `examples/blog-electrical/model.json`
+- `examples/blog-electrical/scenario.json`
+- `examples/blog-electrical/layout.json`
+- `examples/blog-electrical/variant-double-pv.json`
+- `examples/blog-electrical/variant-double-battery-capacity.json`
+- `examples/blog-electrical/expected-results.json`
+
+`scripts/generate-blog-electrical-example.js` deterministically extracts both
+1,440-value legacy profiles and converts watts to kilowatts. It deliberately
+starts the new battery at zero stored energy; the negative `charge` retained in
+the legacy JSON is mutable post-run state, not a reusable initial condition.
+
+All three cases complete through the shared runtime. Every preserved minimum,
+maximum, and nine-point power checkpoint matches the legacy result after unit
+conversion. Maximum bus residual is `2.23e-16 kW` or lower.
+
+The remaining daily-energy differences are intentional corrections at battery
+boundaries:
+
+| Case | Quantity | Legacy kWh | New kWh |
+| --- | --- | ---: | ---: |
+| Baseline | Battery discharge | 5.007289 | 5.000000 |
+| Baseline | Grid import | 7.341660 | 7.348949 |
+| Baseline | Battery charge | 5.005396 | 5.000000 |
+| Baseline | Grid export | 0.078430 | 0.083827 |
+| Double PV | Battery discharge | 5.005415 | 5.000000 |
+| Double PV | Grid import | 6.426265 | 6.431681 |
+| Double PV | Battery charge | 5.042798 | 5.000000 |
+| Double PV | Grid export | 8.576847 | 8.619645 |
+| Double capacity | Battery discharge | 5.085524 | 5.083827 |
+| Double capacity | Grid import | 7.263425 | 7.265123 |
+
+PV and load energy are unchanged. The new battery finishes at exactly
+`0 kWh` in every case rather than overshooting below zero. The corrected
+expected values are locked by `tests/regression/blog-electrical.test.js`.
+
 ## Push 1A acceptance checklist
 
 - The new example has stable IDs and separate engineering and layout data.

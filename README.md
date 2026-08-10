@@ -20,8 +20,9 @@ The executable runtime currently supports deterministic fixed-timestep runs on
 one four-terminal electrical bus with fixed load and PV profiles, branching,
 policy-controlled battery storage and generation, and a residual grid boundary
 with import and export limits. The PV-battery self-consumption policy reproduces
-the legacy dispatch priority. The complete legacy example follows in the next
-Push 1A slice.
+the legacy dispatch priority. The complete 1,440-step legacy example and its
+double-PV and double-capacity variants now run headlessly on the new contracts,
+with corrected battery state boundaries recorded by regression tests.
 
 ## Development
 
@@ -29,3 +30,6 @@ Push 1A slice.
 npm install
 npm test
 ```
+
+Regenerate the new-contract blog-example documents from the preserved legacy
+input with `npm run generate:blog-example`.

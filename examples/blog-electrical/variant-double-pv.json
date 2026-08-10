@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "variant.blog-electrical-double-pv",
+  "name": "Double solar PV",
+  "baseModelId": "model.blog-electrical",
+  "parameterOverrides": [
+    {
+      "componentId": "pv",
+      "parameter": "profileMultiplier",
+      "value": 2
+    }
+  ]
+}

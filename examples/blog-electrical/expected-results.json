@@ -1,0 +1,63 @@
+{
+  "formatVersion": 1,
+  "description": "Corrected Energy Workbench results for the preserved Visual Energy Modeller example.",
+  "numericContract": {
+    "timeStepCount": 1440,
+    "timeStepSeconds": 60,
+    "powerUnit": "kW",
+    "integratedEnergyUnit": "kWh",
+    "integrationMethod": "trapezoidal",
+    "checkpointStepIndices": [
+      0,
+      180,
+      360,
+      540,
+      720,
+      900,
+      1080,
+      1260,
+      1439
+    ]
+  },
+  "cases": {
+    "baseline": {
+      "variantId": null,
+      "integratedEnergyKwh": {
+        "solar supply": 9.453087202915242,
+        "from battery": 5.0000000000000036,
+        "grid supply": 7.348949112911647,
+        "load": 16.718209794847006,
+        "to battery": 4.999999999999998,
+        "grid export": 0.08382652097984335
+      },
+      "finalBatteryStoredEnergyKwh": 0,
+      "maximumBalanceResidualKw": 1.1102230246251565e-16
+    },
+    "doublePv": {
+      "variantId": "variant.blog-electrical-double-pv",
+      "integratedEnergyKwh": {
+        "solar supply": 18.906174405830484,
+        "from battery": 5,
+        "grid supply": 6.431680595099754,
+        "load": 16.718209794847006,
+        "to battery": 5.000000000000002,
+        "grid export": 8.619645206083181
+      },
+      "finalBatteryStoredEnergyKwh": 0,
+      "maximumBalanceResidualKw": 2.220446049250313e-16
+    },
+    "doubleBatteryCapacity": {
+      "variantId": "variant.blog-electrical-double-battery-capacity",
+      "integratedEnergyKwh": {
+        "solar supply": 9.453087202915242,
+        "from battery": 5.083826520979847,
+        "grid supply": 7.265122591931803,
+        "load": 16.718209794847006,
+        "to battery": 5.083826520979839,
+        "grid export": 0
+      },
+      "finalBatteryStoredEnergyKwh": 0,
+      "maximumBalanceResidualKw": 1.1102230246251565e-16
+    }
+  }
+}

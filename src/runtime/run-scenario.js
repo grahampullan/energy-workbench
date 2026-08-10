@@ -181,22 +181,23 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
 
   for (let stepIndex = 0; stepIndex < runtimeModel.time.stepCount; stepIndex += 1) {
     const stepContext = createStepContext(runtimeModel, states, stepIndex);
-    const requests = requestPolicyOperation(
-      policy,
-      runtimeModel,
-      stepContext,
-      diagnostics
-    );
-    if (requests === null || hasErrors(diagnostics)) {
-      return failure(diagnostics);
-    }
-
     const limitsByComponentId = getComponentOperatingLimits(
       runtimeModel,
       stepContext,
       diagnostics
     );
     if (hasErrors(diagnostics)) {
+      return failure(diagnostics);
+    }
+
+    const requests = requestPolicyOperation(
+      policy,
+      runtimeModel,
+      stepContext,
+      limitsByComponentId,
+      diagnostics
+    );
+    if (requests === null || hasErrors(diagnostics)) {
       return failure(diagnostics);
     }
 

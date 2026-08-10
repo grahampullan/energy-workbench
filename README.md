@@ -18,9 +18,10 @@ JSON Schemas for the initial study documents live in `src/core/schemas`.
 
 The executable runtime currently supports deterministic fixed-timestep runs on
 one four-terminal electrical bus with fixed load and PV profiles, branching,
-explicit policy-controlled generation, and a residual grid boundary with
-import and export limits. Storage, legacy dispatch, and the complete legacy
-example follow in later Push 1A slices.
+policy-controlled battery storage and generation, and a residual grid boundary
+with import and export limits. The PV-battery self-consumption policy reproduces
+the legacy dispatch priority. The complete legacy example follows in the next
+Push 1A slice.
 
 ## Development
 

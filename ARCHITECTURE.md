@@ -75,8 +75,8 @@ in code where needed. Do not export an ambiguous bare `Component` class.
 A component step follows one direction:
 
 ```text
-policy request
--> component operating limits
+component operating limits
+-> policy request
 -> resolver allocation
 -> actual command
 -> component evaluation
@@ -84,7 +84,10 @@ policy request
 ```
 
 Requested, feasible, and actual operation must never be conflated. Policies do
-not assign independent physical flows.
+not assign independent physical flows. A policy receives a read-only snapshot
+of current component operating limits, so it can coordinate operation without
+duplicating component equations. The resolver still clamps requests and owns
+physical balance.
 
 For active electrical power commands, positive `powerKw` exports from a
 component and negative `powerKw` imports into it. Directed ports report

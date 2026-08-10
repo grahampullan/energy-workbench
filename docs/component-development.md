@@ -131,8 +131,14 @@ their explicit boundaries.
 `runScenario({ model, scenario, policy, registry, options })` prepares the model,
 initialises isolated state, and runs every scenario step synchronously.
 
-- `policy.request(runtimeModel, stepContext)` returns an object keyed by
-  non-grid controllable component ID, with commands shaped as `{ powerKw }`.
+- The runtime evaluates every component's current operating limits once before
+  requesting policy operation.
+- `policy.request(runtimeModel, stepContext, policyContext)` returns an object
+  keyed by non-grid controllable component ID, with commands shaped as
+  `{ powerKw }`.
+- `policyContext.operatingLimitsByComponentId` is a read-only plain-object
+  snapshot. Policies may use it to coordinate components without repeating
+  component equations.
 - Positive command power exports from a component; negative power imports into
   it.
 - `getOperatingLimits` returns finite `minimumPowerKw` and `maximumPowerKw`
@@ -160,6 +166,52 @@ from policy and avoids treating component array order as dispatch priority.
 The current `electrical.pv` is prescribed by its scenario series: equal limits
 make all available generation actual generation. Curtailment is not inferred by
 the resolver; it would require an explicit controllable-component contract.
+
+### Battery storage
+
+`electrical.battery` has one bidirectional active-power port and one signed
+command. Positive battery power discharges to the bus; negative battery power
+charges from it. This prevents simultaneous charge and discharge commands.
+
+For charge power `Pc = max(0, -powerKw)`, discharge power
+`Pd = max(0, powerKw)`, and timestep `dt` in hours, stored energy advances as:
+
+```text
+E_next = E + chargingEfficiency * Pc * dt
+           - Pd * dt / dischargingEfficiency
+```
+
+The operating limits convert remaining stored energy and capacity into terminal
+power for the current timestep:
+
+```text
+minimumPowerKw = -min(maximumChargePowerKw,
+                      (capacityKwh - E) / chargingEfficiency / dt)
+
+maximumPowerKw =  min(maximumDischargePowerKw,
+                      E * dischargingEfficiency / dt)
+```
+
+The battery therefore requires an explicit policy request. The grid balances
+the remainder after that request is clamped. Stored-energy outputs describe the
+end of the completed timestep, matching the committed next state.
+
+### PV-battery self-consumption policy
+
+`createPvBatterySelfConsumptionPolicy({ batteryComponentId })` implements the
+Push 1A priority without knowing PV or load equations. It sums the fixed
+operating power of every component other than the bus, grid, and target battery,
+then requests the opposite power from the battery:
+
+```text
+battery request = -(fixed generation + fixed demand)
+```
+
+The resolver clamps that request to battery power and energy limits. The grid
+then balances any remainder. This means surplus serves fixed demand, charges
+the battery, then exports; a deficit uses fixed generation, discharges the
+battery, then imports. The policy rejects any additional variable component,
+because dispatch priority for multiple controllable devices must be explicit.
 
 ## Definition checklist
 

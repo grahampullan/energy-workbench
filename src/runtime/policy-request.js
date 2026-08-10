@@ -17,10 +17,27 @@ function policyDiagnostic(code, message, stepIndex, path = "") {
   });
 }
 
-export function requestPolicyOperation(policy, runtimeModel, stepContext, diagnostics) {
+function createPolicyContext(limitsByComponentId) {
+  const operatingLimitsByComponentId = freezeJsonValue(cloneJsonValue(
+    Object.fromEntries(limitsByComponentId)
+  ));
+  return Object.freeze({ operatingLimitsByComponentId });
+}
+
+export function requestPolicyOperation(
+  policy,
+  runtimeModel,
+  stepContext,
+  limitsByComponentId,
+  diagnostics
+) {
   let returnedRequests;
   try {
-    returnedRequests = policy.request(runtimeModel, stepContext);
+    returnedRequests = policy.request(
+      runtimeModel,
+      stepContext,
+      createPolicyContext(limitsByComponentId)
+    );
   } catch (error) {
     diagnostics.push(policyDiagnostic(
       "runtime.policy-failed",

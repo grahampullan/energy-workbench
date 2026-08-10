@@ -5,12 +5,18 @@
   "description": "Interactive engineering environment for approximate, time-resolved energy models",
   "type": "module",
   "scripts": {
+    "build": "node scripts/build-workbench.js",
+    "start": "npm run build && node scripts/serve-workbench.js",
     "generate:blog-example": "node scripts/generate-blog-electrical-example.js",
     "test": "node --test",
-    "check": "npm test"
+    "check": "npm test && npm run build"
   },
   "license": "MIT",
   "dependencies": {
-    "ajv": "^8.20.0"
+    "ajv": "^8.20.0",
+    "board-box": "^0.2.53"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

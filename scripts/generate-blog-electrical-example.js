@@ -142,10 +142,10 @@ const layout = {
   modelId: model.id,
   components: [
     { componentId: "pv", x: 20, y: 40 },
-    { componentId: "grid", x: 20, y: 200 },
-    { componentId: "bus", x: 200, y: 100 },
-    { componentId: "battery", x: 200, y: 350 },
-    { componentId: "load", x: 400, y: 40 }
+    { componentId: "grid", x: 20, y: 220 },
+    { componentId: "bus", x: 260, y: 130 },
+    { componentId: "battery", x: 260, y: 370 },
+    { componentId: "load", x: 500, y: 40 }
   ]
 };
 

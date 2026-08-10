@@ -24,12 +24,27 @@ the legacy dispatch priority. The complete 1,440-step legacy example and its
 double-PV and double-capacity variants now run headlessly on the new contracts,
 with corrected battery state boundaries recorded by regression tests.
 
+The first read-only browser workbench loads that committed example through the
+same runtime. It presents the saved topology, live connection powers, a
+definition-driven component inspector, and timestep scrubbing. Components can
+be moved and resized as temporary layout changes; reloading restores the saved
+layout.
+
 ## Development
 
 ```sh
 npm install
 npm test
 ```
+
+Start the browser workbench at `http://127.0.0.1:4173`:
+
+```sh
+npm start
+```
+
+`npm start` creates an ignored browser bundle and then starts the local static
+server. Use `npm run build` when only the bundle is needed.
 
 Regenerate the new-contract blog-example documents from the preserved legacy
 input with `npm run generate:blog-example`.

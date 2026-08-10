@@ -1,5 +1,6 @@
 dev_notes/
 node_modules/
+build/
 coverage/
 results/
 .DS_Store

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Energy Workbench — time-resolved energy modelling">
+    <title>Energy Workbench</title>
+    <link rel="stylesheet" href="/src/ui/workbench.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">EW</span>
+          <div>
+            <p class="eyebrow">Energy Workbench</p>
+            <h1 id="model-name">Loading study…</h1>
+          </div>
+        </div>
+        <div class="run-status" id="run-status" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          Preparing runtime
+        </div>
+      </header>
+
+      <section class="study-summary" aria-label="Study summary">
+        <div>
+          <span class="summary-label">Scenario</span>
+          <strong id="scenario-name">—</strong>
+        </div>
+        <div>
+          <span class="summary-label">Timestep</span>
+          <strong id="summary-time">—</strong>
+        </div>
+        <div>
+          <span class="summary-label">Topology</span>
+          <strong id="summary-topology">—</strong>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <section class="topology-panel" aria-labelledby="topology-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Live topology</p>
+              <h2 id="topology-title">Electrical system</h2>
+            </div>
+            <p class="panel-hint">Drag or resize components · drag the background to pan · scroll to zoom</p>
+          </div>
+          <div class="topology-frame">
+            <div id="topology-board" aria-label="Energy system topology"></div>
+          </div>
+          <div class="flow-legend" aria-label="Flow legend">
+            <span><i class="legend-line" aria-hidden="true"></i> Actual power flow</span>
+            <span>Layout changes reset on reload</span>
+          </div>
+        </section>
+
+        <aside class="inspector-panel" aria-labelledby="inspector-title">
+          <div id="inspector" class="inspector-empty">
+            <p class="eyebrow">Component inspector</p>
+            <h2 id="inspector-title">Select a component</h2>
+            <p>Choose a component on the board to inspect its definition and current results.</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="timeline-panel" aria-labelledby="timeline-title">
+        <div class="timeline-heading">
+          <div>
+            <p class="eyebrow">Reference day</p>
+            <h2 id="timeline-title">Timeline</h2>
+          </div>
+          <output id="timeline-label" for="timeline">—</output>
+        </div>
+        <input id="timeline" type="range" min="0" max="0" value="0" step="1" disabled>
+        <div class="timeline-extents" aria-hidden="true">
+          <span>00:00</span>
+          <span>24:00</span>
+        </div>
+      </section>
+    </main>
+
+    <template id="fatal-error-template">
+      <section class="fatal-error" role="alert">
+        <p class="eyebrow">Could not open study</p>
+        <h2>Energy Workbench stopped safely</h2>
+        <p class="fatal-error-message"></p>
+      </section>
+    </template>
+
+    <script type="module" src="/build/workbench.js"></script>
+  </body>
+</html>

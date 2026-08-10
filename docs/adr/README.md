@@ -19,3 +19,4 @@ rather than rewriting its history.
 | [0008](0008-residual-grid-and-fixed-pv.md) | Residual grid and fixed PV | Accepted |
 | [0009](0009-single-port-battery.md) | Single-port battery storage | Accepted |
 | [0010](0010-self-consumption-dispatch.md) | Self-consumption dispatch | Accepted |
+| [0011](0011-browser-presentation-boundary.md) | Browser presentation boundary | Accepted |

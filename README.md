@@ -24,11 +24,12 @@ the legacy dispatch priority. The complete 1,440-step legacy example and its
 double-PV and double-capacity variants now run headlessly on the new contracts,
 with corrected battery state boundaries recorded by regression tests.
 
-The first read-only browser workbench loads that committed example through the
-same runtime. It presents the saved topology, live connection powers, a
-definition-driven component inspector, and timestep scrubbing. Components can
-be moved and resized as temporary layout changes; reloading restores the saved
-layout.
+The browser workbench loads that committed example through the same runtime. It
+presents the saved topology, live connection powers, a definition-driven
+component inspector, and timestep scrubbing. Numeric parameter controls create
+temporary preview runs which can be reset or applied to the in-memory working
+model. Components can also be moved and resized as temporary layout changes;
+reloading restores the saved model and layout.
 
 ## Development
 

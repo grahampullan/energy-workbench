@@ -83,6 +83,7 @@ function fieldViews(specifications, values) {
       label: label.endsWith(unitSuffix) ? label.slice(0, -unitSuffix.length) : label,
       unit: specification.unit,
       value,
+      editor: specification.editor ?? null,
       displayValue: formatEngineeringValue(value, specification.unit)
     };
   });
@@ -162,9 +163,12 @@ function powerTone(metric) {
   return metric.value > 0 ? "exporting" : "importing";
 }
 
-function componentView(component, definition, componentResult) {
+function componentView(component, definition, componentResult, parameterOverrides) {
   const metric = primaryMetric(definition, componentResult);
-  const parameterFields = fieldViews(definition.parameters, component.parameters);
+  const parameterFields = fieldViews(definition.parameters, {
+    ...component.parameters,
+    ...parameterOverrides
+  });
   return {
     id: component.id,
     name: component.name,
@@ -180,7 +184,13 @@ function componentView(component, definition, componentResult) {
   };
 }
 
-export function createWorkbenchView({ model, registry, results, stepIndex }) {
+export function createWorkbenchView({
+  model,
+  registry,
+  results,
+  stepIndex,
+  parameterOverrides = []
+}) {
   if (!model || !registry || !results) {
     throw new TypeError("Model, registry, and run results are required");
   }
@@ -195,13 +205,24 @@ export function createWorkbenchView({ model, registry, results, stepIndex }) {
   const modelConnectionsById = new Map(
     model.connections.map((connection) => [connection.id, connection])
   );
+  const overridesByComponentId = new Map();
+  for (const override of parameterOverrides) {
+    const componentOverrides = overridesByComponentId.get(override.componentId) ?? {};
+    componentOverrides[override.parameter] = override.value;
+    overridesByComponentId.set(override.componentId, componentOverrides);
+  }
 
   const components = model.components.map((component) => {
     const componentResult = componentResultsById.get(component.id);
     if (!componentResult) {
       throw new Error(`Run results do not contain component: ${component.id}`);
     }
-    return componentView(component, definitionFor(registry, component), componentResult);
+    return componentView(
+      component,
+      definitionFor(registry, component),
+      componentResult,
+      overridesByComponentId.get(component.id) ?? {}
+    );
   });
 
   const connections = step.connections.map((connectionResult) => {

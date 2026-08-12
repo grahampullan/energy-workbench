@@ -2,12 +2,69 @@ import {
   Board,
   Box,
   Component as BoardBoxComponent,
-  Context
+  Context,
+  Observable
 } from "board-box";
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const BOX_WIDTH = 164;
 const BOX_HEIGHT = 104;
+
+export function bindNumberParameterControls({
+  rangeInput,
+  numberInput,
+  initialValue,
+  onChange,
+  formatValue = String
+}) {
+  const observable = new Observable({
+    state: { value: initialValue, source: "initial" }
+  });
+  let currentValue = initialValue;
+
+  const observerId = observable.subscribe(({ value, source }) => {
+    currentValue = value;
+    if (source !== "range") {
+      rangeInput.value = String(value);
+    }
+    if (source !== "number") {
+      numberInput.value = String(value);
+    }
+    numberInput.setAttribute("aria-valuetext", formatValue(value));
+  });
+
+  function acceptInput(source, input, final) {
+    const value = input.valueAsNumber;
+    if (!Number.isFinite(value)) {
+      if (final) {
+        observable.state = { value: currentValue, source: "invalid" };
+      }
+      return;
+    }
+    observable.state = { value, source };
+    onChange(value, { final });
+  }
+
+  const onRangeInput = () => acceptInput("range", rangeInput, false);
+  const onRangeChange = () => acceptInput("range", rangeInput, true);
+  const onNumberInput = () => acceptInput("number", numberInput, false);
+  const onNumberChange = () => acceptInput("number", numberInput, true);
+  rangeInput.addEventListener("input", onRangeInput);
+  rangeInput.addEventListener("change", onRangeChange);
+  numberInput.addEventListener("input", onNumberInput);
+  numberInput.addEventListener("change", onNumberChange);
+  observable.state = { value: initialValue, source: "initial" };
+
+  return Object.freeze({
+    dispose() {
+      observable.unsubscribeById(observerId);
+      rangeInput.removeEventListener("input", onRangeInput);
+      rangeInput.removeEventListener("change", onRangeChange);
+      numberInput.removeEventListener("input", onNumberInput);
+      numberInput.removeEventListener("change", onNumberChange);
+    }
+  });
+}
 
 function svgElement(name, attributes = {}) {
   const element = document.createElementNS(SVG_NAMESPACE, name);

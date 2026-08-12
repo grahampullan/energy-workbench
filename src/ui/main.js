@@ -8,6 +8,13 @@ import { createComponentRegistry } from "../core/component-registry.js";
 import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-self-consumption.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
+import { createComponentInspector } from "./component-inspector.js";
+import {
+  applyParameterOverrides,
+  parameterOverrideKey,
+  resolvedParameterValue
+} from "./preview-model.js";
+import { createPreviewRunScheduler } from "./preview-run-scheduler.js";
 import { createWorkbenchView } from "./workbench-view-model.js";
 
 const EXAMPLE_ROOT = "/examples/blog-electrical";
@@ -39,74 +46,25 @@ function definitionRegistry() {
   ]);
 }
 
-function descriptionList(fields) {
-  const list = document.createElement("dl");
-  list.className = "inspector-fields";
-  for (const field of fields) {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    const definition = document.createElement("dd");
-    term.textContent = field.label;
-    definition.textContent = field.displayValue;
-    row.append(term, definition);
-    list.append(row);
+function uniqueDiagnostics(diagnostics) {
+  const diagnosticsByIdentity = new Map();
+  for (const diagnostic of diagnostics) {
+    const identity = [
+      diagnostic.severity,
+      diagnostic.code,
+      diagnostic.path,
+      diagnostic.message
+    ].join("\u0000");
+    diagnosticsByIdentity.set(identity, diagnostic);
   }
-  return list;
+  return [...diagnosticsByIdentity.values()];
 }
 
-function inspectorSection(title, fields) {
-  if (fields.length === 0) {
-    return null;
-  }
-  const section = document.createElement("section");
-  section.className = "inspector-section";
-  const heading = document.createElement("h3");
-  heading.textContent = title;
-  section.append(heading, descriptionList(fields));
-  return section;
-}
-
-function renderInspector(component) {
-  const inspector = element("inspector");
-  inspector.className = "inspector-content";
-  inspector.replaceChildren();
-
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = `${component.type} · v${component.definitionVersion}`;
-  const heading = document.createElement("h2");
-  heading.id = "inspector-title";
-  heading.textContent = component.name;
-  const definitionName = document.createElement("p");
-  definitionName.className = "inspector-definition";
-  definitionName.textContent = component.definitionName;
-
-  const liveResult = document.createElement("div");
-  liveResult.className = "inspector-live-result";
-  liveResult.dataset.powerTone = component.powerTone;
-  const liveLabel = document.createElement("span");
-  liveLabel.textContent = component.metric.label;
-  const liveValue = document.createElement("strong");
-  liveValue.textContent = component.metric.displayValue;
-  liveResult.append(liveLabel, liveValue);
-
-  inspector.append(eyebrow, heading, definitionName, liveResult);
-  for (const group of component.parameterGroups) {
-    const section = inspectorSection(group.label, group.fields);
-    if (section) {
-      inspector.append(section);
-    }
-  }
-  for (const [title, fields] of [
-    ["Operation", component.operationFields],
-    ["Outputs", component.outputFields],
-    ["State after timestep", component.stateFields]
-  ]) {
-    const section = inspectorSection(title, fields);
-    if (section) {
-      inspector.append(section);
-    }
-  }
+function runtimeFailure(run) {
+  const message = run.diagnostics.map((diagnostic) => diagnostic.message).join("; ");
+  const error = new Error(message || "The runtime did not complete");
+  error.diagnostics = run.diagnostics;
+  return error;
 }
 
 function showFatalError(error) {
@@ -122,83 +80,306 @@ function showFatalError(error) {
 }
 
 async function startWorkbench() {
-  const [model, scenario, layout] = await Promise.all([
+  const [loadedModel, scenario, layout] = await Promise.all([
     loadJson(`${EXAMPLE_ROOT}/model.json`),
     loadJson(`${EXAMPLE_ROOT}/scenario.json`),
     loadJson(`${EXAMPLE_ROOT}/layout.json`)
   ]);
-  if (layout.modelId !== model.id) {
-    throw new Error(`Layout ${layout.id} belongs to ${layout.modelId}, not ${model.id}`);
+  if (layout.modelId !== loadedModel.id) {
+    throw new Error(`Layout ${layout.id} belongs to ${layout.modelId}, not ${loadedModel.id}`);
   }
 
   const registry = definitionRegistry();
-  const battery = model.components.find((component) => component.type === "electrical.battery");
+  const battery = loadedModel.components.find(
+    (component) => component.type === "electrical.battery"
+  );
   if (!battery) {
     throw new Error("The example requires one battery for its dispatch policy");
   }
-  const run = runScenario({
-    model,
-    scenario,
-    registry,
-    policy: createPvBatterySelfConsumptionPolicy({ batteryComponentId: battery.id })
-  });
-  if (!run.completed) {
-    const messages = run.diagnostics.map((diagnostic) => diagnostic.message).join("; ");
-    throw new Error(messages || "The runtime did not complete");
+  const policy = createPvBatterySelfConsumptionPolicy({ batteryComponentId: battery.id });
+
+  function execute(model) {
+    const run = runScenario({ model, scenario, registry, policy });
+    if (!run.completed) {
+      throw runtimeFailure(run);
+    }
+    return run;
   }
 
+  let workingModel = loadedModel;
+  let baselineRun = execute(workingModel);
+  let activeModel = workingModel;
+  let activeRun = baselineRun;
+  let pendingModel = null;
   let selectedComponentId = battery.id;
-  let stepIndex = Math.floor(run.results.steps.length / 2);
-  let view = createWorkbenchView({ model, registry, results: run.results, stepIndex });
+  let stepIndex = Math.floor(activeRun.results.steps.length / 2);
+  let previewDiagnostics = [];
+  let previewReady = false;
+  let schedulerState = { running: false, pending: false, latestRequestId: 0 };
+  const previewOverrides = new Map();
+  let view;
+  let topology;
+  let inspector;
 
-  function getView(componentId) {
-    if (!componentId) {
-      return view;
-    }
-    const component = view.components.find((candidate) => candidate.id === componentId);
-    if (!component) {
-      throw new Error(`View does not contain component: ${componentId}`);
-    }
-    return { component, selected: componentId === selectedComponentId };
+  function overrideList() {
+    return [...previewOverrides.values()];
   }
 
-  function updateText() {
+  function createView() {
+    return createWorkbenchView({
+      model: activeModel,
+      registry,
+      results: activeRun.results,
+      stepIndex,
+      parameterOverrides: overrideList()
+    });
+  }
+
+  function selectedComponent() {
+    const component = view.components.find(
+      (candidate) => candidate.id === selectedComponentId
+    );
+    if (!component) {
+      throw new Error(`View does not contain component: ${selectedComponentId}`);
+    }
+    return component;
+  }
+
+  function previewState(rebuildParameters = false) {
+    const previewCount = previewOverrides.size;
+    const busy = previewCount > 0 && (schedulerState.running || schedulerState.pending);
+    return {
+      rebuildParameters,
+      previewKeys: new Set(previewOverrides.keys()),
+      previewCount,
+      busy,
+      diagnostics: previewDiagnostics,
+      canApply: previewReady && !busy
+    };
+  }
+
+  function setRunStatus() {
+    const status = element("run-status");
+    status.classList.remove(
+      "run-status--complete",
+      "run-status--preview",
+      "run-status--error"
+    );
+    let message;
+    let statusClass;
+    if (previewOverrides.size === 0) {
+      message = `${activeRun.results.steps.length.toLocaleString("en-GB")} timesteps ready`;
+      statusClass = "run-status--complete";
+    } else if (previewDiagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      message = "Preview needs attention";
+      statusClass = "run-status--error";
+    } else if (schedulerState.running || schedulerState.pending) {
+      message = "Updating preview…";
+      statusClass = "run-status--preview";
+    } else if (previewReady) {
+      message = `Preview · ${activeRun.results.steps.length.toLocaleString("en-GB")} timesteps`;
+      statusClass = "run-status--preview";
+    } else {
+      message = "Preview unavailable";
+      statusClass = "run-status--error";
+    }
+    status.classList.add(statusClass);
+    status.lastChild.textContent = ` ${message}`;
+  }
+
+  function updateInspector(rebuildParameters = false) {
+    inspector.render(selectedComponent(), previewState(rebuildParameters));
+  }
+
+  function updateResultViews({ rebuildParameters = false, updateTopology = true } = {}) {
+    view = createView();
     element("timeline-label").textContent = view.timelineLabel;
     element("summary-time").textContent = view.timelineLabel.split(" · ")[0];
-    const selected = view.components.find((component) => component.id === selectedComponentId);
-    renderInspector(selected);
+    if (updateTopology) {
+      topology.update();
+    }
+    updateInspector(rebuildParameters);
+    setRunStatus();
   }
 
-  const topology = createTopologyBoard({
+  function updatePreviewChrome() {
+    if (!view || !inspector) {
+      return;
+    }
+    view = createView();
+    updateInspector();
+    setRunStatus();
+  }
+
+  const scheduler = createPreviewRunScheduler({
+    delayMs: 80,
+    run({ model, diagnostics }) {
+      const run = execute(model);
+      return {
+        model,
+        run,
+        diagnostics: uniqueDiagnostics([...diagnostics, ...run.diagnostics])
+      };
+    },
+    onResult(result) {
+      activeModel = result.model;
+      activeRun = result.run;
+      pendingModel = result.model;
+      previewDiagnostics = result.diagnostics;
+      previewReady = true;
+      updateResultViews();
+    },
+    onError(error) {
+      previewDiagnostics = uniqueDiagnostics(error.diagnostics ?? [{
+        severity: "error",
+        code: "ui.preview-run",
+        path: "",
+        message: error.message
+      }]);
+      previewReady = false;
+      updatePreviewChrome();
+    },
+    onStateChange(state) {
+      schedulerState = state;
+      updatePreviewChrome();
+    },
+    onCallbackError(error) {
+      console.error("Preview presentation callback failed", error);
+    }
+  });
+
+  function restoreBaseline({ rebuildParameters = false } = {}) {
+    previewOverrides.clear();
+    pendingModel = null;
+    previewDiagnostics = baselineRun.diagnostics;
+    previewReady = false;
+    activeModel = workingModel;
+    activeRun = baselineRun;
+    scheduler.invalidate();
+    updateResultViews({ rebuildParameters });
+  }
+
+  function requestPreview({ componentId, parameter, value }) {
+    const key = parameterOverrideKey(componentId, parameter);
+    const workingValue = resolvedParameterValue({
+      model: workingModel,
+      registry,
+      componentId,
+      parameter
+    });
+    if (value === workingValue) {
+      previewOverrides.delete(key);
+    } else {
+      previewOverrides.set(key, { componentId, parameter, value });
+    }
+
+    if (previewOverrides.size === 0) {
+      restoreBaseline();
+      return;
+    }
+
+    previewReady = false;
+    const candidate = applyParameterOverrides({
+      model: workingModel,
+      registry,
+      overrides: overrideList()
+    });
+    previewDiagnostics = uniqueDiagnostics(candidate.diagnostics);
+    view = createView();
+    updateInspector();
+    if (!candidate.applied) {
+      pendingModel = null;
+      scheduler.invalidate();
+      setRunStatus();
+      return;
+    }
+
+    pendingModel = candidate.model;
+    scheduler.request({
+      model: candidate.model,
+      diagnostics: candidate.diagnostics
+    });
+  }
+
+  function resetPreview() {
+    if (previewOverrides.size > 0) {
+      restoreBaseline({ rebuildParameters: true });
+    }
+  }
+
+  function applyPreview() {
+    const busy = schedulerState.running || schedulerState.pending;
+    if (previewOverrides.size === 0 || busy || !previewReady || activeModel !== pendingModel) {
+      return;
+    }
+    const applied = applyParameterOverrides({
+      model: workingModel,
+      registry,
+      overrides: overrideList()
+    });
+    if (!applied.applied) {
+      previewDiagnostics = uniqueDiagnostics(applied.diagnostics);
+      previewReady = false;
+      updatePreviewChrome();
+      return;
+    }
+
+    workingModel = applied.model;
+    baselineRun = activeRun;
+    activeModel = workingModel;
+    previewOverrides.clear();
+    pendingModel = null;
+    previewDiagnostics = uniqueDiagnostics([
+      ...applied.diagnostics,
+      ...baselineRun.diagnostics
+    ]);
+    previewReady = false;
+    scheduler.invalidate();
+    updateResultViews({ rebuildParameters: true });
+  }
+
+  view = createView();
+  inspector = createComponentInspector({
+    target: element("inspector"),
+    onParameterInput: requestPreview,
+    onReset: resetPreview,
+    onApply: applyPreview
+  });
+  topology = createTopologyBoard({
     targetId: "topology-board",
-    model,
+    model: workingModel,
     layout,
-    getView,
+    getView(componentId) {
+      if (!componentId) {
+        return view;
+      }
+      const component = view.components.find((candidate) => candidate.id === componentId);
+      if (!component) {
+        throw new Error(`View does not contain component: ${componentId}`);
+      }
+      return { component, selected: componentId === selectedComponentId };
+    },
     onSelect(componentId) {
       selectedComponentId = componentId;
       topology.update();
-      updateText();
+      updateInspector();
     }
   });
 
   const timeline = element("timeline");
-  timeline.max = String(run.results.steps.length - 1);
+  timeline.max = String(activeRun.results.steps.length - 1);
   timeline.value = String(stepIndex);
   timeline.disabled = false;
   timeline.addEventListener("input", () => {
     stepIndex = Number(timeline.value);
-    view = createWorkbenchView({ model, registry, results: run.results, stepIndex });
-    topology.update();
-    updateText();
+    updateResultViews();
   });
 
-  element("model-name").textContent = model.name;
+  element("model-name").textContent = workingModel.name;
   element("scenario-name").textContent = scenario.name;
-  element("summary-topology").textContent = `${model.components.length} components · ${model.connections.length} connections`;
-  const status = element("run-status");
-  status.classList.add("run-status--complete");
-  status.lastChild.textContent = ` ${run.results.steps.length.toLocaleString("en-GB")} timesteps ready`;
-  updateText();
+  element("summary-topology").textContent = `${workingModel.components.length} components · ${workingModel.connections.length} connections`;
+  previewDiagnostics = baselineRun.diagnostics;
+  updateResultViews({ rebuildParameters: true });
 }
 
 startWorkbench().catch(showFatalError);

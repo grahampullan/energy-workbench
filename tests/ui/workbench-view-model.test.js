@@ -84,6 +84,7 @@ test("inspector labels and units come from component definition metadata", () =>
 
   assert.equal(capacity.label, "Capacity");
   assert.equal(capacity.unit, electricalBatteryDefinition.parameters.capacityKwh.unit);
+  assert.deepEqual(capacity.editor, electricalBatteryDefinition.parameters.capacityKwh.editor);
   assert.equal(capacity.displayValue, "5 kWh");
   assert.equal(formatFieldLabel("maximumChargePowerKw"), "Maximum charge power kW");
   assert.equal(formatEngineeringValue(-0, "kW"), "0 kW");
@@ -99,4 +100,28 @@ test("presentation rejects an unavailable timestep", () => {
     }),
     /stepIndex must be between/u
   );
+});
+
+test("temporary parameter values do not replace canonical runtime results", () => {
+  const view = createWorkbenchView({
+    model,
+    registry,
+    results: run.results,
+    stepIndex: 0,
+    parameterOverrides: [{
+      componentId: "battery",
+      parameter: "capacityKwh",
+      value: 9
+    }]
+  });
+  const battery = view.components.find((component) => component.id === "battery");
+  const capacity = battery.parameterGroups
+    .flatMap((group) => group.fields)
+    .find((field) => field.id === "capacityKwh");
+  const runtimeBattery = run.results.steps[0].components.find(
+    (component) => component.componentId === "battery"
+  );
+
+  assert.equal(capacity.value, 9);
+  assert.equal(battery.metric.value, runtimeBattery.actualCommand.powerKw);
 });

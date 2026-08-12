@@ -46,6 +46,11 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 - Dispose subscriptions explicitly.
 - Do not duplicate component metadata or equations in inspectors; generate
   controls from the component definition where practical.
+- Use D3 selections, keyed data joins, scales, axes, and shape generators for
+  SVG charts and graphical overlays. Keep D3 within `src/ui` and derive its
+  input data from canonical run results.
+- Continue to use board-box for topology mechanics. Use ordinary DOM APIs for
+  semantic interface elements such as forms, buttons, and inspectors.
 
 ## Test defaults
 

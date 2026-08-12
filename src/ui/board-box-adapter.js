@@ -5,8 +5,8 @@ import {
   Context,
   Observable
 } from "board-box";
+import { select } from "d3";
 
-const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const BOX_WIDTH = 164;
 const BOX_HEIGHT = 104;
 
@@ -64,14 +64,6 @@ export function bindNumberParameterControls({
       numberInput.removeEventListener("change", onNumberChange);
     }
   });
-}
-
-function svgElement(name, attributes = {}) {
-  const element = document.createElementNS(SVG_NAMESPACE, name);
-  for (const [attribute, value] of Object.entries(attributes)) {
-    element.setAttribute(attribute, value);
-  }
-  return element;
 }
 
 function componentClass(type) {
@@ -132,19 +124,18 @@ class WorkbenchComponent extends BoardBoxComponent {
 }
 
 function addArrowMarkers(svg) {
-  const definitions = svgElement("defs");
-  const marker = svgElement("marker", {
-    id: "flow-arrow",
-    viewBox: "0 0 10 10",
-    refX: "8",
-    refY: "5",
-    markerWidth: "7",
-    markerHeight: "7",
-    orient: "auto-start-reverse"
-  });
-  marker.append(svgElement("path", { d: "M 0 0 L 10 5 L 0 10 z" }));
-  definitions.append(marker);
-  svg.append(definitions);
+  svg
+    .append("defs")
+    .append("marker")
+    .attr("id", "flow-arrow")
+    .attr("viewBox", "0 0 10 10")
+    .attr("refX", 8)
+    .attr("refY", 5)
+    .attr("markerWidth", 7)
+    .attr("markerHeight", 7)
+    .attr("orient", "auto-start-reverse")
+    .append("path")
+    .attr("d", "M 0 0 L 10 5 L 0 10 z");
 }
 
 function boxEdgePoint(box, toward) {
@@ -167,15 +158,12 @@ function boxEdgePoint(box, toward) {
   };
 }
 
-function renderConnections(svg, boxesByComponentId, view) {
-  svg.querySelector(".connection-content")?.remove();
-  const content = svgElement("g", { class: "connection-content" });
-
-  for (const connection of view.connections) {
+function connectionGeometry(boxesByComponentId, connections) {
+  return connections.flatMap((connection) => {
     const fromBox = boxesByComponentId.get(connection.fromComponentId);
     const toBox = boxesByComponentId.get(connection.toComponentId);
     if (!fromBox || !toBox) {
-      continue;
+      return [];
     }
 
     const fromCentre = {
@@ -190,23 +178,44 @@ function renderConnections(svg, boxesByComponentId, view) {
     const toEdge = boxEdgePoint(toBox, fromCentre);
     const { x: x1, y: y1 } = fromEdge;
     const { x: x2, y: y2 } = toEdge;
-    const line = svgElement("line", { x1, y1, x2, y2, class: "connection-line" });
-    if (Math.abs(connection.powerKw) >= 1e-9) {
-      line.setAttribute(connection.powerKw > 0 ? "marker-end" : "marker-start", "url(#flow-arrow)");
-    }
-    content.append(line);
+    return [{ ...connection, x1, y1, x2, y2 }];
+  });
+}
 
-    const label = svgElement("g", {
-      class: "connection-label",
-      transform: `translate(${(x1 + x2) / 2} ${(y1 + y2) / 2})`
-    });
-    const text = svgElement("text", { x: "0", y: "0", dy: "0.35em" });
-    text.textContent = connection.displayPower;
-    label.append(text);
-    content.append(label);
-  }
+function renderConnections(content, boxesByComponentId, view) {
+  const connections = connectionGeometry(boxesByComponentId, view.connections);
 
-  svg.append(content);
+  content
+    .selectAll("line.connection-line")
+    .data(connections, (connection) => connection.id)
+    .join("line")
+    .attr("class", "connection-line")
+    .attr("x1", (connection) => connection.x1)
+    .attr("y1", (connection) => connection.y1)
+    .attr("x2", (connection) => connection.x2)
+    .attr("y2", (connection) => connection.y2)
+    .attr("marker-start", (connection) =>
+      connection.powerKw < -1e-9 ? "url(#flow-arrow)" : null
+    )
+    .attr("marker-end", (connection) =>
+      connection.powerKw > 1e-9 ? "url(#flow-arrow)" : null
+    );
+
+  const labels = content
+    .selectAll("g.connection-label")
+    .data(connections, (connection) => connection.id)
+    .join((enter) => {
+      const label = enter.append("g").attr("class", "connection-label");
+      label.append("text").attr("x", 0).attr("y", 0).attr("dy", "0.35em");
+      return label;
+    })
+    .attr("transform", (connection) =>
+      `translate(${(connection.x1 + connection.x2) / 2} ${(connection.y1 + connection.y2) / 2})`
+    );
+
+  labels
+    .select("text")
+    .text((connection) => connection.displayPower);
 }
 
 export function createTopologyBoard({ targetId, model, layout, getView, onSelect }) {
@@ -227,16 +236,18 @@ export function createTopologyBoard({ targetId, model, layout, getView, onSelect
   });
   context.addBoard(board);
 
-  const svg = svgElement("svg", {
-    class: "connection-layer",
-    "aria-hidden": "true"
-  });
+  const svg = select(target)
+    .append("svg")
+    .attr("class", "connection-layer")
+    .attr("aria-hidden", "true");
   addArrowMarkers(svg);
-  target.append(svg);
+  const connectionContent = svg
+    .append("g")
+    .attr("class", "connection-content");
 
   const boxesByComponentId = new Map();
   const updateConnections = () => {
-    renderConnections(svg, boxesByComponentId, getView());
+    renderConnections(connectionContent, boxesByComponentId, getView());
   };
   for (const component of model.components) {
     const position = positionsByComponentId.get(component.id);

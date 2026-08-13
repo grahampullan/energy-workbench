@@ -217,8 +217,8 @@ export function createResultsChart({
     const margin = POWER_MARGIN;
     const plotWidth = WIDTH - margin.left - margin.right;
     const plotHeight = HEIGHT - margin.top - margin.bottom;
-    const maximumPowerKw = max(model.series, (series) =>
-      max(series.values, (point) => point.powerKw)
+    const maximumPowerkW = max(model.series, (series) =>
+      max(series.values, (point) => point.powerkW)
     ) ?? 0;
     const firstElapsedSeconds = model.elapsedSeconds[0];
     const lastElapsedSeconds = model.elapsedSeconds.at(-1);
@@ -231,12 +231,12 @@ export function createResultsChart({
       ])
       .range([margin.left, WIDTH - margin.right]);
     yScale = scaleLinear()
-      .domain([0, maximumPowerKw || 1])
+      .domain([0, maximumPowerkW || 1])
       .nice()
       .range([HEIGHT - margin.bottom, margin.top]);
     const powerLine = line()
       .x((point) => xScale(point.elapsedSeconds))
-      .y((point) => yScale(point.powerKw));
+      .y((point) => yScale(point.powerkW));
 
     xAxisLayer
       .attr("transform", `translate(0 ${HEIGHT - margin.bottom})`)
@@ -295,12 +295,12 @@ export function createResultsChart({
       .domain(model.series.map((series) => series.id))
       .range([margin.left, WIDTH - margin.right])
       .padding(0.22);
-    const maximumEnergyKwh = max(
+    const maximumEnergykWh = max(
       model.series,
-      (series) => series.integratedEnergyKwh
+      (series) => series.integratedEnergykWh
     ) ?? 0;
     const y = scaleLinear()
-      .domain([0, maximumEnergyKwh || 1])
+      .domain([0, maximumEnergykWh || 1])
       .nice()
       .range([HEIGHT - margin.bottom, margin.top]);
     const labelsBySeriesId = new Map(model.series.map((series) => [
@@ -338,9 +338,9 @@ export function createResultsChart({
       .attr("class", "results-energy-bar")
       .attr("data-series-id", (series) => series.id)
       .attr("x", (series) => x(series.id))
-      .attr("y", (series) => y(series.integratedEnergyKwh))
+      .attr("y", (series) => y(series.integratedEnergykWh))
       .attr("width", x.bandwidth())
-      .attr("height", (series) => y(0) - y(series.integratedEnergyKwh))
+      .attr("height", (series) => y(0) - y(series.integratedEnergykWh))
       .attr("fill", (series) => colourFor(series.id));
     bars
       .on("pointerenter", (event, series) => onHighlightConnection(series.connectionId))
@@ -390,15 +390,15 @@ export function createResultsChart({
       .join("circle")
       .attr("r", 3.5)
       .attr("cx", cursorX)
-      .attr("cy", (series) => yScale(series.values[state.stepIndex].powerKw))
+      .attr("cy", (series) => yScale(series.values[state.stepIndex].powerkW))
       .attr("fill", (series) => colourFor(series.id));
   }
 
   function updateLegend() {
     for (const series of state.model.series) {
       const value = mode === "power"
-        ? series.values[state.stepIndex].powerKw
-        : series.integratedEnergyKwh;
+        ? series.values[state.stepIndex].powerkW
+        : series.integratedEnergykWh;
       const unit = mode === "power" ? "kW" : "kWh";
       legendBySeriesId.get(series.id).value.textContent = formatEngineeringValue(value, unit);
     }

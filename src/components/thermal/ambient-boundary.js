@@ -1,8 +1,8 @@
 import {
   ABSOLUTE_ZERO_C,
-  createThermalFlow,
-  THERMAL_FLOW_MEDIUM
+  createThermalFlow
 } from "../../core/thermal-flow.js";
+import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -24,7 +24,7 @@ function ambientTemperatureC(runtimeComponent, stepContext) {
 
 export const ambientBoundaryDefinition = {
   type: "thermal.ambient-boundary",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Ambient boundary",
 
   parameters: {
@@ -38,13 +38,13 @@ export const ambientBoundaryDefinition = {
 
   ports: [{
     id: "heat-in",
-    medium: THERMAL_FLOW_MEDIUM,
+    flowType: THERMAL_HEAT_FLOW_TYPE,
     direction: "in"
   }],
 
   outputs: {
     ambientTemperatureC: { unit: "°C" },
-    receivedHeatFlowKw: { unit: "kW" }
+    receivedHeatFlowkW: { unit: "kW" }
   },
 
   editor: {
@@ -97,7 +97,7 @@ export const ambientBoundaryDefinition = {
       }
       const temperatureC = ambientTemperatureC(runtimeComponent, stepContext);
       const flow = createThermalFlow({
-        heatFlowKw: actualCommand.heatFlowKw,
+        heatFlowkW: actualCommand.heatFlowkW,
         sourceTemperatureC: actualCommand.sourceTemperatureC,
         deliveryTemperatureC: temperatureC
       });
@@ -105,7 +105,7 @@ export const ambientBoundaryDefinition = {
         portFlows: { "heat-in": flow },
         outputs: {
           ambientTemperatureC: temperatureC,
-          receivedHeatFlowKw: flow.heatFlowKw
+          receivedHeatFlowkW: flow.heatFlowkW
         },
         nextState: {},
         diagnostics: []

@@ -1,7 +1,8 @@
 import { createDiagnostic } from "../core/validation/validation-result.js";
-import { THERMAL_FLOW_MEDIUM } from "../core/thermal-flow.js";
-
-const ACTIVE_POWER_MEDIUM = "electricity.active-power";
+import {
+  ACTIVE_POWER_FLOW_TYPE,
+  THERMAL_HEAT_FLOW_TYPE
+} from "../core/flow-types.js";
 const BUS_TYPE = "electrical.bus";
 const GRID_TYPE = "electrical.grid";
 
@@ -18,7 +19,7 @@ function resolverDiagnostic(code, message, stepIndex, path = "") {
 }
 
 function hasActivePowerPort(component) {
-  return component.ports.some((port) => port.medium === ACTIVE_POWER_MEDIUM);
+  return component.ports.some((port) => port.flowType === ACTIVE_POWER_FLOW_TYPE);
 }
 
 function prepareFeasibleCommands({
@@ -40,7 +41,7 @@ function prepareFeasibleCommands({
       if (request) {
         diagnostics.push(resolverDiagnostic(
           "runtime.grid-policy-request",
-          "The grid is the residual balancing component and must not receive a policy request",
+          "The grid is the automatic balancing component and must not receive a policy request",
           stepIndex,
           `/components/${component.id}`
         ));
@@ -49,7 +50,7 @@ function prepareFeasibleCommands({
       continue;
     }
     if (!request) {
-      if (limits.minimumPowerKw !== limits.maximumPowerKw) {
+      if (limits.minimumPowerkW !== limits.maximumPowerkW) {
         diagnostics.push(resolverDiagnostic(
           "runtime.missing-policy-request",
           `Policy did not request operation for controllable component: ${component.id}`,
@@ -58,15 +59,15 @@ function prepareFeasibleCommands({
         ));
         continue;
       }
-      feasibleCommands.set(component.id, { powerKw: limits.minimumPowerKw });
+      feasibleCommands.set(component.id, { powerkW: limits.minimumPowerkW });
       continue;
     }
 
     feasibleCommands.set(component.id, {
-      powerKw: clamp(
-        request.powerKw,
-        limits.minimumPowerKw,
-        limits.maximumPowerKw
+      powerkW: clamp(
+        request.powerkW,
+        limits.minimumPowerkW,
+        limits.maximumPowerkW
       )
     });
   }
@@ -97,11 +98,11 @@ function validateBusTopology(runtimeModel, stepIndex, diagnostics) {
   const [grid] = grids;
 
   for (const connection of runtimeModel.connections) {
-    if (connection.medium !== ACTIVE_POWER_MEDIUM) {
-      if (connection.medium !== THERMAL_FLOW_MEDIUM) {
+    if (connection.flowType !== ACTIVE_POWER_FLOW_TYPE) {
+      if (connection.flowType !== THERMAL_HEAT_FLOW_TYPE) {
         diagnostics.push(resolverDiagnostic(
-          "runtime.unsupported-medium",
-          `Runtime does not support connection medium: ${connection.medium}`,
+          "runtime.unsupported-flow-type",
+          `Runtime does not support connection flowType: ${connection.flowType}`,
           stepIndex,
           `/connections/${connection.id}`
         ));
@@ -121,7 +122,7 @@ function validateBusTopology(runtimeModel, stepIndex, diagnostics) {
   }
 
   for (const component of runtimeModel.components) {
-    const electricalPorts = component.ports.filter((port) => port.medium === ACTIVE_POWER_MEDIUM);
+    const electricalPorts = component.ports.filter((port) => port.flowType === ACTIVE_POWER_FLOW_TYPE);
     if (electricalPorts.length === 0) {
       continue;
     }
@@ -155,7 +156,7 @@ function allocateBalancedCommands({
   grid,
   feasibleCommands,
   limitsByComponentId,
-  toleranceKw,
+  tolerancekW,
   stepIndex,
   diagnostics
 }) {
@@ -167,30 +168,30 @@ function allocateBalancedCommands({
   for (const component of externalComponents) {
     actualCommands.set(
       component.id,
-      component === grid ? { powerKw: 0 } : { ...feasibleCommands.get(component.id) }
+      component === grid ? { powerkW: 0 } : { ...feasibleCommands.get(component.id) }
     );
   }
 
-  const nonGridPowerKw = externalComponents.reduce(
+  const nonGridPowerkW = externalComponents.reduce(
     (total, component) => component === grid
       ? total
-      : total + actualCommands.get(component.id).powerKw,
+      : total + actualCommands.get(component.id).powerkW,
     0
   );
-  const requiredGridPowerKw = nonGridPowerKw === 0 ? 0 : -nonGridPowerKw;
+  const requiredGridPowerkW = nonGridPowerkW === 0 ? 0 : -nonGridPowerkW;
   const gridLimits = limitsByComponentId.get(grid.id);
   if (
-    requiredGridPowerKw < gridLimits.minimumPowerKw - toleranceKw ||
-    requiredGridPowerKw > gridLimits.maximumPowerKw + toleranceKw
+    requiredGridPowerkW < gridLimits.minimumPowerkW - tolerancekW ||
+    requiredGridPowerkW > gridLimits.maximumPowerkW + tolerancekW
   ) {
     diagnostics.push(resolverDiagnostic(
       "runtime.electrical-balance-infeasible",
-      `Electrical bus requires grid power ${requiredGridPowerKw} kW but ${grid.id} permits ${gridLimits.minimumPowerKw} to ${gridLimits.maximumPowerKw} kW`,
+      `Electrical bus requires grid power ${requiredGridPowerkW} kW but ${grid.id} permits ${gridLimits.minimumPowerkW} to ${gridLimits.maximumPowerkW} kW`,
       stepIndex,
       `/components/${grid.id}`
     ));
   } else {
-    actualCommands.set(grid.id, { powerKw: requiredGridPowerKw });
+    actualCommands.set(grid.id, { powerkW: requiredGridPowerkW });
   }
 
   return { actualCommands };
@@ -198,25 +199,25 @@ function allocateBalancedCommands({
 
 function bindConnectionFlows(runtimeModel, bus, actualCommands) {
   const connectionFlows = new Map();
-  const busPortPowerKw = Object.fromEntries(bus.ports.map((port) => [port.id, 0]));
+  const busPortPowerkW = Object.fromEntries(bus.ports.map((port) => [port.id, 0]));
 
   for (const connection of runtimeModel.connections) {
-    if (connection.medium !== ACTIVE_POWER_MEDIUM) {
+    if (connection.flowType !== ACTIVE_POWER_FLOW_TYPE) {
       continue;
     }
     const busIsFrom = connection.from.component === bus;
     const externalEndpoint = busIsFrom ? connection.to : connection.from;
-    const externalPowerKw = actualCommands.get(externalEndpoint.component.id).powerKw;
-    const powerKw = busIsFrom ? -externalPowerKw : externalPowerKw;
+    const externalPowerkW = actualCommands.get(externalEndpoint.component.id).powerkW;
+    const powerkW = busIsFrom ? -externalPowerkW : externalPowerkW;
 
-    connectionFlows.set(connection.id, { powerKw });
+    connectionFlows.set(connection.id, { powerkW });
     const busPort = busIsFrom ? connection.from.port : connection.to.port;
-    busPortPowerKw[busPort.id] = busIsFrom ? powerKw : -powerKw;
+    busPortPowerkW[busPort.id] = busIsFrom ? powerkW : -powerkW;
   }
 
   actualCommands.set(bus.id, {
-    powerKw: 0,
-    portPowerKw: busPortPowerKw
+    powerkW: 0,
+    portPowerkW: busPortPowerkW
   });
 
   return connectionFlows;
@@ -227,7 +228,7 @@ export function resolveElectricalBus({
   requests,
   limitsByComponentId,
   stepIndex,
-  toleranceKw
+  tolerancekW
 }) {
   const diagnostics = [];
   const topology = validateBusTopology(runtimeModel, stepIndex, diagnostics);
@@ -250,7 +251,7 @@ export function resolveElectricalBus({
     grid,
     feasibleCommands,
     limitsByComponentId,
-    toleranceKw,
+    tolerancekW,
     stepIndex,
     diagnostics
   });

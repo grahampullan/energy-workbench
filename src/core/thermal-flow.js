@@ -1,66 +1,37 @@
-export const THERMAL_FLOW_MEDIUM = "thermal.heat-flow";
-export const ABSOLUTE_ZERO_C = -273.15;
+import {
+  ABSOLUTE_ZERO_C,
+  createFlow,
+  flowValidationMessage,
+  THERMAL_HEAT_FLOW_TYPE
+} from "./flow-types.js";
 
-const THERMAL_FLOW_FIELDS = new Set([
-  "heatFlowKw",
-  "sourceTemperatureC",
-  "deliveryTemperatureC"
-]);
+export { ABSOLUTE_ZERO_C };
 
 export function thermalFlowValidationMessage(flow) {
-  if (flow === null || typeof flow !== "object" || Array.isArray(flow)) {
-    return "Thermal flow must be an object";
-  }
-  const fields = Object.keys(flow);
-  if (
-    fields.length !== THERMAL_FLOW_FIELDS.size ||
-    fields.some((field) => !THERMAL_FLOW_FIELDS.has(field))
-  ) {
-    return "Thermal flow must contain exactly heatFlowKw, sourceTemperatureC, and deliveryTemperatureC";
-  }
-  if (!Number.isFinite(flow.heatFlowKw) || flow.heatFlowKw < 0) {
-    return "heatFlowKw must be a finite, non-negative number";
-  }
-  for (const temperature of ["sourceTemperatureC", "deliveryTemperatureC"]) {
-    if (!Number.isFinite(flow[temperature]) || flow[temperature] < ABSOLUTE_ZERO_C) {
-      return `${temperature} must be finite and no lower than absolute zero`;
-    }
-  }
-  if (
-    flow.heatFlowKw > 0 &&
-    flow.deliveryTemperatureC > flow.sourceTemperatureC
-  ) {
-    return "A positive directed heat flow cannot be delivered above its source temperature";
-  }
-  return null;
+  return flowValidationMessage(THERMAL_HEAT_FLOW_TYPE, flow);
 }
 
 export function createThermalFlow(flow = {}) {
-  const validationMessage = thermalFlowValidationMessage(flow);
-  if (validationMessage) {
-    throw new TypeError(validationMessage);
-  }
-  const { heatFlowKw, sourceTemperatureC, deliveryTemperatureC } = flow;
-  return Object.freeze({ heatFlowKw, sourceTemperatureC, deliveryTemperatureC });
+  return createFlow(THERMAL_HEAT_FLOW_TYPE, flow);
 }
 
 export function calculateStandingHeatLoss({
-  thermalCapacityKwhPerK,
-  heatLossCoefficientKwPerK,
+  thermalCapacitykWhPerK,
+  heatLossCoefficientkWPerK,
   temperatureC,
   ambientTemperatureC,
-  chargeHeatFlowKw,
-  dischargeHeatFlowKw,
+  chargeHeatFlowkW,
+  dischargeHeatFlowkW,
   durationHours
 } = {}) {
   const positiveValues = {
-    thermalCapacityKwhPerK,
+    thermalCapacitykWhPerK,
     durationHours
   };
   const nonNegativeValues = {
-    heatLossCoefficientKwPerK,
-    chargeHeatFlowKw,
-    dischargeHeatFlowKw
+    heatLossCoefficientkWPerK,
+    chargeHeatFlowkW,
+    dischargeHeatFlowkW
   };
   if (Object.values(positiveValues).some(
     (value) => !Number.isFinite(value) || value <= 0
@@ -81,18 +52,18 @@ export function calculateStandingHeatLoss({
     throw new TypeError("Standing-loss temperatures must be finite and no lower than absolute zero");
   }
 
-  const unconstrainedHeatLossKw = heatLossCoefficientKwPerK *
+  const unconstrainedHeatLosskW = heatLossCoefficientkWPerK *
     Math.max(0, temperatureC - ambientTemperatureC);
-  const energyAboveAmbientBeforeLossKwh = Math.max(
+  const energyAboveAmbientBeforeLosskWh = Math.max(
     0,
-    thermalCapacityKwhPerK * (temperatureC - ambientTemperatureC) +
-      (chargeHeatFlowKw - dischargeHeatFlowKw) * durationHours
+    thermalCapacitykWhPerK * (temperatureC - ambientTemperatureC) +
+      (chargeHeatFlowkW - dischargeHeatFlowkW) * durationHours
   );
   return Object.freeze({
-    unconstrainedHeatLossKw,
-    heatLossKw: Math.min(
-      unconstrainedHeatLossKw,
-      energyAboveAmbientBeforeLossKwh / durationHours
+    unconstrainedHeatLosskW,
+    heatLosskW: Math.min(
+      unconstrainedHeatLosskW,
+      energyAboveAmbientBeforeLosskWh / durationHours
     )
   });
 }

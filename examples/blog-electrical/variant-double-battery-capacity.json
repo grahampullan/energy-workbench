@@ -6,7 +6,7 @@
   "parameterOverrides": [
     {
       "componentId": "battery",
-      "parameter": "capacityKwh",
+      "parameter": "capacitykWh",
       "value": 10
     }
   ]

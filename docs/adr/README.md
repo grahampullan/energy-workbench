@@ -22,3 +22,4 @@ rather than rewriting its history.
 | [0011](0011-browser-presentation-boundary.md) | Browser presentation boundary | Accepted |
 | [0012](0012-restricted-thermal-flow.md) | Restricted thermal flow and storage | Accepted |
 | [0013](0013-restricted-coupled-resolver.md) | Restricted coupled resolver | Accepted |
+| [0014](0014-flow-type-and-connection-result-contract.md) | Flow type and connection-result contract | Accepted |

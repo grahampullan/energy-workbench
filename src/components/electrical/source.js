@@ -1,10 +1,10 @@
 export const electricalSourceDefinition = {
   type: "electrical.source",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Electrical source",
 
   parameters: {
-    maximumPowerKw: {
+    maximumPowerkW: {
       unit: "kW",
       default: 1000,
       hardBounds: { minimum: 0 },
@@ -17,18 +17,18 @@ export const electricalSourceDefinition = {
   ports: [
     {
       id: "electricity-out",
-      medium: "electricity.active-power",
+      flowType: ACTIVE_POWER_FLOW_TYPE,
       direction: "out"
     }
   ],
 
   outputs: {
-    powerKw: { unit: "kW" }
+    powerkW: { unit: "kW" }
   },
 
   editor: {
     groups: [
-      { id: "rating", label: "Rating", parameters: ["maximumPowerKw"] }
+      { id: "rating", label: "Rating", parameters: ["maximumPowerkW"] }
     ]
   },
 
@@ -47,18 +47,18 @@ export const electricalSourceDefinition = {
 
     getOperatingLimits(runtimeComponent) {
       return {
-        minimumPowerKw: 0,
-        maximumPowerKw: runtimeComponent.parameters.maximumPowerKw
+        minimumPowerkW: 0,
+        maximumPowerkW: runtimeComponent.parameters.maximumPowerkW
       };
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
       return {
         portFlows: {
-          "electricity-out": { powerKw: actualCommand.powerKw }
+          "electricity-out": { powerkW: actualCommand.powerkW }
         },
         outputs: {
-          powerKw: actualCommand.powerKw
+          powerkW: actualCommand.powerkW
         },
         nextState: stepContext.state,
         diagnostics: []
@@ -66,3 +66,4 @@ export const electricalSourceDefinition = {
     }
   }
 };
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

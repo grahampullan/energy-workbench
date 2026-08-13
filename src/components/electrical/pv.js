@@ -4,7 +4,7 @@ function parameterValue(component, definition, parameter) {
     : definition.parameters[parameter].default;
 }
 
-function availablePowerKw(runtimeComponent, stepContext) {
+function availablePowerkW(runtimeComponent, stepContext) {
   const seriesValue = stepContext.seriesValues[runtimeComponent.modelData.generationSeriesId];
   const availablePower = seriesValue * runtimeComponent.modelData.profileMultiplier;
   if (!Number.isFinite(availablePower) || availablePower < 0) {
@@ -15,7 +15,7 @@ function availablePowerKw(runtimeComponent, stepContext) {
 
 export const electricalPvDefinition = {
   type: "electrical.pv",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Solar PV",
 
   parameters: {
@@ -36,14 +36,14 @@ export const electricalPvDefinition = {
   ports: [
     {
       id: "electricity-out",
-      medium: "electricity.active-power",
+      flowType: ACTIVE_POWER_FLOW_TYPE,
       direction: "out"
     }
   ],
 
   outputs: {
-    availablePowerKw: { unit: "kW" },
-    powerKw: { unit: "kW" }
+    availablePowerkW: { unit: "kW" },
+    powerkW: { unit: "kW" }
   },
 
   editor: {
@@ -96,22 +96,22 @@ export const electricalPvDefinition = {
     },
 
     getOperatingLimits(runtimeComponent, stepContext) {
-      const availablePower = availablePowerKw(runtimeComponent, stepContext);
+      const availablePower = availablePowerkW(runtimeComponent, stepContext);
       return {
-        minimumPowerKw: availablePower,
-        maximumPowerKw: availablePower
+        minimumPowerkW: availablePower,
+        maximumPowerkW: availablePower
       };
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
-      const availablePower = availablePowerKw(runtimeComponent, stepContext);
+      const availablePower = availablePowerkW(runtimeComponent, stepContext);
       return {
         portFlows: {
-          "electricity-out": { powerKw: actualCommand.powerKw }
+          "electricity-out": { powerkW: actualCommand.powerkW }
         },
         outputs: {
-          availablePowerKw: availablePower,
-          powerKw: actualCommand.powerKw
+          availablePowerkW: availablePower,
+          powerkW: actualCommand.powerkW
         },
         nextState: {},
         diagnostics: []
@@ -119,3 +119,4 @@ export const electricalPvDefinition = {
     }
   }
 };
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

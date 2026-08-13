@@ -1,4 +1,5 @@
 import { cloneJsonValue } from "./json-value.js";
+import { hasFlowType } from "./flow-types.js";
 
 const STABLE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
 const FIELD_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*$/u;
@@ -119,7 +120,12 @@ function assertPorts(ports, definitionType) {
   for (const port of ports) {
     assertRecord(port, `${definitionType}.ports entry`);
     assertStableId(port.id, `${definitionType}.ports[].id`);
-    assertStableId(port.medium, `${definitionType}.ports.${port.id}.medium`);
+    assertStableId(port.flowType, `${definitionType}.ports.${port.id}.flowType`);
+    if (!hasFlowType(port.flowType)) {
+      throw new TypeError(
+        `${definitionType}.ports.${port.id}.flowType is not supported: ${port.flowType}`
+      );
+    }
     if (!PORT_DIRECTIONS.has(port.direction)) {
       throw new TypeError(`${definitionType}.ports.${port.id}.direction is invalid`);
     }

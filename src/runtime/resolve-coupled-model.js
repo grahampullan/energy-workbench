@@ -1,12 +1,14 @@
 import {
   calculateStandingHeatLoss,
-  createThermalFlow,
-  THERMAL_FLOW_MEDIUM
+  createThermalFlow
 } from "../core/thermal-flow.js";
+import {
+  ACTIVE_POWER_FLOW_TYPE,
+  THERMAL_HEAT_FLOW_TYPE
+} from "../core/flow-types.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
 import { resolveElectricalBus } from "./resolve-electrical-bus.js";
 
-const ACTIVE_POWER_MEDIUM = "electricity.active-power";
 const AMBIENT_TYPE = "thermal.ambient-boundary";
 const DEMAND_TYPE = "thermal.heat-demand";
 const HEATER_TYPE = "thermal.electric-heater";
@@ -30,8 +32,8 @@ function resolverDiagnostic(code, message, stepIndex, path = "") {
   });
 }
 
-function hasPortMedium(component, medium) {
-  return component.ports.some((port) => port.medium === medium);
+function hasPortFlowType(component, flowType) {
+  return component.ports.some((port) => port.flowType === flowType);
 }
 
 function singleComponent(runtimeModel, type, stepIndex, diagnostics) {
@@ -57,7 +59,7 @@ function matchingConnection(runtimeModel, {
   label
 }, stepIndex, diagnostics) {
   const matches = runtimeModel.connections.filter((connection) =>
-    connection.medium === THERMAL_FLOW_MEDIUM &&
+    connection.flowType === THERMAL_HEAT_FLOW_TYPE &&
     connection.from.component === fromComponent &&
     connection.from.port.id === fromPortId &&
     connection.to.component === toComponent &&
@@ -76,7 +78,7 @@ function matchingConnection(runtimeModel, {
 
 function validateThermalTopology(runtimeModel, stepIndex, diagnostics) {
   const thermalComponents = runtimeModel.components.filter(
-    (component) => hasPortMedium(component, THERMAL_FLOW_MEDIUM)
+    (component) => hasPortFlowType(component, THERMAL_HEAT_FLOW_TYPE)
   );
   for (const component of thermalComponents) {
     if (!THERMAL_COMPONENT_TYPES.has(component.type)) {
@@ -96,7 +98,7 @@ function validateThermalTopology(runtimeModel, stepIndex, diagnostics) {
   if (!heater || !store || !demand || !ambient) {
     return null;
   }
-  if (!hasPortMedium(heater, ACTIVE_POWER_MEDIUM)) {
+  if (!hasPortFlowType(heater, ACTIVE_POWER_FLOW_TYPE)) {
     diagnostics.push(resolverDiagnostic(
       "runtime.unsupported-thermal-topology",
       `Electric heater ${heater.id} requires an active-power port`,
@@ -127,7 +129,7 @@ function validateThermalTopology(runtimeModel, stepIndex, diagnostics) {
     label: "store-to-ambient"
   }, stepIndex, diagnostics);
   const thermalConnections = runtimeModel.connections.filter(
-    (connection) => connection.medium === THERMAL_FLOW_MEDIUM
+    (connection) => connection.flowType === THERMAL_HEAT_FLOW_TYPE
   );
   if (thermalConnections.length !== 3) {
     diagnostics.push(resolverDiagnostic(
@@ -169,22 +171,22 @@ function validateThermalLimits(topology, limitsByComponentId, stepIndex, diagnos
       minimum: Number.MIN_VALUE,
       maximum: 1
     }) &&
-    requireFiniteLimit(heaterLimits, "maximumHeatOutputKw", { minimum: 0 }) &&
+    requireFiniteLimit(heaterLimits, "maximumHeatOutputkW", { minimum: 0 }) &&
     requireFiniteLimit(heaterLimits, "supplyTemperatureC");
   const storeValid = [
-    "maximumChargeHeatFlowKw",
-    "maximumDischargeHeatFlowKw",
-    "thermalCapacityKwhPerK",
-    "heatLossCoefficientKwPerK"
+    "maximumChargeHeatFlowkW",
+    "maximumDischargeHeatFlowkW",
+    "thermalCapacitykWhPerK",
+    "heatLossCoefficientkWPerK"
   ].every((field) => requireFiniteLimit(storeLimits, field, {
-    minimum: field === "thermalCapacityKwhPerK" ? Number.MIN_VALUE : 0
+    minimum: field === "thermalCapacitykWhPerK" ? Number.MIN_VALUE : 0
   })) && [
     "sourceTemperatureC",
     "minimumUsefulTemperatureC",
     "maximumTemperatureC"
   ].every((field) => requireFiniteLimit(storeLimits, field));
   const demandValid =
-    requireFiniteLimit(demandLimits, "maximumHeatFlowKw", { minimum: 0 }) &&
+    requireFiniteLimit(demandLimits, "maximumHeatFlowkW", { minimum: 0 }) &&
     requireFiniteLimit(demandLimits, "minimumDeliveryTemperatureC");
   const ambientValid = requireFiniteLimit(ambientLimits, "ambientTemperatureC");
 
@@ -247,93 +249,93 @@ function allocateThermalCommands({
   const supplyTemperatureC = heaterLimits.supplyTemperatureC;
   const ambientTemperatureC = ambientLimits.ambientTemperatureC;
   const durationHours = stepContext.durationHours;
-  const dischargeHeatFlowKw =
+  const dischargeHeatFlowkW =
     storeTemperatureC >= demandLimits.minimumDeliveryTemperatureC
       ? Math.min(
-          demandLimits.maximumHeatFlowKw,
-          storeLimits.maximumDischargeHeatFlowKw
+          demandLimits.maximumHeatFlowkW,
+          storeLimits.maximumDischargeHeatFlowkW
         )
       : 0;
-  const feasibleRequestedPowerKw = clamp(
-    heaterRequest.powerKw,
-    heaterLimits.minimumPowerKw,
-    heaterLimits.maximumPowerKw
+  const feasibleRequestedPowerkW = clamp(
+    heaterRequest.powerkW,
+    heaterLimits.minimumPowerkW,
+    heaterLimits.maximumPowerkW
   );
-  const requestedHeatOutputKw = Math.min(
-    heaterLimits.maximumHeatOutputKw,
-    -feasibleRequestedPowerKw * heaterLimits.heatOutputPerElectricalInput
+  const requestedHeatOutputkW = Math.min(
+    heaterLimits.maximumHeatOutputkW,
+    -feasibleRequestedPowerkW * heaterLimits.heatOutputPerElectricalInput
   );
   const standingLoss = calculateStandingHeatLoss({
-    thermalCapacityKwhPerK: storeLimits.thermalCapacityKwhPerK,
-    heatLossCoefficientKwPerK: storeLimits.heatLossCoefficientKwPerK,
+    thermalCapacitykWhPerK: storeLimits.thermalCapacitykWhPerK,
+    heatLossCoefficientkWPerK: storeLimits.heatLossCoefficientkWPerK,
     temperatureC: storeTemperatureC,
     ambientTemperatureC,
-    chargeHeatFlowKw: requestedHeatOutputKw,
-    dischargeHeatFlowKw,
+    chargeHeatFlowkW: requestedHeatOutputkW,
+    dischargeHeatFlowkW,
     durationHours
   });
-  const maximumChargeAtSupplyTemperatureKw = supplyTemperatureC < storeTemperatureC
+  const maximumChargeAtSupplyTemperaturekW = supplyTemperatureC < storeTemperatureC
     ? 0
     : Math.max(
         0,
-        dischargeHeatFlowKw +
-          standingLoss.unconstrainedHeatLossKw +
-          storeLimits.thermalCapacityKwhPerK *
+        dischargeHeatFlowkW +
+          standingLoss.unconstrainedHeatLosskW +
+          storeLimits.thermalCapacitykWhPerK *
             (supplyTemperatureC - storeTemperatureC) /
             durationHours
       );
-  const chargeHeatFlowKw = Math.min(
-    requestedHeatOutputKw,
-    storeLimits.maximumChargeHeatFlowKw,
-    maximumChargeAtSupplyTemperatureKw
+  const chargeHeatFlowkW = Math.min(
+    requestedHeatOutputkW,
+    storeLimits.maximumChargeHeatFlowkW,
+    maximumChargeAtSupplyTemperaturekW
   );
-  const heaterPowerKw = chargeHeatFlowKw === 0
+  const heaterPowerkW = chargeHeatFlowkW === 0
     ? 0
-    : -chargeHeatFlowKw / heaterLimits.heatOutputPerElectricalInput;
-  const { heatLossKw } = calculateStandingHeatLoss({
-    thermalCapacityKwhPerK: storeLimits.thermalCapacityKwhPerK,
-    heatLossCoefficientKwPerK: storeLimits.heatLossCoefficientKwPerK,
+    : -chargeHeatFlowkW / heaterLimits.heatOutputPerElectricalInput;
+  const { heatLosskW } = calculateStandingHeatLoss({
+    thermalCapacitykWhPerK: storeLimits.thermalCapacitykWhPerK,
+    heatLossCoefficientkWPerK: storeLimits.heatLossCoefficientkWPerK,
     temperatureC: storeTemperatureC,
     ambientTemperatureC,
-    chargeHeatFlowKw,
-    dischargeHeatFlowKw,
+    chargeHeatFlowkW,
+    dischargeHeatFlowkW,
     durationHours
   });
 
   return {
-    adjustedHeaterRequest: { powerKw: heaterPowerKw },
+    adjustedHeaterRequest: { powerkW: heaterPowerkW },
     heaterActualCommand: {
-      powerKw: heaterPowerKw,
-      heatOutputKw: chargeHeatFlowKw
+      powerkW: heaterPowerkW,
+      heatOutputkW: chargeHeatFlowkW
     },
     storeActualCommand: {
-      chargeHeatFlowKw,
+      chargeHeatFlowkW,
       chargeSourceTemperatureC: supplyTemperatureC,
       chargeDeliveryTemperatureC: supplyTemperatureC,
-      dischargeHeatFlowKw,
+      dischargeHeatFlowkW,
       ambientTemperatureC
     },
     demandActualCommand: createThermalFlow({
-      heatFlowKw: dischargeHeatFlowKw,
+      heatFlowkW: dischargeHeatFlowkW,
       sourceTemperatureC: storeTemperatureC,
       deliveryTemperatureC: storeTemperatureC
     }),
     ambientActualCommand: {
-      heatFlowKw: heatLossKw,
+      heatFlowkW: heatLosskW,
       sourceTemperatureC: storeTemperatureC
     },
     heaterToStoreFlow: createThermalFlow({
-      heatFlowKw: chargeHeatFlowKw,
+      heatFlowkW: chargeHeatFlowkW,
       sourceTemperatureC: supplyTemperatureC,
       deliveryTemperatureC: supplyTemperatureC
     }),
     storeToDemandFlow: createThermalFlow({
-      heatFlowKw: dischargeHeatFlowKw,
+      heatFlowkW: dischargeHeatFlowkW,
       sourceTemperatureC: storeTemperatureC,
       deliveryTemperatureC: storeTemperatureC
     }),
     storeToAmbientFlow: createThermalFlow({
-      heatFlowKw: heatLossKw,
+      heatFlowkW: heatLosskW,
       sourceTemperatureC: storeTemperatureC,
       deliveryTemperatureC: ambientTemperatureC
     })
@@ -345,7 +347,7 @@ export function resolveCoupledModel({
   requests,
   limitsByComponentId,
   stepContext,
-  toleranceKw
+  tolerancekW
 }) {
   const diagnostics = [];
   const topology = validateThermalTopology(
@@ -386,7 +388,7 @@ export function resolveCoupledModel({
     requests: electricalRequests,
     limitsByComponentId,
     stepIndex: stepContext.stepIndex,
-    toleranceKw
+    tolerancekW
   });
   diagnostics.push(...electrical.diagnostics);
   if (!electrical.resolved) {

@@ -17,7 +17,7 @@ function createFixture({
   generationValues = [5, 5, 0, 0],
   loadProfileMultiplier = 1,
   pvProfileMultiplier = 1,
-  storedEnergyKwh = 0,
+  storedEnergykWh = 0,
   policy = createPvBatterySelfConsumptionPolicy({
     batteryComponentId: "battery"
   })
@@ -34,8 +34,8 @@ function createFixture({
           definitionVersion: electricalGridDefinition.version,
           name: "Grid",
           parameters: {
-            maximumImportPowerKw: 100,
-            maximumExportPowerKw: 100
+            maximumImportPowerkW: 100,
+            maximumExportPowerkW: 100
           },
           initialState: {}
         },
@@ -75,13 +75,13 @@ function createFixture({
           definitionVersion: electricalBatteryDefinition.version,
           name: "Battery",
           parameters: {
-            capacityKwh: 5,
-            maximumChargePowerKw: 3,
-            maximumDischargePowerKw: 3,
+            capacitykWh: 5,
+            maximumChargePowerkW: 3,
+            maximumDischargePowerkW: 3,
             chargingEfficiency: 1,
             dischargingEfficiency: 1
           },
-          initialState: { storedEnergyKwh }
+          initialState: { storedEnergykWh }
         }
       ],
       connections: [
@@ -159,27 +159,27 @@ test("self-consumption dispatch uses battery before residual grid exchange", () 
   const batterySteps = result.results.steps.map((step) => step.components[4]);
   const gridSteps = result.results.steps.map((step) => step.components[0]);
   assert.deepEqual(
-    batterySteps.map((component) => component.requestedCommand.powerKw),
+    batterySteps.map((component) => component.requestedCommand.powerkW),
     [-3, -4, 5, 5]
   );
   assert.deepEqual(
-    batterySteps.map((component) => component.feasibleCommand.powerKw),
+    batterySteps.map((component) => component.feasibleCommand.powerkW),
     [-3, -2, 3, 2]
   );
   assert.deepEqual(
-    batterySteps.map((component) => component.actualCommand.powerKw),
+    batterySteps.map((component) => component.actualCommand.powerkW),
     [-3, -2, 3, 2]
   );
   assert.deepEqual(
-    batterySteps.map((component) => component.state.storedEnergyKwh),
+    batterySteps.map((component) => component.state.storedEnergykWh),
     [3, 5, 2, 0]
   );
   assert.deepEqual(
-    gridSteps.map((component) => component.actualCommand.powerKw),
+    gridSteps.map((component) => component.actualCommand.powerkW),
     [0, -2, 2, 3]
   );
   assert.deepEqual(
-    result.results.steps.map((step) => step.connections[3].powerKw),
+    result.results.steps.map((step) => step.connections[3].flow.powerkW),
     [-3, -2, 3, 2]
   );
   assert.deepEqual(runScenario(fixture), result);
@@ -191,15 +191,15 @@ test("dispatch consumes fixed component limits including profile multipliers", (
     generationValues: [6],
     loadProfileMultiplier: 2,
     pvProfileMultiplier: 0.5,
-    storedEnergyKwh: 2
+    storedEnergykWh: 2
   }));
 
   assert.equal(result.completed, true);
   assert.deepEqual(result.results.steps[0].components[4].requestedCommand, {
-    powerKw: 1
+    powerkW: 1
   });
   assert.deepEqual(result.results.steps[0].components[0].actualCommand, {
-    powerKw: 0
+    powerkW: 0
   });
 });
 
@@ -232,12 +232,12 @@ test("runtime gives policies an immutable operating-limit snapshot", () => {
     true
   );
   assert.deepEqual(receivedPolicyContext.operatingLimitsByComponentId.pv, {
-    minimumPowerKw: 5,
-    maximumPowerKw: 5
+    minimumPowerkW: 5,
+    maximumPowerkW: 5
   });
   assert.deepEqual(receivedPolicyContext.operatingLimitsByComponentId.load, {
-    minimumPowerKw: -2,
-    maximumPowerKw: -2
+    minimumPowerkW: -2,
+    maximumPowerkW: -2
   });
 });
 
@@ -265,7 +265,7 @@ test("self-consumption policy rejects invalid battery and extra variable operati
     type: electricalSourceDefinition.type,
     definitionVersion: electricalSourceDefinition.version,
     name: "Variable source",
-    parameters: { maximumPowerKw: 10 },
+    parameters: { maximumPowerkW: 10 },
     initialState: {}
   };
   const variableSourceResult = runScenario(variableSource);

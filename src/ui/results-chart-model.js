@@ -1,3 +1,5 @@
+import { ACTIVE_POWER_FLOW_TYPE } from "../core/flow-types.js";
+
 function definitionFor(registry, component) {
   const definition = registry.get(component.type, component.definitionVersion);
   if (!definition) {
@@ -16,7 +18,7 @@ function portFor(definition, componentId, portId) {
   return port;
 }
 
-export function integratePowerSeriesKwh(values, timeStepSeconds) {
+export function integratePowerSerieskWh(values, timeStepSeconds) {
   if (!Array.isArray(values)) {
     throw new TypeError("Power-series values must be an array");
   }
@@ -28,13 +30,13 @@ export function integratePowerSeriesKwh(values, timeStepSeconds) {
   }
 
   const durationHours = timeStepSeconds / 3600;
-  let energyKwh = 0;
+  let energykWh = 0;
   for (let index = 1; index < values.length; index += 1) {
     const previous = values[index - 1];
     const current = values[index];
-    energyKwh += (previous + current) / 2 * durationHours;
+    energykWh += (previous + current) / 2 * durationHours;
   }
-  return energyKwh;
+  return energykWh;
 }
 
 function flowSeries({
@@ -55,13 +57,13 @@ function flowSeries({
     componentIds: [fromComponent.id, toComponent.id],
     direction,
     label: `${source.name} → ${destination.name}`,
-    values: values.map((powerKw, stepIndex) => ({
+    values: values.map((powerkW, stepIndex) => ({
       stepIndex,
       elapsedSeconds: elapsedSeconds[stepIndex],
-      powerKw: forward ? Math.max(0, powerKw) : Math.max(0, -powerKw)
+      powerkW: forward ? Math.max(0, powerkW) : Math.max(0, -powerkW)
     })),
-    integratedEnergyKwh: integratePowerSeriesKwh(
-      values.map((powerKw) => forward ? Math.max(0, powerKw) : Math.max(0, -powerKw)),
+    integratedEnergykWh: integratePowerSerieskWh(
+      values.map((powerkW) => forward ? Math.max(0, powerkW) : Math.max(0, -powerkW)),
       timeStepSeconds
     )
   };
@@ -98,6 +100,9 @@ export function createResultsChartModel({ model, registry, results }) {
     const toDefinition = definitionFor(registry, toComponent);
     const fromPort = portFor(fromDefinition, fromComponent.id, connection.from.portId);
     const toPort = portFor(toDefinition, toComponent.id, connection.to.portId);
+    if (fromPort.flowType !== ACTIVE_POWER_FLOW_TYPE) {
+      return [];
+    }
     const values = connectionResultsByStep.map((resultsByConnection, stepIndex) => {
       const result = resultsByConnection.get(connection.id);
       if (!result) {
@@ -105,12 +110,17 @@ export function createResultsChartModel({ model, registry, results }) {
           `Run results do not contain connection ${connection.id} at step ${stepIndex}`
         );
       }
-      if (!Number.isFinite(result.powerKw)) {
+      if (result.flowType !== ACTIVE_POWER_FLOW_TYPE) {
+        throw new TypeError(
+          `Connection ${connection.id} must have ${ACTIVE_POWER_FLOW_TYPE} results`
+        );
+      }
+      if (!Number.isFinite(result.flow?.powerkW)) {
         throw new TypeError(
           `Connection ${connection.id} power must be finite at step ${stepIndex}`
         );
       }
-      return result.powerKw;
+      return result.flow.powerkW;
     });
     const directions = fromPort.direction === "bidirectional" &&
       toPort.direction === "bidirectional"

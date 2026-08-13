@@ -59,14 +59,14 @@ test("browser presentation derives the selected timestep from canonical results"
   assert.equal(view.timelineLabel, "12:00 · step 721 of 1440");
   assert.equal(view.components.length, model.components.length);
   assert.equal(view.connections.length, model.connections.length);
-  assert.equal(batteryView.metric.value, runtimeBattery.actualCommand.powerKw);
+  assert.equal(batteryView.metric.value, runtimeBattery.actualCommand.powerkW);
   assert.equal(
-    batteryView.outputFields.find((field) => field.id === "storedEnergyKwh").value,
-    runtimeBattery.outputs.storedEnergyKwh
+    batteryView.outputFields.find((field) => field.id === "storedEnergykWh").value,
+    runtimeBattery.outputs.storedEnergykWh
   );
   assert.deepEqual(
-    view.connections.map((connection) => connection.powerKw),
-    runtimeStep.connections.map((connection) => connection.powerKw)
+    view.connections.map((connection) => connection.signedFlow),
+    runtimeStep.connections.map((connection) => connection.flow.powerkW)
   );
 });
 
@@ -80,13 +80,13 @@ test("inspector labels and units come from component definition metadata", () =>
   const battery = view.components.find((component) => component.id === "battery");
   const capacity = battery.parameterGroups
     .flatMap((group) => group.fields)
-    .find((field) => field.id === "capacityKwh");
+    .find((field) => field.id === "capacitykWh");
 
   assert.equal(capacity.label, "Capacity");
-  assert.equal(capacity.unit, electricalBatteryDefinition.parameters.capacityKwh.unit);
-  assert.deepEqual(capacity.editor, electricalBatteryDefinition.parameters.capacityKwh.editor);
+  assert.equal(capacity.unit, electricalBatteryDefinition.parameters.capacitykWh.unit);
+  assert.deepEqual(capacity.editor, electricalBatteryDefinition.parameters.capacitykWh.editor);
   assert.equal(capacity.displayValue, "5 kWh");
-  assert.equal(formatFieldLabel("maximumChargePowerKw"), "Maximum charge power kW");
+  assert.equal(formatFieldLabel("maximumChargePowerkW"), "Maximum charge power kW");
   assert.equal(formatEngineeringValue(-0, "kW"), "0 kW");
 });
 
@@ -110,18 +110,18 @@ test("temporary parameter values do not replace canonical runtime results", () =
     stepIndex: 0,
     parameterOverrides: [{
       componentId: "battery",
-      parameter: "capacityKwh",
+      parameter: "capacitykWh",
       value: 9
     }]
   });
   const battery = view.components.find((component) => component.id === "battery");
   const capacity = battery.parameterGroups
     .flatMap((group) => group.fields)
-    .find((field) => field.id === "capacityKwh");
+    .find((field) => field.id === "capacitykWh");
   const runtimeBattery = run.results.steps[0].components.find(
     (component) => component.componentId === "battery"
   );
 
   assert.equal(capacity.value, 9);
-  assert.equal(battery.metric.value, runtimeBattery.actualCommand.powerKw);
+  assert.equal(battery.metric.value, runtimeBattery.actualCommand.powerkW);
 });

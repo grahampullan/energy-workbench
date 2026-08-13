@@ -165,7 +165,7 @@ test("layout schema contains presentation geometry but rejects engineering data"
   assertValid(schemaIds.layout, layout);
 
   const invalid = structuredClone(layout);
-  invalid.components[0].parameters = { powerKw: 100 };
+  invalid.components[0].parameters = { powerkW: 100 };
   assertInvalid(schemaIds.layout, invalid);
 });
 

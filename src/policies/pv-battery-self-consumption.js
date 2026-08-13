@@ -17,8 +17,8 @@ function requireBattery(runtimeModel, batteryComponentId) {
   return battery;
 }
 
-function fixedExternalPowerKw(runtimeModel, battery, operatingLimitsByComponentId) {
-  let powerKw = 0;
+function fixedExternalPowerkW(runtimeModel, battery, operatingLimitsByComponentId) {
+  let powerkW = 0;
 
   for (const component of runtimeModel.components) {
     if (
@@ -32,15 +32,15 @@ function fixedExternalPowerKw(runtimeModel, battery, operatingLimitsByComponentI
     if (!limits) {
       throw new Error(`Operating limits are missing for component: ${component.id}`);
     }
-    if (limits.minimumPowerKw !== limits.maximumPowerKw) {
+    if (limits.minimumPowerkW !== limits.maximumPowerkW) {
       throw new Error(
         `Self-consumption policy requires fixed operation for component: ${component.id}`
       );
     }
-    powerKw += limits.minimumPowerKw;
+    powerkW += limits.minimumPowerkW;
   }
 
-  return powerKw;
+  return powerkW;
 }
 
 export function createPvBatterySelfConsumptionPolicy({ batteryComponentId } = {}) {
@@ -56,15 +56,15 @@ export function createPvBatterySelfConsumptionPolicy({ batteryComponentId } = {}
         throw new Error("Self-consumption policy requires component operating limits");
       }
       const battery = requireBattery(runtimeModel, batteryComponentId);
-      const fixedPowerKw = fixedExternalPowerKw(
+      const fixedPowerkW = fixedExternalPowerkW(
         runtimeModel,
         battery,
         operatingLimitsByComponentId
       );
-      const requestedBatteryPowerKw = fixedPowerKw === 0 ? 0 : -fixedPowerKw;
+      const requestedBatteryPowerkW = fixedPowerkW === 0 ? 0 : -fixedPowerkW;
 
       return {
-        [batteryComponentId]: { powerKw: requestedBatteryPowerKw }
+        [batteryComponentId]: { powerkW: requestedBatteryPowerkW }
       };
     }
   });

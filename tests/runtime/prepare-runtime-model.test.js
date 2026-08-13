@@ -10,7 +10,7 @@ function createFixture({ sourcePrepare, loadPrepare } = {}) {
     type: "electrical.source",
     name: "Source",
     parameters: {
-      ratedPowerKw: {
+      ratedPowerkW: {
         unit: "kW",
         default: 100,
         hardBounds: { minimum: 0, maximum: 500 },
@@ -18,14 +18,14 @@ function createFixture({ sourcePrepare, loadPrepare } = {}) {
       }
     },
     initialState: {
-      availableEnergyKwh: { unit: "kWh", default: 25 }
+      availableEnergykWh: { unit: "kWh", default: 25 }
     },
     ports: [
-      { id: "electricity-out", medium: "electricity.active-power", direction: "out" }
+      { id: "electricity-out", flowType: "electricity.active-power", direction: "out" }
     ],
     model: {
       prepare: sourcePrepare ?? ((component) => ({
-        ratedPowerKw: component.parameters.ratedPowerKw
+        ratedPowerkW: component.parameters.ratedPowerkW
       }))
     }
   });
@@ -40,7 +40,7 @@ function createFixture({ sourcePrepare, loadPrepare } = {}) {
       }
     },
     ports: [
-      { id: "electricity-in", medium: "electricity.active-power", direction: "in" }
+      { id: "electricity-in", flowType: "electricity.active-power", direction: "in" }
     ],
     model: {
       prepare: loadPrepare ?? (() => ({ profileSeriesId: "load-power" }))
@@ -128,23 +128,23 @@ test("prepareRuntimeModel resolves defaults, component data, ports, and connecti
 
   const [source, load] = result.runtimeModel.components;
   assert.equal(source.definition, fixture.sourceDefinition);
-  assert.deepEqual(source.parameters, { ratedPowerKw: 100 });
-  assert.deepEqual(source.initialState, { availableEnergyKwh: 25 });
+  assert.deepEqual(source.parameters, { ratedPowerkW: 100 });
+  assert.deepEqual(source.initialState, { availableEnergykWh: 25 });
   assert.deepEqual(source.modelData, { coefficient: 0.95 });
   assert.notEqual(source.modelData, returnedModelData);
   assert.deepEqual(load.parameters, { profileMultiplier: 2 });
 
-  assert.deepEqual(receivedComponent.parameters, { ratedPowerKw: 100 });
-  assert.deepEqual(receivedComponent.initialState, { availableEnergyKwh: 25 });
+  assert.deepEqual(receivedComponent.parameters, { ratedPowerkW: 100 });
+  assert.deepEqual(receivedComponent.initialState, { availableEnergykWh: 25 });
   assert.equal(Object.isFrozen(receivedComponent), true);
   assert.notEqual(receivedContext.model, fixture.model);
   assert.notEqual(receivedContext.scenario, fixture.scenario);
   assert.equal(Object.isFrozen(receivedContext.model), true);
   assert.equal(Object.isFrozen(receivedContext.scenario), true);
-  assert.equal(receivedContext.model.components[0].parameters.ratedPowerKw, 100);
+  assert.equal(receivedContext.model.components[0].parameters.ratedPowerkW, 100);
 
   const [connection] = result.runtimeModel.connections;
-  assert.equal(connection.medium, "electricity.active-power");
+  assert.equal(connection.flowType, "electricity.active-power");
   assert.equal(connection.from.component, source);
   assert.equal(connection.from.port, source.ports[0]);
   assert.equal(connection.to.component, load);
@@ -161,14 +161,14 @@ test("prepareRuntimeModel resolves defaults, component data, ports, and connecti
 
 test("preparation keeps model validity warnings without rejecting the runtime model", () => {
   const fixture = createFixture();
-  fixture.model.components[0].parameters.ratedPowerKw = 5;
+  fixture.model.components[0].parameters.ratedPowerkW = 5;
 
   const result = prepareRuntimeModel(fixture);
 
   assert.equal(result.prepared, true);
   assert.deepEqual(diagnosticCodes(result), ["model.parameter-validity-range"]);
   assert.equal(result.diagnostics[0].severity, "warning");
-  assert.equal(result.runtimeModel.components[0].parameters.ratedPowerKw, 5);
+  assert.equal(result.runtimeModel.components[0].parameters.ratedPowerkW, 5);
 });
 
 test("invalid model and scenario documents are rejected before component preparation", () => {
@@ -217,7 +217,7 @@ test("component preparation failures and invalid return values become diagnostic
 
 test("preparation rejects non-JSON inputs and requires an explicit registry", () => {
   const fixture = createFixture();
-  fixture.model.components[0].parameters.ratedPowerKw = Number.POSITIVE_INFINITY;
+  fixture.model.components[0].parameters.ratedPowerkW = Number.POSITIVE_INFINITY;
 
   const result = prepareRuntimeModel(fixture);
   assert.equal(result.prepared, false);

@@ -9,11 +9,11 @@ or closures may be private implementation details.
 ```js
 export const exampleComponentDefinition = {
   type: "domain.example",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Example",
 
   parameters: {
-    ratedPowerKw: {
+    ratedPowerkW: {
       unit: "kW",
       default: 100,
       hardBounds: { minimum: 0 },
@@ -23,7 +23,7 @@ export const exampleComponentDefinition = {
   },
 
   initialState: {
-    generatedEnergyKwh: {
+    generatedEnergykWh: {
       unit: "kWh",
       default: 0
     }
@@ -32,18 +32,18 @@ export const exampleComponentDefinition = {
   ports: [
     {
       id: "electricity-out",
-      medium: "electricity.active-power",
+      flowType: "electricity.active-power",
       direction: "out"
     }
   ],
 
   outputs: {
-    powerKw: { unit: "kW" }
+    powerkW: { unit: "kW" }
   },
 
   editor: {
     groups: [
-      { id: "rating", label: "Rating", parameters: ["ratedPowerKw"] }
+      { id: "rating", label: "Rating", parameters: ["ratedPowerkW"] }
     ]
   },
 
@@ -58,20 +58,20 @@ export const exampleComponentDefinition = {
     },
     getOperatingLimits(runtimeComponent) {
       return {
-        minimumPowerKw: 0,
-        maximumPowerKw: runtimeComponent.parameters.ratedPowerKw
+        minimumPowerkW: 0,
+        maximumPowerkW: runtimeComponent.parameters.ratedPowerkW
       };
     },
     evaluate(runtimeComponent, actualCommand, stepContext) {
       return {
         portFlows: {
-          "electricity-out": { powerKw: actualCommand.powerKw }
+          "electricity-out": { powerkW: actualCommand.powerkW }
         },
-        outputs: { powerKw: actualCommand.powerKw },
+        outputs: { powerkW: actualCommand.powerkW },
         nextState: {
-          generatedEnergyKwh:
-            stepContext.state.generatedEnergyKwh +
-            actualCommand.powerKw * stepContext.durationHours
+          generatedEnergykWh:
+            stepContext.state.generatedEnergykWh +
+            actualCommand.powerkW * stepContext.durationHours
         },
         diagnostics: []
       };
@@ -89,8 +89,8 @@ the first runtime slice.
   useful editor ranges.
 - Initial-state declarations own units and defaults. Component validation owns
   state constraints that depend on parameters or other state fields.
-- Ports declare compatibility. A connection does not redefine a port's medium
-  or direction.
+- Ports declare compatibility through `flowType` and permitted direction. A
+  connection stores only endpoint references and does not duplicate either.
 - `validate` checks engineering meaning that JSON Schema cannot express. It
   returns an array of `{ severity, code, message, path }` diagnostics, or
   `undefined` when there are none; omitted severity means `error`.
@@ -135,14 +135,14 @@ initialises isolated state, and runs every scenario step synchronously.
   requesting policy operation.
 - `policy.request(runtimeModel, stepContext, policyContext)` returns an object
   keyed by non-grid controllable component ID, with commands shaped as
-  `{ powerKw }`.
+  `{ powerkW }`.
 - `policyContext.operatingLimitsByComponentId` is a read-only plain-object
   snapshot. Policies may use it to coordinate components without repeating
   component equations.
 - Positive command power exports from a component; negative power imports into
   it.
 - For an active-power component, `getOperatingLimits` includes finite
-  `minimumPowerKw` and `maximumPowerKw` values. Equal values prescribe fixed
+  `minimumPowerkW` and `maximumPowerkW` values. Equal values prescribe fixed
   operation and need no policy request. Thermal components return the explicit
   heat-rate, temperature, and state-dependent limits required by their current
   resolver.
@@ -155,12 +155,18 @@ initialises isolated state, and runs every scenario step synchronously.
   passed its balance check.
 - External series must be loaded and materialised before calling `runScenario`.
 
-Connection `powerKw` is signed from its persisted `from` endpoint towards `to`.
+Each connection result has the shape
+`{ connectionId, flowType, flow }`. For active power, `flow` is exactly
+`{ powerkW }`; its value is signed from the persisted `from` endpoint towards
+`to`. Endpoint mismatch is a `runtime.connection-balance` diagnostic, not a
+result field.
+
 The current resolver accepts one `electrical.bus` with four bidirectional
 terminals. Each external component has one electrical connection, and each bus
-terminal has at most one. Exactly one `electrical.grid` is the residual
-boundary: its requested and feasible commands are `null`, and the resolver sets
-its actual command after fixed and explicitly policy-controlled operation.
+terminal has at most one. Exactly one `electrical.grid` is the automatic
+balancing boundary: its requested and feasible commands are `null`, and the
+resolver sets its actual command after fixed and explicitly policy-controlled
+operation.
 Positive grid power is import into the model; negative grid power is export.
 The grid limits can make a timestep infeasible. This keeps balancing separate
 from policy and avoids treating component array order as dispatch priority.
@@ -171,17 +177,17 @@ the resolver; it would require an explicit controllable-component contract.
 
 ### Restricted thermal ports
 
-A directed `thermal.heat-flow` port reports exactly:
+A directed `thermal.heat-flow` port reports a `flow` object containing exactly:
 
 ```js
 {
-  heatFlowKw,
+  heatFlowkW,
   sourceTemperatureC,
   deliveryTemperatureC
 }
 ```
 
-`heatFlowKw` is non-negative in the declared direction. All three values are
+`heatFlowkW` is non-negative in the declared direction. All three values are
 finite, temperatures are in °C and no lower than absolute zero, and positive
 flow cannot have a delivery temperature above its source temperature. A zero
 flow still carries boundary temperatures, which may be in either order.
@@ -225,8 +231,8 @@ declared conversion. The coupled resolver then:
 3. allocates standing loss to ambient; and
 4. passes feasible heater input to the electrical-bus resolver for grid balance.
 
-The heater's requested command is `{ powerKw }`. Its feasible and actual
-commands also contain `heatOutputKw`, making the cross-domain allocation
+The heater's requested command is `{ powerkW }`. Its feasible and actual
+commands also contain `heatOutputkW`, making the cross-domain allocation
 explicit. Store, demand, and ambient commands are resolver-owned. Every thermal
 connection is checked for matching heat rate, source temperature, and delivery
 temperature before state is committed.
@@ -241,8 +247,8 @@ allocation contract.
 command. Positive battery power discharges to the bus; negative battery power
 charges from it. This prevents simultaneous charge and discharge commands.
 
-For charge power `Pc = max(0, -powerKw)`, discharge power
-`Pd = max(0, powerKw)`, and timestep `dt` in hours, stored energy advances as:
+For charge power `Pc = max(0, -powerkW)`, discharge power
+`Pd = max(0, powerkW)`, and timestep `dt` in hours, stored energy advances as:
 
 ```text
 E_next = E + chargingEfficiency * Pc * dt
@@ -253,10 +259,10 @@ The operating limits convert remaining stored energy and capacity into terminal
 power for the current timestep:
 
 ```text
-minimumPowerKw = -min(maximumChargePowerKw,
-                      (capacityKwh - E) / chargingEfficiency / dt)
+minimumPowerkW = -min(maximumChargePowerkW,
+                      (capacitykWh - E) / chargingEfficiency / dt)
 
-maximumPowerKw =  min(maximumDischargePowerKw,
+maximumPowerkW =  min(maximumDischargePowerkW,
                       E * dischargingEfficiency / dt)
 ```
 

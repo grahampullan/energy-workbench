@@ -25,8 +25,9 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 5. Keep feature behaviour in its owning module. Avoid forwarding wrappers and
    broad barrel files; a small registry or composition module is fine.
 6. Make engineering units obvious in schemas, names, and tests. Prefer names
-   such as `powerKw`, `energyKwh`, `durationHours`, and `temperatureC` over
-   context-dependent `value` fields.
+   such as `powerkW`, `energykWh`, `durationHours`, and `temperatureC` over
+   context-dependent `value` fields. Preserve SI symbol casing inside
+   identifiers: use `kW` and `kWh`, never `Kw`, `KW`, or `Kwh`.
 7. Use JSON Schema once for structural validity and JavaScript once for
    engineering validity. Reject invalid input clearly; do not silently repair
    it.

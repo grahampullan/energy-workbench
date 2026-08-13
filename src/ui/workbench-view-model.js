@@ -1,5 +1,12 @@
+import {
+  ACTIVE_POWER_FLOW_TYPE,
+  THERMAL_HEAT_FLOW_TYPE
+} from "../core/flow-types.js";
+
 const WORD_CASE = new Map([
   ["id", "ID"],
+  ["kilowattunit", "kW"],
+  ["kilowatthourunit", "kWh"],
   ["kw", "kW"],
   ["kwh", "kWh"],
   ["pv", "PV"]
@@ -21,12 +28,32 @@ function titleWord(word, wordIndex) {
 
 export function formatFieldLabel(field) {
   return field
+    .replaceAll("kWh", " kilowatthourunit ")
+    .replaceAll("kW", " kilowattunit ")
     .replaceAll(/([a-z0-9])([A-Z])/gu, "$1 $2")
     .replaceAll(/[._-]+/gu, " ")
     .split(/\s+/u)
     .filter(Boolean)
     .map(titleWord)
     .join(" ");
+}
+
+function connectionFlowView(connectionResult) {
+  if (connectionResult.flowType === ACTIVE_POWER_FLOW_TYPE) {
+    const value = connectionResult.flow?.powerkW;
+    return {
+      signedFlow: value,
+      displayFlow: formatEngineeringValue(value, "kW")
+    };
+  }
+  if (connectionResult.flowType === THERMAL_HEAT_FLOW_TYPE) {
+    const value = connectionResult.flow?.heatFlowkW;
+    return {
+      signedFlow: value,
+      displayFlow: formatEngineeringValue(value, "kW")
+    };
+  }
+  throw new Error(`Run results contain an unsupported flow type: ${connectionResult.flowType}`);
 }
 
 export function formatEngineeringValue(value, unit = "") {
@@ -114,24 +141,24 @@ function operationFields(componentResult) {
     ["Actual power", componentResult.actualCommand]
   ];
   return commands.flatMap(([label, command]) =>
-    isRecord(command) && typeof command.powerKw === "number"
-      ? [{ label, value: command.powerKw, unit: "kW", displayValue: formatEngineeringValue(command.powerKw, "kW") }]
+    isRecord(command) && typeof command.powerkW === "number"
+      ? [{ label, value: command.powerkW, unit: "kW", displayValue: formatEngineeringValue(command.powerkW, "kW") }]
       : []
   );
 }
 
 function primaryMetric(definition, componentResult) {
-  if (typeof componentResult.outputs.balanceResidualPowerKw === "number") {
-    const value = componentResult.outputs.balanceResidualPowerKw;
+  if (typeof componentResult.outputs.powerBalanceErrorkW === "number") {
+    const value = componentResult.outputs.powerBalanceErrorkW;
     return {
-      label: "Balance residual",
+      label: "Power balance error",
       value,
       unit: "kW",
       displayValue: formatEngineeringValue(value, "kW")
     };
   }
-  if (typeof componentResult.actualCommand?.powerKw === "number") {
-    const value = componentResult.actualCommand.powerKw;
+  if (typeof componentResult.actualCommand?.powerkW === "number") {
+    const value = componentResult.actualCommand.powerkW;
     return {
       label: "Current power",
       value,
@@ -230,13 +257,15 @@ export function createWorkbenchView({
     if (!connection) {
       throw new Error(`Run results contain an unknown connection: ${connectionResult.connectionId}`);
     }
+    const flowView = connectionFlowView(connectionResult);
     return {
       id: connection.id,
       name: connection.name,
       fromComponentId: connection.from.componentId,
       toComponentId: connection.to.componentId,
-      powerKw: connectionResult.powerKw,
-      displayPower: formatEngineeringValue(connectionResult.powerKw, "kW")
+      flowType: connectionResult.flowType,
+      flow: connectionResult.flow,
+      ...flowView
     };
   });
 

@@ -21,13 +21,13 @@ const model = {
     definitionVersion: electricalBatteryDefinition.version,
     name: "Battery",
     parameters: {
-      capacityKwh: 5,
-      maximumChargePowerKw: 3,
-      maximumDischargePowerKw: 3,
+      capacitykWh: 5,
+      maximumChargePowerkW: 3,
+      maximumDischargePowerkW: 3,
       chargingEfficiency: 1,
       dischargingEfficiency: 1
     },
-    initialState: { storedEnergyKwh: 0 }
+    initialState: { storedEnergykWh: 0 }
   }],
   connections: []
 };
@@ -38,14 +38,14 @@ test("parameter overrides produce a validated model without mutating the working
     model,
     registry,
     overrides: [
-      { componentId: "battery", parameter: "capacityKwh", value: 8 },
-      { componentId: "battery", parameter: "maximumChargePowerKw", value: 4 }
+      { componentId: "battery", parameter: "capacitykWh", value: 8 },
+      { componentId: "battery", parameter: "maximumChargePowerkW", value: 4 }
     ]
   });
 
   assert.equal(result.applied, true);
-  assert.equal(result.model.components[0].parameters.capacityKwh, 8);
-  assert.equal(result.model.components[0].parameters.maximumChargePowerKw, 4);
+  assert.equal(result.model.components[0].parameters.capacitykWh, 8);
+  assert.equal(result.model.components[0].parameters.maximumChargePowerkW, 4);
   assert.equal(result.inverseCommands.length, 2);
   assert.deepEqual(model, snapshot);
 });
@@ -55,7 +55,7 @@ test("invalid overrides return diagnostics and preserve the working model", () =
     model,
     registry,
     overrides: [
-      { componentId: "battery", parameter: "capacityKwh", value: -1 }
+      { componentId: "battery", parameter: "capacitykWh", value: -1 }
     ]
   });
 
@@ -68,13 +68,13 @@ test("invalid overrides return diagnostics and preserve the working model", () =
 
 test("preview helpers resolve defaults and stable override keys", () => {
   const modelUsingDefault = structuredClone(model);
-  delete modelUsingDefault.components[0].parameters.capacityKwh;
+  delete modelUsingDefault.components[0].parameters.capacitykWh;
 
   assert.equal(resolvedParameterValue({
     model: modelUsingDefault,
     registry,
     componentId: "battery",
-    parameter: "capacityKwh"
+    parameter: "capacitykWh"
   }), 5);
-  assert.equal(parameterOverrideKey("battery", "capacityKwh"), "battery\u0000capacityKwh");
+  assert.equal(parameterOverrideKey("battery", "capacitykWh"), "battery\u0000capacitykWh");
 });

@@ -1,8 +1,8 @@
 import {
   ABSOLUTE_ZERO_C,
-  createThermalFlow,
-  THERMAL_FLOW_MEDIUM
+  createThermalFlow
 } from "../../core/thermal-flow.js";
+import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -10,7 +10,7 @@ function parameterValue(component, parameter) {
     : heatDemandDefinition.parameters[parameter].default;
 }
 
-function demandHeatFlowKw(runtimeComponent, stepContext) {
+function demandHeatFlowkW(runtimeComponent, stepContext) {
   const seriesValue = stepContext.seriesValues[runtimeComponent.modelData.demandSeriesId];
   const demand = seriesValue * runtimeComponent.modelData.profileMultiplier;
   if (!Number.isFinite(demand) || demand < 0) {
@@ -21,7 +21,7 @@ function demandHeatFlowKw(runtimeComponent, stepContext) {
 
 export const heatDemandDefinition = {
   type: "thermal.heat-demand",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Heat demand",
 
   parameters: {
@@ -47,14 +47,14 @@ export const heatDemandDefinition = {
 
   ports: [{
     id: "heat-in",
-    medium: THERMAL_FLOW_MEDIUM,
+    flowType: THERMAL_HEAT_FLOW_TYPE,
     direction: "in"
   }],
 
   outputs: {
-    demandHeatFlowKw: { unit: "kW" },
-    servedHeatFlowKw: { unit: "kW" },
-    unmetHeatFlowKw: { unit: "kW" },
+    demandHeatFlowkW: { unit: "kW" },
+    servedHeatFlowkW: { unit: "kW" },
+    unmetHeatFlowkW: { unit: "kW" },
     deliveryTemperatureC: { unit: "°C" },
     deliveryTemperatureMarginK: { unit: "K" }
   },
@@ -106,7 +106,7 @@ export const heatDemandDefinition = {
 
     getOperatingLimits(runtimeComponent, stepContext) {
       return {
-        maximumHeatFlowKw: demandHeatFlowKw(runtimeComponent, stepContext),
+        maximumHeatFlowkW: demandHeatFlowkW(runtimeComponent, stepContext),
         minimumDeliveryTemperatureC:
           runtimeComponent.parameters.minimumDeliveryTemperatureC
       };
@@ -114,37 +114,37 @@ export const heatDemandDefinition = {
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
       const flow = createThermalFlow(actualCommand);
-      const demand = demandHeatFlowKw(runtimeComponent, stepContext);
+      const demand = demandHeatFlowkW(runtimeComponent, stepContext);
       const minimumDeliveryTemperatureC =
         runtimeComponent.parameters.minimumDeliveryTemperatureC;
       const usefulTemperature =
         flow.deliveryTemperatureC >= minimumDeliveryTemperatureC;
-      const servedHeatFlowKw = usefulTemperature
-        ? Math.min(flow.heatFlowKw, demand)
+      const servedHeatFlowkW = usefulTemperature
+        ? Math.min(flow.heatFlowkW, demand)
         : 0;
-      const unmetHeatFlowKw = demand - servedHeatFlowKw;
+      const unmetHeatFlowkW = demand - servedHeatFlowkW;
       const diagnostics = [];
 
-      if (flow.heatFlowKw > demand) {
+      if (flow.heatFlowkW > demand) {
         diagnostics.push({
           code: "thermal.heat-demand.excess-heat",
-          message: `Received ${flow.heatFlowKw} kW for a ${demand} kW heat demand`
+          message: `Received ${flow.heatFlowkW} kW for a ${demand} kW heat demand`
         });
       }
-      if (unmetHeatFlowKw > 0) {
+      if (unmetHeatFlowkW > 0) {
         diagnostics.push({
           severity: "warning",
           code: "thermal.heat-demand.unmet-heat",
-          message: `${unmetHeatFlowKw} kW of heat demand is unmet`
+          message: `${unmetHeatFlowkW} kW of heat demand is unmet`
         });
       }
 
       return {
         portFlows: { "heat-in": flow },
         outputs: {
-          demandHeatFlowKw: demand,
-          servedHeatFlowKw,
-          unmetHeatFlowKw,
+          demandHeatFlowkW: demand,
+          servedHeatFlowkW,
+          unmetHeatFlowkW,
           deliveryTemperatureC: flow.deliveryTemperatureC,
           deliveryTemperatureMarginK:
             flow.deliveryTemperatureC - minimumDeliveryTemperatureC

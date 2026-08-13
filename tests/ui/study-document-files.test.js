@@ -36,10 +36,10 @@ const model = {
   components: [{
     id: "battery",
     type: "electrical.battery",
-    definitionVersion: "0.1.0",
+    definitionVersion: "0.2.0",
     name: "Battery",
-    parameters: { capacityKwh: 5 },
-    initialState: { storedEnergyKwh: 0 }
+    parameters: { capacitykWh: 5 },
+    initialState: { storedEnergykWh: 0 }
   }],
   connections: []
 };
@@ -81,8 +81,8 @@ test("model import rejects invalid JSON and a different workspace shape", () => 
 
 test("saved preview variant is deterministic, detached, and valid", () => {
   const overrides = [
-    { componentId: "battery", parameter: "maximumChargePowerKw", value: 4 },
-    { componentId: "battery", parameter: "capacityKwh", value: 8 }
+    { componentId: "battery", parameter: "maximumChargePowerkW", value: 4 },
+    { componentId: "battery", parameter: "capacitykWh", value: 8 }
   ];
   const variant = createParameterVariant({
     model,
@@ -94,7 +94,7 @@ test("saved preview variant is deterministic, detached, and valid", () => {
   assert.equal(variant.id, "variant.test.larger-battery-option-a");
   assert.deepEqual(
     variant.parameterOverrides.map((override) => override.parameter),
-    ["capacityKwh", "maximumChargePowerKw"]
+    ["capacitykWh", "maximumChargePowerkW"]
   );
   assert.equal(variant.parameterOverrides[1].value, 4);
   const validation = validateVariant(variant, { model, registry });

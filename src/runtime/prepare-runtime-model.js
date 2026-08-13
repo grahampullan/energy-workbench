@@ -144,7 +144,7 @@ function buildRuntimeComponents(model, scenario, registry, diagnostics) {
       modelData,
       ports: definition.ports.map((port) => ({
         id: port.id,
-        medium: port.medium,
+        flowType: port.flowType,
         direction: port.direction,
         connectionIds: []
       }))
@@ -169,7 +169,7 @@ function buildRuntimeConnections(model, runtimeComponents) {
     return Object.freeze({
       id: connection.id,
       name: connection.name,
-      medium: fromPort.medium,
+      flowType: fromPort.flowType,
       from: Object.freeze({ component: fromComponent, port: fromPort }),
       to: Object.freeze({ component: toComponent, port: toPort })
     });

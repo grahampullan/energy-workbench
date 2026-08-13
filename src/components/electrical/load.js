@@ -4,7 +4,7 @@ function parameterValue(component, definition, parameter) {
     : definition.parameters[parameter].default;
 }
 
-function demandPowerKw(runtimeComponent, stepContext) {
+function demandPowerkW(runtimeComponent, stepContext) {
   const seriesValue = stepContext.seriesValues[runtimeComponent.modelData.demandSeriesId];
   const demand = seriesValue * runtimeComponent.modelData.profileMultiplier;
   if (!Number.isFinite(demand) || demand < 0) {
@@ -15,7 +15,7 @@ function demandPowerKw(runtimeComponent, stepContext) {
 
 export const electricalLoadDefinition = {
   type: "electrical.load",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Electrical load",
 
   parameters: {
@@ -36,14 +36,14 @@ export const electricalLoadDefinition = {
   ports: [
     {
       id: "electricity-in",
-      medium: "electricity.active-power",
+      flowType: ACTIVE_POWER_FLOW_TYPE,
       direction: "in"
     }
   ],
 
   outputs: {
-    demandPowerKw: { unit: "kW" },
-    suppliedPowerKw: { unit: "kW" }
+    demandPowerkW: { unit: "kW" },
+    suppliedPowerkW: { unit: "kW" }
   },
 
   editor: {
@@ -92,22 +92,22 @@ export const electricalLoadDefinition = {
     },
 
     getOperatingLimits(runtimeComponent, stepContext) {
-      const demand = demandPowerKw(runtimeComponent, stepContext);
+      const demand = demandPowerkW(runtimeComponent, stepContext);
       return {
-        minimumPowerKw: -demand,
-        maximumPowerKw: -demand
+        minimumPowerkW: -demand,
+        maximumPowerkW: -demand
       };
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
-      const demand = demandPowerKw(runtimeComponent, stepContext);
+      const demand = demandPowerkW(runtimeComponent, stepContext);
       return {
         portFlows: {
-          "electricity-in": { powerKw: -actualCommand.powerKw }
+          "electricity-in": { powerkW: -actualCommand.powerkW }
         },
         outputs: {
-          demandPowerKw: demand,
-          suppliedPowerKw: -actualCommand.powerKw
+          demandPowerkW: demand,
+          suppliedPowerkW: -actualCommand.powerkW
         },
         nextState: stepContext.state,
         diagnostics: []
@@ -115,3 +115,4 @@ export const electricalLoadDefinition = {
     }
   }
 };
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

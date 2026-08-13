@@ -284,10 +284,10 @@ export function validateModel(model, { registry } = {}) {
         path: `/connections/${connectionIndex}/to/portId`
       }));
     }
-    if (fromPort.medium !== toPort.medium) {
+    if (fromPort.flowType !== toPort.flowType) {
       diagnostics.push(createDiagnostic({
-        code: "model.incompatible-port-media",
-        message: `Cannot connect ${fromPort.medium} to ${toPort.medium}`,
+        code: "model.incompatible-port-flow-types",
+        message: `Cannot connect ${fromPort.flowType} to ${toPort.flowType}`,
         path: `/connections/${connectionIndex}`
       }));
     }

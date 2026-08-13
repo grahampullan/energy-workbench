@@ -14,7 +14,7 @@ const sourceDefinition = createTestComponentDefinition({
   type: "electrical.source",
   name: "Electrical source",
   parameters: {
-    ratedPowerKw: {
+    ratedPowerkW: {
       unit: "kW",
       default: 100,
       hardBounds: { minimum: 0, maximum: 500 },
@@ -22,10 +22,10 @@ const sourceDefinition = createTestComponentDefinition({
     }
   },
   ports: [
-    { id: "electricity-out", medium: "electricity.active-power", direction: "out" }
+    { id: "electricity-out", flowType: "electricity.active-power", direction: "out" }
   ],
   outputs: {
-    powerKw: { unit: "kW" }
+    powerkW: { unit: "kW" }
   }
 });
 
@@ -40,10 +40,10 @@ const loadDefinition = createTestComponentDefinition({
     }
   },
   ports: [
-    { id: "electricity-in", medium: "electricity.active-power", direction: "in" }
+    { id: "electricity-in", flowType: "electricity.active-power", direction: "in" }
   ],
   outputs: {
-    demandKw: { unit: "kW" }
+    demandkW: { unit: "kW" }
   }
 });
 
@@ -59,7 +59,7 @@ const model = {
       type: sourceDefinition.type,
       definitionVersion: sourceDefinition.version,
       name: "Source",
-      parameters: { ratedPowerKw: 100 },
+      parameters: { ratedPowerkW: 100 },
       initialState: {}
     },
     {
@@ -94,7 +94,7 @@ test("model validation resolves registered definitions, ports, and parameters", 
 
 test("model validation distinguishes hard bounds from validity warnings", () => {
   const warningModel = structuredClone(model);
-  warningModel.components[0].parameters.ratedPowerKw = 5;
+  warningModel.components[0].parameters.ratedPowerkW = 5;
   const warningResult = validateModel(warningModel, { registry });
 
   assert.equal(warningResult.valid, true);
@@ -102,7 +102,7 @@ test("model validation distinguishes hard bounds from validity warnings", () => 
   assert.equal(warningResult.diagnostics[0].severity, "warning");
 
   const invalidModel = structuredClone(model);
-  invalidModel.components[0].parameters.ratedPowerKw = -1;
+  invalidModel.components[0].parameters.ratedPowerkW = -1;
   const invalidResult = validateModel(invalidModel, { registry });
 
   assert.equal(invalidResult.valid, false);
@@ -130,7 +130,7 @@ test("model validation reports dangling and incompatible port references", () =>
   const thermalLoad = createTestComponentDefinition({
     type: "thermal.load",
     ports: [
-      { id: "heat-in", medium: "thermal.heat", direction: "in" }
+      { id: "heat-in", flowType: "thermal.heat-flow", direction: "in" }
     ]
   });
   const mixedRegistry = createComponentRegistry([sourceDefinition, thermalLoad]);
@@ -140,7 +140,7 @@ test("model validation reports dangling and incompatible port references", () =>
   incompatible.connections[0].to.portId = "heat-in";
   const incompatibleResult = validateModel(incompatible, { registry: mixedRegistry });
 
-  assert.ok(diagnosticCodes(incompatibleResult).includes("model.incompatible-port-media"));
+  assert.ok(diagnosticCodes(incompatibleResult).includes("model.incompatible-port-flow-types"));
 });
 
 test("component-specific validators contribute diagnostics without owning runtime state", () => {
@@ -218,7 +218,7 @@ test("variant validation checks targets, parameter declarations, and bounds", ()
     name: "Test variant",
     baseModelId: model.id,
     parameterOverrides: [
-      { componentId: "source", parameter: "ratedPowerKw", value: 600 },
+      { componentId: "source", parameter: "ratedPowerkW", value: 600 },
       { componentId: "load", parameter: "missingParameter", value: 1 }
     ]
   };

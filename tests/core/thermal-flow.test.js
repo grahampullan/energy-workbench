@@ -10,13 +10,13 @@ import { evaluateRuntimeComponents } from "../../src/runtime/component-execution
 
 test("thermal flows use one exact, immutable boundary contract", () => {
   const flow = createThermalFlow({
-    heatFlowKw: 120,
+    heatFlowkW: 120,
     sourceTemperatureC: 90,
     deliveryTemperatureC: 85
   });
 
   assert.deepEqual(flow, {
-    heatFlowKw: 120,
+    heatFlowkW: 120,
     sourceTemperatureC: 90,
     deliveryTemperatureC: 85
   });
@@ -24,14 +24,14 @@ test("thermal flows use one exact, immutable boundary contract", () => {
   assert.equal(thermalFlowValidationMessage(flow), null);
   assert.throws(
     () => createThermalFlow({ ...flow, massFlowKgPerSecond: 2 }),
-    /exactly heatFlowKw/u
+    /exactly heatFlowkW/u
   );
 });
 
 test("thermal flows reject invalid power and temperatures", () => {
   assert.throws(
     () => createThermalFlow({
-      heatFlowKw: -1,
+      heatFlowkW: -1,
       sourceTemperatureC: 80,
       deliveryTemperatureC: 70
     }),
@@ -39,7 +39,7 @@ test("thermal flows reject invalid power and temperatures", () => {
   );
   assert.throws(
     () => createThermalFlow({
-      heatFlowKw: 1,
+      heatFlowkW: 1,
       sourceTemperatureC: -274,
       deliveryTemperatureC: -274
     }),
@@ -47,7 +47,7 @@ test("thermal flows reject invalid power and temperatures", () => {
   );
   assert.throws(
     () => createThermalFlow({
-      heatFlowKw: 1,
+      heatFlowkW: 1,
       sourceTemperatureC: 70,
       deliveryTemperatureC: 80
     }),
@@ -55,11 +55,11 @@ test("thermal flows reject invalid power and temperatures", () => {
   );
 
   assert.deepEqual(createThermalFlow({
-    heatFlowKw: 0,
+    heatFlowkW: 0,
     sourceTemperatureC: 20,
     deliveryTemperatureC: 25
   }), {
-    heatFlowKw: 0,
+    heatFlowkW: 0,
     sourceTemperatureC: 20,
     deliveryTemperatureC: 25
   });
@@ -74,7 +74,7 @@ test("component execution reports malformed thermal port flows", () => {
         return {
           portFlows: {
             heat: {
-              heatFlowKw: -10,
+              heatFlowkW: -10,
               sourceTemperatureC: 80,
               deliveryTemperatureC: 70
             }
@@ -93,7 +93,7 @@ test("component execution reports malformed thermal port flows", () => {
       definition,
       ports: [{
         id: "heat",
-        medium: "thermal.heat-flow",
+        flowType: "thermal.heat-flow",
         direction: "out"
       }]
     }]
@@ -116,31 +116,31 @@ test("component execution reports malformed thermal port flows", () => {
     diagnostics.map((diagnostic) => diagnostic.code),
     ["runtime.component-port-flow-contract"]
   );
-  assert.match(diagnostics[0].message, /heatFlowKw/u);
+  assert.match(diagnostics[0].message, /heatFlowkW/u);
 });
 
 test("standing heat loss is bounded by energy available above ambient", () => {
   assert.deepEqual(calculateStandingHeatLoss({
-    thermalCapacityKwhPerK: 1,
-    heatLossCoefficientKwPerK: 10,
+    thermalCapacitykWhPerK: 1,
+    heatLossCoefficientkWPerK: 10,
     temperatureC: 21,
     ambientTemperatureC: 20,
-    chargeHeatFlowKw: 0,
-    dischargeHeatFlowKw: 0,
+    chargeHeatFlowkW: 0,
+    dischargeHeatFlowkW: 0,
     durationHours: 1
   }), {
-    unconstrainedHeatLossKw: 10,
-    heatLossKw: 1
+    unconstrainedHeatLosskW: 10,
+    heatLosskW: 1
   });
 
   assert.throws(
     () => calculateStandingHeatLoss({
-      thermalCapacityKwhPerK: 0,
-      heatLossCoefficientKwPerK: 1,
+      thermalCapacitykWhPerK: 0,
+      heatLossCoefficientkWPerK: 1,
       temperatureC: 21,
       ambientTemperatureC: 20,
-      chargeHeatFlowKw: 0,
-      dischargeHeatFlowKw: 0,
+      chargeHeatFlowkW: 0,
+      dischargeHeatFlowkW: 0,
       durationHours: 1
     }),
     /capacity and duration/u

@@ -8,13 +8,13 @@ import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function createBatteryFixture({
-  capacityKwh = 5,
-  maximumChargePowerKw = 3,
-  maximumDischargePowerKw = 3,
+  capacitykWh = 5,
+  maximumChargePowerkW = 3,
+  maximumDischargePowerkW = 3,
   chargingEfficiency = 1,
   dischargingEfficiency = 1,
-  storedEnergyKwh = 0,
-  requestedPowerKw = [0],
+  storedEnergykWh = 0,
+  requestedPowerkW = [0],
   timeStepSeconds = 3600
 } = {}) {
   return {
@@ -29,8 +29,8 @@ function createBatteryFixture({
           definitionVersion: electricalGridDefinition.version,
           name: "Grid",
           parameters: {
-            maximumImportPowerKw: 100,
-            maximumExportPowerKw: 100
+            maximumImportPowerkW: 100,
+            maximumExportPowerkW: 100
           },
           initialState: {}
         },
@@ -48,13 +48,13 @@ function createBatteryFixture({
           definitionVersion: electricalBatteryDefinition.version,
           name: "Battery",
           parameters: {
-            capacityKwh,
-            maximumChargePowerKw,
-            maximumDischargePowerKw,
+            capacitykWh,
+            maximumChargePowerkW,
+            maximumDischargePowerkW,
             chargingEfficiency,
             dischargingEfficiency
           },
-          initialState: { storedEnergyKwh }
+          initialState: { storedEnergykWh }
         }
       ],
       connections: [
@@ -78,14 +78,14 @@ function createBatteryFixture({
       name: "Battery scenario",
       time: {
         timeStepSeconds,
-        stepCount: requestedPowerKw.length
+        stepCount: requestedPowerkW.length
       },
       series: []
     },
     policy: {
       request(runtimeModel, stepContext) {
         return {
-          battery: { powerKw: requestedPowerKw[stepContext.stepIndex] }
+          battery: { powerkW: requestedPowerkW[stepContext.stepIndex] }
         };
       }
     },
@@ -110,33 +110,33 @@ function assertClose(actual, expected, tolerance = 1e-12) {
 
 test("battery limits clamp charging and discharging at empty and full state", () => {
   const fixture = createBatteryFixture({
-    requestedPowerKw: [3, -3, -3, -3, 3, 3]
+    requestedPowerkW: [3, -3, -3, -3, 3, 3]
   });
   const result = runScenario(fixture);
 
   assert.equal(result.completed, true);
   const batterySteps = result.results.steps.map((step) => step.components[2]);
   assert.deepEqual(
-    batterySteps.map((component) => component.feasibleCommand.powerKw),
+    batterySteps.map((component) => component.feasibleCommand.powerkW),
     [0, -3, -2, 0, 3, 2]
   );
   assert.deepEqual(
-    batterySteps.map((component) => component.state.storedEnergyKwh),
+    batterySteps.map((component) => component.state.storedEnergykWh),
     [0, 3, 5, 5, 2, 0]
   );
   assert.deepEqual(batterySteps[2].operatingLimits, {
-    minimumPowerKw: -2,
-    maximumPowerKw: 3
+    minimumPowerkW: -2,
+    maximumPowerkW: 3
   });
   assert.deepEqual(batterySteps[3].outputs, {
-    chargePowerKw: 0,
-    dischargePowerKw: 0,
-    netPowerKw: 0,
-    storedEnergyKwh: 5,
+    chargePowerkW: 0,
+    dischargePowerkW: 0,
+    netPowerkW: 0,
+    storedEnergykWh: 5,
     stateOfChargeFraction: 1
   });
   assert.deepEqual(
-    result.results.steps.map((step) => step.components[0].actualCommand.powerKw),
+    result.results.steps.map((step) => step.components[0].actualCommand.powerkW),
     [0, 3, 2, 0, -3, -2]
   );
   assert.deepEqual(runScenario(fixture), result);
@@ -144,83 +144,83 @@ test("battery limits clamp charging and discharging at empty and full state", ()
 
 test("battery state applies charging and discharging efficiency", () => {
   const result = runScenario(createBatteryFixture({
-    capacityKwh: 10,
-    maximumChargePowerKw: 10,
-    maximumDischargePowerKw: 10,
+    capacitykWh: 10,
+    maximumChargePowerkW: 10,
+    maximumDischargePowerkW: 10,
     chargingEfficiency: 0.8,
     dischargingEfficiency: 0.5,
-    storedEnergyKwh: 1,
-    requestedPowerKw: [-2, 1]
+    storedEnergykWh: 1,
+    requestedPowerkW: [-2, 1]
   }));
 
   assert.equal(result.completed, true);
   const [chargeStep, dischargeStep] = result.results.steps;
-  assertClose(chargeStep.components[2].state.storedEnergyKwh, 2.6);
-  assertClose(dischargeStep.components[2].state.storedEnergyKwh, 0.6);
+  assertClose(chargeStep.components[2].state.storedEnergykWh, 2.6);
+  assertClose(dischargeStep.components[2].state.storedEnergykWh, 0.6);
   assert.deepEqual(chargeStep.components[2].outputs, {
-    chargePowerKw: 2,
-    dischargePowerKw: 0,
-    netPowerKw: -2,
-    storedEnergyKwh: 2.6,
+    chargePowerkW: 2,
+    dischargePowerkW: 0,
+    netPowerkW: -2,
+    storedEnergykWh: 2.6,
     stateOfChargeFraction: 0.26
   });
   assert.deepEqual(dischargeStep.components[2].portFlows, {
-    electricity: { powerKw: 1 }
+    electricity: { powerkW: 1 }
   });
   assert.deepEqual(
-    result.results.steps.map((step) => step.connections[1].powerKw),
+    result.results.steps.map((step) => step.connections[1].flow.powerkW),
     [-2, 1]
   );
 });
 
 test("battery energy limits include timestep duration and refine consistently", () => {
   const limitedResult = runScenario(createBatteryFixture({
-    storedEnergyKwh: 0.5,
-    requestedPowerKw: [3],
+    storedEnergykWh: 0.5,
+    requestedPowerkW: [3],
     timeStepSeconds: 900
   }));
   assert.equal(limitedResult.completed, true);
   assert.deepEqual(limitedResult.results.steps[0].components[2].operatingLimits, {
-    minimumPowerKw: -3,
-    maximumPowerKw: 2
+    minimumPowerkW: -3,
+    maximumPowerkW: 2
   });
   assert.deepEqual(limitedResult.results.steps[0].components[2].actualCommand, {
-    powerKw: 2
+    powerkW: 2
   });
   assert.equal(
-    limitedResult.results.steps[0].components[2].state.storedEnergyKwh,
+    limitedResult.results.steps[0].components[2].state.storedEnergykWh,
     0
   );
 
   const coarseResult = runScenario(createBatteryFixture({
-    capacityKwh: 10,
-    maximumChargePowerKw: 10,
+    capacitykWh: 10,
+    maximumChargePowerkW: 10,
     chargingEfficiency: 0.8,
-    storedEnergyKwh: 1,
-    requestedPowerKw: [-2],
+    storedEnergykWh: 1,
+    requestedPowerkW: [-2],
     timeStepSeconds: 3600
   }));
   const refinedResult = runScenario(createBatteryFixture({
-    capacityKwh: 10,
-    maximumChargePowerKw: 10,
+    capacitykWh: 10,
+    maximumChargePowerkW: 10,
     chargingEfficiency: 0.8,
-    storedEnergyKwh: 1,
-    requestedPowerKw: [-2, -2],
+    storedEnergykWh: 1,
+    requestedPowerkW: [-2, -2],
     timeStepSeconds: 1800
   }));
   assert.equal(coarseResult.completed, true);
   assert.equal(refinedResult.completed, true);
   assertClose(
-    coarseResult.results.steps[0].components[2].state.storedEnergyKwh,
-    refinedResult.results.steps[1].components[2].state.storedEnergyKwh
+    coarseResult.results.steps[0].components[2].state.storedEnergykWh,
+    refinedResult.results.steps[1].components[2].state.storedEnergykWh
   );
-  assertClose(coarseResult.results.steps[0].components[2].state.storedEnergyKwh, 2.6);
+  assertClose(coarseResult.results.steps[0].components[2].state.storedEnergykWh, 2.6);
 });
 
 test("battery validation rejects impossible initial energy and zero efficiency", () => {
   const excessiveInitialEnergy = runScenario(createBatteryFixture({
-    capacityKwh: 5,
-    storedEnergyKwh: 6
+    capacitykWh: 5,
+    storedEnergykWh: 6
   }));
   assert.equal(excessiveInitialEnergy.completed, false);
   assert.ok(

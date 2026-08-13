@@ -16,14 +16,14 @@ function createFixture({
   demandValues = [10],
   ambientValues = demandValues.map(() => 20),
   timeStepSeconds = 3600,
-  maximumGridImportPowerKw = 200,
+  maximumGridImportPowerkW = 200,
   heaterEfficiency = 1,
-  heaterMaximumInputPowerKw = 100,
+  heaterMaximumInputPowerkW = 100,
   heaterSupplyTemperatureC = 100,
   storeInitialTemperatureC = 80,
   storeMaximumTemperatureC = 100,
   storeMinimumUsefulTemperatureC = 70,
-  storeHeatLossCoefficientKwPerK = 0,
+  storeHeatLossCoefficientkWPerK = 0,
   demandDefinition = heatDemandDefinition,
   policy = createHeatDemandFollowingPolicy({
     heaterComponentId: "heater",
@@ -42,8 +42,8 @@ function createFixture({
           definitionVersion: electricalGridDefinition.version,
           name: "Grid",
           parameters: {
-            maximumImportPowerKw: maximumGridImportPowerKw,
-            maximumExportPowerKw: 200
+            maximumImportPowerkW: maximumGridImportPowerkW,
+            maximumExportPowerkW: 200
           },
           initialState: {}
         },
@@ -61,7 +61,7 @@ function createFixture({
           definitionVersion: electricHeaterDefinition.version,
           name: "Electric heater",
           parameters: {
-            maximumElectricalInputPowerKw: heaterMaximumInputPowerKw,
+            maximumElectricalInputPowerkW: heaterMaximumInputPowerkW,
             efficiency: heaterEfficiency,
             supplyTemperatureC: heaterSupplyTemperatureC
           },
@@ -77,9 +77,9 @@ function createFixture({
             waterDensityKgPerM3: 1000,
             specificHeatCapacityKjPerKgK: 3.6,
             maximumTemperatureC: storeMaximumTemperatureC,
-            heatLossCoefficientKwPerK: storeHeatLossCoefficientKwPerK,
-            maximumChargeHeatFlowKw: 100,
-            maximumDischargeHeatFlowKw: 100,
+            heatLossCoefficientkWPerK: storeHeatLossCoefficientkWPerK,
+            maximumChargeHeatFlowkW: 100,
+            maximumDischargeHeatFlowkW: 100,
             minimumUsefulTemperatureC: storeMinimumUsefulTemperatureC
           },
           initialState: { temperatureC: storeInitialTemperatureC }
@@ -187,81 +187,82 @@ test("coupled runtime follows demand and balances electrical and thermal connect
   const step = result.results.steps[0];
   const [grid, bus, heater, store, demand, ambient] = step.components;
 
-  assert.deepEqual(heater.requestedCommand, { powerKw: -10 });
+  assert.deepEqual(heater.requestedCommand, { powerkW: -10 });
   assert.deepEqual(heater.feasibleCommand, {
-    powerKw: -10,
-    heatOutputKw: 10
+    powerkW: -10,
+    heatOutputkW: 10
   });
   assert.deepEqual(heater.actualCommand, {
-    powerKw: -10,
-    heatOutputKw: 10
+    powerkW: -10,
+    heatOutputkW: 10
   });
   assert.deepEqual(heater.outputs, {
-    electricalInputPowerKw: 10,
-    heatOutputKw: 10,
+    electricalInputPowerkW: 10,
+    heatOutputkW: 10,
     supplyTemperatureC: 100
   });
-  assert.deepEqual(grid.actualCommand, { powerKw: 10 });
-  assert.equal(bus.outputs.balanceResidualPowerKw, 0);
+  assert.deepEqual(grid.actualCommand, { powerkW: 10 });
+  assert.equal(bus.outputs.powerBalanceErrorkW, 0);
 
   assert.equal(store.requestedCommand, null);
   assert.equal(store.feasibleCommand, null);
   assert.deepEqual(store.actualCommand, {
-    chargeHeatFlowKw: 10,
+    chargeHeatFlowkW: 10,
     chargeSourceTemperatureC: 100,
     chargeDeliveryTemperatureC: 100,
-    dischargeHeatFlowKw: 10,
+    dischargeHeatFlowkW: 10,
     ambientTemperatureC: 20
   });
   assert.deepEqual(store.outputs, {
-    chargeHeatFlowKw: 10,
-    dischargeHeatFlowKw: 10,
-    heatLossKw: 0,
-    netHeatFlowKw: 0,
+    chargeHeatFlowkW: 10,
+    dischargeHeatFlowkW: 10,
+    heatLosskW: 0,
+    netHeatFlowkW: 0,
     temperatureC: 80,
-    usableEnergyKwh: 10,
+    usableEnergykWh: 10,
     deliveryTemperatureMarginK: 10
   });
-  assert.equal(demand.outputs.servedHeatFlowKw, 10);
-  assert.equal(demand.outputs.unmetHeatFlowKw, 0);
-  assert.equal(ambient.outputs.receivedHeatFlowKw, 0);
+  assert.equal(demand.outputs.servedHeatFlowkW, 10);
+  assert.equal(demand.outputs.unmetHeatFlowkW, 0);
+  assert.equal(ambient.outputs.receivedHeatFlowkW, 0);
 
   assert.deepEqual(step.connections, [
     {
       connectionId: "grid-to-bus",
-      medium: "electricity.active-power",
-      powerKw: 10,
-      residualPowerKw: 0
+      flowType: "electricity.active-power",
+      flow: { powerkW: 10 }
     },
     {
       connectionId: "bus-to-heater",
-      medium: "electricity.active-power",
-      powerKw: 10,
-      residualPowerKw: 0
+      flowType: "electricity.active-power",
+      flow: { powerkW: 10 }
     },
     {
       connectionId: "heater-to-store",
-      medium: "thermal.heat-flow",
-      heatFlowKw: 10,
-      sourceTemperatureC: 100,
-      deliveryTemperatureC: 100,
-      residualHeatFlowKw: 0
+      flowType: "thermal.heat-flow",
+      flow: {
+        heatFlowkW: 10,
+        sourceTemperatureC: 100,
+        deliveryTemperatureC: 100
+      }
     },
     {
       connectionId: "store-to-demand",
-      medium: "thermal.heat-flow",
-      heatFlowKw: 10,
-      sourceTemperatureC: 80,
-      deliveryTemperatureC: 80,
-      residualHeatFlowKw: 0
+      flowType: "thermal.heat-flow",
+      flow: {
+        heatFlowkW: 10,
+        sourceTemperatureC: 80,
+        deliveryTemperatureC: 80
+      }
     },
     {
       connectionId: "store-to-ambient",
-      medium: "thermal.heat-flow",
-      heatFlowKw: 0,
-      sourceTemperatureC: 80,
-      deliveryTemperatureC: 20,
-      residualHeatFlowKw: 0
+      flowType: "thermal.heat-flow",
+      flow: {
+        heatFlowkW: 0,
+        sourceTemperatureC: 80,
+        deliveryTemperatureC: 20
+      }
     }
   ]);
   assert.deepEqual(runScenario(fixture), result);
@@ -280,30 +281,30 @@ test("coupled runtime reports unmet heat until the store reaches useful temperat
   ]);
   const [first, second] = result.results.steps;
   assert.equal(first.components[3].state.temperatureC, 75);
-  assert.equal(first.components[4].outputs.servedHeatFlowKw, 0);
-  assert.equal(first.components[4].outputs.unmetHeatFlowKw, 10);
-  assert.equal(second.components[3].actualCommand.dischargeHeatFlowKw, 5);
+  assert.equal(first.components[4].outputs.servedHeatFlowkW, 0);
+  assert.equal(first.components[4].outputs.unmetHeatFlowkW, 10);
+  assert.equal(second.components[3].actualCommand.dischargeHeatFlowkW, 5);
   assert.equal(second.components[3].state.temperatureC, 80);
-  assert.equal(second.components[4].outputs.servedHeatFlowKw, 5);
-  assert.equal(second.components[4].outputs.unmetHeatFlowKw, 5);
+  assert.equal(second.components[4].outputs.servedHeatFlowkW, 5);
+  assert.equal(second.components[4].outputs.unmetHeatFlowkW, 5);
 });
 
 test("coupled runtime allocates standing loss and conserves store energy", () => {
   const result = runScenario(createFixture({
     demandValues: [4],
-    storeHeatLossCoefficientKwPerK: 0.1
+    storeHeatLossCoefficientkWPerK: 0.1
   }));
 
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
   const store = step.components[3];
-  assert.equal(store.actualCommand.chargeHeatFlowKw, 4);
-  assert.equal(store.actualCommand.dischargeHeatFlowKw, 4);
-  assert.equal(store.outputs.heatLossKw, 6);
-  assert.equal(store.outputs.netHeatFlowKw, -6);
+  assert.equal(store.actualCommand.chargeHeatFlowkW, 4);
+  assert.equal(store.actualCommand.dischargeHeatFlowkW, 4);
+  assert.equal(store.outputs.heatLosskW, 6);
+  assert.equal(store.outputs.netHeatFlowkW, -6);
   assert.equal(store.state.temperatureC, 74);
-  assert.equal(step.components[5].outputs.receivedHeatFlowKw, 6);
-  assert.equal(step.connections[4].heatFlowKw, 6);
+  assert.equal(step.components[5].outputs.receivedHeatFlowkW, 6);
+  assert.equal(step.connections[4].flow.heatFlowkW, 6);
 });
 
 test("heat-demand-following policy converts requested heat through heater efficiency", () => {
@@ -314,12 +315,12 @@ test("heat-demand-following policy converts requested heat through heater effici
 
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
-  assert.deepEqual(step.components[2].requestedCommand, { powerKw: -10 });
+  assert.deepEqual(step.components[2].requestedCommand, { powerkW: -10 });
   assert.deepEqual(step.components[2].actualCommand, {
-    powerKw: -10,
-    heatOutputKw: 8
+    powerkW: -10,
+    heatOutputkW: 8
   });
-  assert.deepEqual(step.components[0].actualCommand, { powerKw: 10 });
+  assert.deepEqual(step.components[0].actualCommand, { powerkW: 10 });
 });
 
 test("coupled resolver clamps heater operation at the store supply-temperature boundary", () => {
@@ -327,25 +328,25 @@ test("coupled resolver clamps heater operation at the store supply-temperature b
     demandValues: [0],
     heaterEfficiency: 0.8,
     heaterSupplyTemperatureC: 85,
-    policy: { request: () => ({ heater: { powerKw: -100 } }) }
+    policy: { request: () => ({ heater: { powerkW: -100 } }) }
   }));
 
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
-  assert.deepEqual(step.components[2].requestedCommand, { powerKw: -100 });
+  assert.deepEqual(step.components[2].requestedCommand, { powerkW: -100 });
   assert.deepEqual(step.components[2].feasibleCommand, {
-    powerKw: -6.25,
-    heatOutputKw: 5
+    powerkW: -6.25,
+    heatOutputkW: 5
   });
-  assert.deepEqual(step.components[0].actualCommand, { powerKw: 6.25 });
+  assert.deepEqual(step.components[0].actualCommand, { powerkW: 6.25 });
   assert.equal(step.components[3].state.temperatureC, 85);
-  assert.equal(step.connections[2].heatFlowKw, 5);
+  assert.equal(step.connections[2].flow.heatFlowkW, 5);
 });
 
 test("coupled runtime preserves electrical grid infeasibility", () => {
   const result = runScenario(createFixture({
     demandValues: [10],
-    maximumGridImportPowerKw: 4
+    maximumGridImportPowerkW: 4
   }));
 
   assert.equal(result.completed, false);
@@ -380,7 +381,7 @@ test("coupled connection balance checks component-evaluated thermal flows", () =
           portFlows: {
             "heat-in": {
               ...evaluation.portFlows["heat-in"],
-              heatFlowKw: evaluation.portFlows["heat-in"].heatFlowKw + 1
+              heatFlowkW: evaluation.portFlows["heat-in"].heatFlowkW + 1
             }
           }
         };

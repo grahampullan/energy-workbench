@@ -2,7 +2,7 @@ const terminalIds = ["terminal-1", "terminal-2", "terminal-3", "terminal-4"];
 
 export const electricalBusDefinition = {
   type: "electrical.bus",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Electrical bus",
 
   parameters: {},
@@ -10,12 +10,12 @@ export const electricalBusDefinition = {
 
   ports: terminalIds.map((id) => ({
     id,
-    medium: "electricity.active-power",
+    flowType: ACTIVE_POWER_FLOW_TYPE,
     direction: "bidirectional"
   })),
 
   outputs: {
-    balanceResidualPowerKw: { unit: "kW" }
+    powerBalanceErrorkW: { unit: "kW" }
   },
 
   editor: {},
@@ -35,27 +35,28 @@ export const electricalBusDefinition = {
 
     getOperatingLimits() {
       return {
-        minimumPowerKw: 0,
-        maximumPowerKw: 0
+        minimumPowerkW: 0,
+        maximumPowerkW: 0
       };
     },
 
     evaluate(runtimeComponent, actualCommand) {
       const portFlows = Object.fromEntries(runtimeComponent.ports.map((port) => [
         port.id,
-        { powerKw: actualCommand.portPowerKw[port.id] }
+        { powerkW: actualCommand.portPowerkW[port.id] }
       ]));
-      const balanceResidualPowerKw = Object.values(portFlows).reduce(
-        (total, flow) => total + flow.powerKw,
+      const powerBalanceErrorkW = Object.values(portFlows).reduce(
+        (total, flow) => total + flow.powerkW,
         0
       );
 
       return {
         portFlows,
-        outputs: { balanceResidualPowerKw },
+        outputs: { powerBalanceErrorkW },
         nextState: {},
         diagnostics: []
       };
     }
   }
 };
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

@@ -51,19 +51,19 @@ export function createHeatDemandFollowingPolicy({
         throw new Error("Heat-demand-following policy requires heater and demand limits");
       }
       const conversion = heaterLimits.heatOutputPerElectricalInput;
-      const demandHeatFlowKw = demandLimits.maximumHeatFlowKw;
+      const demandHeatFlowkW = demandLimits.maximumHeatFlowkW;
       if (!Number.isFinite(conversion) || conversion <= 0) {
         throw new Error("Heater limits must declare a positive heat conversion");
       }
-      if (!Number.isFinite(demandHeatFlowKw) || demandHeatFlowKw < 0) {
+      if (!Number.isFinite(demandHeatFlowkW) || demandHeatFlowkW < 0) {
         throw new Error("Heat-demand limits must declare non-negative demand");
       }
-      const requestedPowerKw = demandHeatFlowKw === 0
+      const requestedPowerkW = demandHeatFlowkW === 0
         ? 0
-        : -demandHeatFlowKw / conversion;
+        : -demandHeatFlowkW / conversion;
 
       return {
-        [heaterComponentId]: { powerKw: requestedPowerKw }
+        [heaterComponentId]: { powerkW: requestedPowerkW }
       };
     }
   });

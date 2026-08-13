@@ -13,8 +13,8 @@ function createFixture({
   gridDefinition = electricalGridDefinition,
   pvDefinition = electricalPvDefinition,
   loadDefinition = electricalLoadDefinition,
-  maximumImportPowerKw = 50,
-  maximumExportPowerKw = 50,
+  maximumImportPowerkW = 50,
+  maximumExportPowerkW = 50,
   pvProfileMultiplier = 1,
   loadProfileMultiplier = 1.5,
   demandValues = [10, 20],
@@ -33,7 +33,7 @@ function createFixture({
         type: gridDefinition.type,
         definitionVersion: gridDefinition.version,
         name: "Grid",
-        parameters: { maximumImportPowerKw, maximumExportPowerKw },
+        parameters: { maximumImportPowerkW, maximumExportPowerkW },
         initialState: {}
       },
       {
@@ -129,7 +129,7 @@ function addDispatchableSource(fixture) {
     type: electricalSourceDefinition.type,
     definitionVersion: electricalSourceDefinition.version,
     name: "Dispatchable source",
-    parameters: { maximumPowerKw: 50 },
+    parameters: { maximumPowerkW: 50 },
     initialState: {}
   });
   fixture.model.connections.push({
@@ -169,70 +169,67 @@ test("runScenario records fixed PV and load operation with residual grid import 
   const [grid, bus, pv, load] = firstStep.components;
   assert.equal(grid.requestedCommand, null);
   assert.deepEqual(grid.operatingLimits, {
-    minimumPowerKw: -50,
-    maximumPowerKw: 50
+    minimumPowerkW: -50,
+    maximumPowerkW: 50
   });
   assert.equal(grid.feasibleCommand, null);
-  assert.deepEqual(grid.actualCommand, { powerKw: 10 });
+  assert.deepEqual(grid.actualCommand, { powerkW: 10 });
   assert.deepEqual(grid.outputs, {
-    importPowerKw: 10,
-    exportPowerKw: 0,
-    netPowerKw: 10
+    importPowerkW: 10,
+    exportPowerkW: 0,
+    netPowerkW: 10
   });
 
   assert.equal(bus.requestedCommand, null);
-  assert.deepEqual(bus.feasibleCommand, { powerKw: 0 });
+  assert.deepEqual(bus.feasibleCommand, { powerkW: 0 });
   assert.deepEqual(bus.actualCommand, {
-    powerKw: 0,
-    portPowerKw: {
+    powerkW: 0,
+    portPowerkW: {
       "terminal-1": -10,
       "terminal-2": -5,
       "terminal-3": 15,
       "terminal-4": 0
     }
   });
-  assert.deepEqual(bus.outputs, { balanceResidualPowerKw: 0 });
+  assert.deepEqual(bus.outputs, { powerBalanceErrorkW: 0 });
 
   assert.equal(pv.requestedCommand, null);
-  assert.deepEqual(pv.feasibleCommand, { powerKw: 5 });
-  assert.deepEqual(pv.actualCommand, { powerKw: 5 });
-  assert.deepEqual(pv.outputs, { availablePowerKw: 5, powerKw: 5 });
+  assert.deepEqual(pv.feasibleCommand, { powerkW: 5 });
+  assert.deepEqual(pv.actualCommand, { powerkW: 5 });
+  assert.deepEqual(pv.outputs, { availablePowerkW: 5, powerkW: 5 });
 
   assert.equal(load.requestedCommand, null);
-  assert.deepEqual(load.feasibleCommand, { powerKw: -15 });
-  assert.deepEqual(load.actualCommand, { powerKw: -15 });
+  assert.deepEqual(load.feasibleCommand, { powerkW: -15 });
+  assert.deepEqual(load.actualCommand, { powerkW: -15 });
   assert.deepEqual(load.outputs, {
-    demandPowerKw: 15,
-    suppliedPowerKw: 15
+    demandPowerkW: 15,
+    suppliedPowerkW: 15
   });
   assert.deepEqual(firstStep.connections, [
     {
       connectionId: "grid-to-bus",
-      medium: "electricity.active-power",
-      powerKw: 10,
-      residualPowerKw: 0
+      flowType: "electricity.active-power",
+      flow: { powerkW: 10 }
     },
     {
       connectionId: "pv-to-bus",
-      medium: "electricity.active-power",
-      powerKw: 5,
-      residualPowerKw: 0
+      flowType: "electricity.active-power",
+      flow: { powerkW: 5 }
     },
     {
       connectionId: "bus-to-load",
-      medium: "electricity.active-power",
-      powerKw: 15,
-      residualPowerKw: 0
+      flowType: "electricity.active-power",
+      flow: { powerkW: 15 }
     }
   ]);
 
-  assert.deepEqual(secondStep.components[0].actualCommand, { powerKw: -10 });
+  assert.deepEqual(secondStep.components[0].actualCommand, { powerkW: -10 });
   assert.deepEqual(secondStep.components[0].outputs, {
-    importPowerKw: 0,
-    exportPowerKw: 10,
-    netPowerKw: -10
+    importPowerkW: 0,
+    exportPowerkW: 10,
+    netPowerkW: -10
   });
-  assert.deepEqual(secondStep.connections.map((connection) => connection.powerKw), [
+  assert.deepEqual(secondStep.connections.map((connection) => connection.flow.powerkW), [
     -10,
     40,
     30
@@ -245,7 +242,7 @@ test("state is initialised once and committed only after each balanced step", ()
     ...electricalPvDefinition,
     version: "0.2.0",
     initialState: {
-      generatedEnergyKwh: { unit: "kWh", default: 0 }
+      generatedEnergykWh: { unit: "kWh", default: 0 }
     },
     model: {
       ...electricalPvDefinition.model,
@@ -261,9 +258,9 @@ test("state is initialised once and committed only after each balanced step", ()
         return {
           ...evaluation,
           nextState: {
-            generatedEnergyKwh:
-              stepContext.state.generatedEnergyKwh +
-              actualCommand.powerKw * stepContext.durationHours
+            generatedEnergykWh:
+              stepContext.state.generatedEnergykWh +
+              actualCommand.powerkW * stepContext.durationHours
           }
         };
       }
@@ -275,20 +272,20 @@ test("state is initialised once and committed only after each balanced step", ()
     demandValues: [10, 10],
     generationValues: [10, 10],
     timeStepSeconds: 1800,
-    pvInitialState: { generatedEnergyKwh: 5 }
+    pvInitialState: { generatedEnergykWh: 5 }
   });
 
   const result = runScenario(fixture);
 
   assert.equal(result.completed, true);
   assert.deepEqual(result.results.initialStates[2].state, {
-    generatedEnergyKwh: 5
+    generatedEnergykWh: 5
   });
   assert.deepEqual(result.results.steps[0].components[2].state, {
-    generatedEnergyKwh: 10
+    generatedEnergykWh: 10
   });
   assert.deepEqual(result.results.steps[1].components[2].state, {
-    generatedEnergyKwh: 15
+    generatedEnergykWh: 15
   });
 
   const coarseFixture = createFixture({
@@ -297,17 +294,17 @@ test("state is initialised once and committed only after each balanced step", ()
     demandValues: [10],
     generationValues: [10],
     timeStepSeconds: 3600,
-    pvInitialState: { generatedEnergyKwh: 5 }
+    pvInitialState: { generatedEnergykWh: 5 }
   });
   const coarseResult = runScenario(coarseFixture);
   assert.deepEqual(coarseResult.results.steps[0].components[2].state, {
-    generatedEnergyKwh: 15
+    generatedEnergykWh: 15
   });
 });
 
 test("grid import and export limits make residual balance explicitly infeasible", () => {
   const importLimited = createFixture({
-    maximumImportPowerKw: 20,
+    maximumImportPowerkW: 20,
     loadProfileMultiplier: 1,
     demandValues: [30],
     generationValues: [0]
@@ -318,7 +315,7 @@ test("grid import and export limits make residual balance explicitly infeasible"
   assert.ok(diagnosticCodes(importResult).includes("runtime.electrical-balance-infeasible"));
 
   const exportLimited = createFixture({
-    maximumExportPowerKw: 20,
+    maximumExportPowerkW: 20,
     loadProfileMultiplier: 1,
     demandValues: [0],
     generationValues: [30]
@@ -340,18 +337,18 @@ test("the grid remains idle when fixed PV exactly supplies fixed demand", () => 
 
   assert.equal(result.completed, true);
   assert.deepEqual(result.results.steps[0].components[0].actualCommand, {
-    powerKw: 0
+    powerkW: 0
   });
   assert.deepEqual(result.results.steps[0].components[0].outputs, {
-    importPowerKw: 0,
-    exportPowerKw: 0,
-    netPowerKw: 0
+    importPowerkW: 0,
+    exportPowerkW: 0,
+    netPowerkW: 0
   });
 });
 
 test("the grid is resolver-owned and cannot receive a policy request", () => {
   const fixture = createFixture({
-    policy: { request: () => ({ grid: { powerKw: 0 } }) }
+    policy: { request: () => ({ grid: { powerkW: 0 } }) }
   });
 
   const result = runScenario(fixture);
@@ -368,7 +365,7 @@ test("a non-grid controllable component requires an explicit valid policy reques
   assert.ok(diagnosticCodes(missingResult).includes("runtime.missing-policy-request"));
 
   const malformedRequest = createFixture({
-    policy: { request: () => ({ source: { powerKw: "maximum" } }) }
+    policy: { request: () => ({ source: { powerkW: "maximum" } }) }
   });
   addDispatchableSource(malformedRequest);
   const malformedResult = runScenario(malformedRequest);
@@ -378,8 +375,8 @@ test("a non-grid controllable component requires an explicit valid policy reques
 
 test("policy fixes controllable operation before the grid balances the remainder", () => {
   const fixture = createFixture({
-    maximumExportPowerKw: 100,
-    policy: { request: () => ({ source: { powerKw: 100 } }) }
+    maximumExportPowerkW: 100,
+    policy: { request: () => ({ source: { powerkW: 100 } }) }
   });
   addDispatchableSource(fixture);
 
@@ -387,11 +384,11 @@ test("policy fixes controllable operation before the grid balances the remainder
 
   assert.equal(result.completed, true);
   const firstStep = result.results.steps[0];
-  assert.deepEqual(firstStep.components[4].requestedCommand, { powerKw: 100 });
-  assert.deepEqual(firstStep.components[4].feasibleCommand, { powerKw: 50 });
-  assert.deepEqual(firstStep.components[4].actualCommand, { powerKw: 50 });
-  assert.deepEqual(firstStep.components[0].actualCommand, { powerKw: -40 });
-  assert.deepEqual(firstStep.connections.map((connection) => connection.powerKw), [
+  assert.deepEqual(firstStep.components[4].requestedCommand, { powerkW: 100 });
+  assert.deepEqual(firstStep.components[4].feasibleCommand, { powerkW: 50 });
+  assert.deepEqual(firstStep.components[4].actualCommand, { powerkW: 50 });
+  assert.deepEqual(firstStep.components[0].actualCommand, { powerkW: -40 });
+  assert.deepEqual(firstStep.connections.map((connection) => connection.flow.powerkW), [
     -40,
     5,
     15,
@@ -453,7 +450,7 @@ test("connection balance is checked against component-evaluated port flows", () 
           ...evaluation,
           portFlows: {
             "electricity-in": {
-              powerKw: evaluation.portFlows["electricity-in"].powerKw + 1
+              powerkW: evaluation.portFlows["electricity-in"].powerkW + 1
             }
           }
         };
@@ -490,14 +487,14 @@ test("the bus resolver balances branching electrical loads through the grid", ()
 
   assert.equal(result.completed, true);
   assert.deepEqual(result.results.steps[0].components[0].actualCommand, {
-    powerKw: 20
+    powerkW: 20
   });
   assert.deepEqual(
-    result.results.steps[0].connections.map((connection) => connection.powerKw),
+    result.results.steps[0].connections.map((connection) => connection.flow.powerkW),
     [20, 5, 15, 10]
   );
   assert.equal(
-    result.results.steps[0].components[1].outputs.balanceResidualPowerKw,
+    result.results.steps[0].components[1].outputs.powerBalanceErrorkW,
     0
   );
 });

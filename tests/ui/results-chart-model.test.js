@@ -14,7 +14,7 @@ import { createPvBatterySelfConsumptionPolicy } from
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import {
   createResultsChartModel,
-  integratePowerSeriesKwh
+  integratePowerSerieskWh
 } from "../../src/ui/results-chart-model.js";
 
 const exampleDirectory = new URL("../../examples/blog-electrical/", import.meta.url);
@@ -71,7 +71,7 @@ test("chart model derives directional power series from canonical connection res
     ]
   );
   assert.ok(chart.series.every((series) =>
-    series.values.every((point) => point.powerKw >= 0)
+    series.values.every((point) => point.powerkW >= 0)
   ));
 });
 
@@ -79,9 +79,9 @@ test("chart integration reproduces the reviewed daily-energy regression values",
   const chart = createResultsChartModel({ model, registry, results: run.results });
   const energyBySeriesId = Object.fromEntries(chart.series.map((series) => [
     series.id,
-    series.integratedEnergyKwh
+    series.integratedEnergykWh
   ]));
-  const expected = expectedResults.cases.baseline.integratedEnergyKwh;
+  const expected = expectedResults.cases.baseline.integratedEnergykWh;
 
   assert.ok(Math.abs(energyBySeriesId["pv-to-bus:forward"] - expected["solar supply"]) < 1e-12);
   assert.ok(Math.abs(energyBySeriesId["battery-to-bus:forward"] - expected["from battery"]) < 1e-12);
@@ -92,9 +92,9 @@ test("chart integration reproduces the reviewed daily-energy regression values",
 });
 
 test("trapezoidal integration validates its engineering inputs", () => {
-  assert.equal(integratePowerSeriesKwh([0, 2, 2], 3600), 3);
-  assert.throws(() => integratePowerSeriesKwh([0, Number.NaN], 60), /finite/u);
-  assert.throws(() => integratePowerSeriesKwh([0, 1], 0), /positive/u);
+  assert.equal(integratePowerSerieskWh([0, 2, 2], 3600), 3);
+  assert.throws(() => integratePowerSerieskWh([0, Number.NaN], 60), /finite/u);
+  assert.throws(() => integratePowerSerieskWh([0, 1], 0), /positive/u);
 });
 
 test("chart model rejects an incomplete connection result series", () => {

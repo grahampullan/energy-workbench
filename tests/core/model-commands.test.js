@@ -9,7 +9,7 @@ const sourceDefinition = createTestComponentDefinition({
   type: "electrical.source",
   name: "Electrical source",
   parameters: {
-    ratedPowerKw: {
+    ratedPowerkW: {
       unit: "kW",
       default: 100,
       hardBounds: { minimum: 0, maximum: 500 },
@@ -17,10 +17,10 @@ const sourceDefinition = createTestComponentDefinition({
     }
   },
   ports: [
-    { id: "electricity-out", medium: "electricity.active-power", direction: "out" }
+    { id: "electricity-out", flowType: "electricity.active-power", direction: "out" }
   ],
   outputs: {
-    powerKw: { unit: "kW" }
+    powerkW: { unit: "kW" }
   }
 });
 
@@ -35,10 +35,10 @@ const loadDefinition = createTestComponentDefinition({
     }
   },
   ports: [
-    { id: "electricity-in", medium: "electricity.active-power", direction: "in" }
+    { id: "electricity-in", flowType: "electricity.active-power", direction: "in" }
   ],
   outputs: {
-    demandKw: { unit: "kW" }
+    demandkW: { unit: "kW" }
   }
 });
 
@@ -54,7 +54,7 @@ const model = {
       type: sourceDefinition.type,
       definitionVersion: sourceDefinition.version,
       name: "Source",
-      parameters: { ratedPowerKw: 100 },
+      parameters: { ratedPowerkW: 100 },
       initialState: {}
     },
     {
@@ -89,7 +89,7 @@ test("setParameter returns a new model and an exact undo/redo path", () => {
   const command = {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: 250
   };
 
@@ -97,7 +97,7 @@ test("setParameter returns a new model and an exact undo/redo path", () => {
 
   assert.equal(changed.applied, true);
   assert.notEqual(changed.model, model);
-  assert.equal(changed.model.components[0].parameters.ratedPowerKw, 250);
+  assert.equal(changed.model.components[0].parameters.ratedPowerkW, 250);
   assert.deepEqual(model, originalSnapshot);
 
   const undone = apply(changed.model, changed.inverseCommand);
@@ -111,12 +111,12 @@ test("setParameter returns a new model and an exact undo/redo path", () => {
 
 test("setParameter undo restores an omitted parameter rather than persisting its default", () => {
   const modelUsingDefault = structuredClone(model);
-  delete modelUsingDefault.components[0].parameters.ratedPowerKw;
+  delete modelUsingDefault.components[0].parameters.ratedPowerkW;
 
   const changed = apply(modelUsingDefault, {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: 200
   });
 
@@ -132,7 +132,7 @@ test("commands accept validity warnings but reject hard-bound violations", () =>
   const warning = apply(model, {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: 5
   });
   assert.equal(warning.applied, true);
@@ -141,7 +141,7 @@ test("commands accept validity warnings but reject hard-bound violations", () =>
   const invalid = apply(model, {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: -1
   });
   assert.equal(invalid.applied, false);
@@ -254,7 +254,7 @@ test("malformed, unknown, and non-JSON command data return diagnostics", () => {
   const nonJson = apply(model, {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: 1n
   });
   assert.equal(nonJson.applied, false);
@@ -265,7 +265,7 @@ test("malformed, unknown, and non-JSON command data return diagnostics", () => {
   const circular = apply(model, {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: circularValue
   });
   assert.equal(circular.applied, false);
@@ -275,7 +275,7 @@ test("malformed, unknown, and non-JSON command data return diagnostics", () => {
   const invalidModel = apply(malformedModel, {
     type: "setParameter",
     componentId: "source",
-    parameter: "ratedPowerKw",
+    parameter: "ratedPowerkW",
     value: 100
   });
   assert.equal(invalidModel.applied, false);

@@ -41,30 +41,30 @@ test("component registry rejects incomplete engineering definitions", () => {
 test("component registry requires declared initial-state units and defaults", () => {
   const missingUnit = createTestComponentDefinition({
     initialState: {
-      storedEnergyKwh: { default: 0 }
+      storedEnergykWh: { default: 0 }
     }
   });
   assert.throws(
     () => createComponentRegistry([missingUnit]),
-    /initialState\.storedEnergyKwh\.unit is required/u
+    /initialState\.storedEnergykWh\.unit is required/u
   );
 
   const missingDefault = createTestComponentDefinition({
     initialState: {
-      storedEnergyKwh: { unit: "kWh" }
+      storedEnergykWh: { unit: "kWh" }
     }
   });
   assert.throws(
     () => createComponentRegistry([missingDefault]),
-    /initialState\.storedEnergyKwh\.default is required/u
+    /initialState\.storedEnergykWh\.default is required/u
   );
 });
 
 test("component registry rejects duplicate ports and malformed parameter ranges", () => {
   const duplicatePorts = createTestComponentDefinition({
     ports: [
-      { id: "power", medium: "electricity.active-power", direction: "in" },
-      { id: "power", medium: "electricity.active-power", direction: "out" }
+      { id: "power", flowType: "electricity.active-power", direction: "in" },
+      { id: "power", flowType: "electricity.active-power", direction: "out" }
     ]
   });
   assert.throws(
@@ -74,7 +74,7 @@ test("component registry rejects duplicate ports and malformed parameter ranges"
 
   const malformedRange = createTestComponentDefinition({
     parameters: {
-      powerKw: {
+      powerkW: {
         unit: "kW",
         default: 10,
         hardBounds: { minimum: 20, maximum: 10 }
@@ -84,5 +84,18 @@ test("component registry rejects duplicate ports and malformed parameter ranges"
   assert.throws(
     () => createComponentRegistry([malformedRange]),
     /minimum cannot exceed maximum/u
+  );
+});
+
+test("component registry rejects unsupported flow types", () => {
+  const definition = createTestComponentDefinition({
+    ports: [
+      { id: "material-out", flowType: "material.mass-flow", direction: "out" }
+    ]
+  });
+
+  assert.throws(
+    () => createComponentRegistry([definition]),
+    /flowType is not supported/u
   );
 });

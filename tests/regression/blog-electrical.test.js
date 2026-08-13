@@ -91,24 +91,24 @@ function powerSeries(runResult) {
     const pv = componentAtStep(step, "pv");
     const load = componentAtStep(step, "load");
     const battery = componentAtStep(step, "battery");
-    series["solar supply"].push(pv.outputs.powerKw);
-    series["from battery"].push(battery.outputs.dischargePowerKw);
-    series["grid supply"].push(grid.outputs.importPowerKw);
-    series.load.push(load.outputs.suppliedPowerKw);
-    series["to battery"].push(battery.outputs.chargePowerKw);
-    series["grid export"].push(grid.outputs.exportPowerKw);
+    series["solar supply"].push(pv.outputs.powerkW);
+    series["from battery"].push(battery.outputs.dischargePowerkW);
+    series["grid supply"].push(grid.outputs.importPowerkW);
+    series.load.push(load.outputs.suppliedPowerkW);
+    series["to battery"].push(battery.outputs.chargePowerkW);
+    series["grid export"].push(grid.outputs.exportPowerkW);
   }
 
   return series;
 }
 
-function integratePowerKwh(values, timeStepSeconds) {
+function integratePowerkWh(values, timeStepSeconds) {
   const durationHours = timeStepSeconds / 3600;
-  let energyKwh = 0;
+  let energykWh = 0;
   for (let index = 1; index < values.length; index += 1) {
-    energyKwh += (values[index - 1] + values[index]) / 2 * durationHours;
+    energykWh += (values[index - 1] + values[index]) / 2 * durationHours;
   }
-  return energyKwh;
+  return energykWh;
 }
 
 function summariseRun(runResult) {
@@ -116,27 +116,27 @@ function summariseRun(runResult) {
   const series = powerSeries(runResult);
   const seriesSummary = Object.fromEntries(
     Object.entries(series).map(([name, values]) => [name, {
-      minimumKw: Math.min(...values),
-      maximumKw: Math.max(...values),
-      integratedEnergyKwh: integratePowerKwh(
+      minimumkW: Math.min(...values),
+      maximumkW: Math.max(...values),
+      integratedEnergykWh: integratePowerkWh(
         values,
         runResult.results.time.timeStepSeconds
       ),
-      checkpointsKw: checkpointStepIndices.map((stepIndex) => values[stepIndex])
+      checkpointskW: checkpointStepIndices.map((stepIndex) => values[stepIndex])
     }])
   );
   const finalStep = runResult.results.steps.at(-1);
-  const maximumBalanceResidualKw = Math.max(
+  const maximumPowerBalanceErrorkW = Math.max(
     ...runResult.results.steps.map((step) => Math.abs(
-      componentAtStep(step, "bus").outputs.balanceResidualPowerKw
+      componentAtStep(step, "bus").outputs.powerBalanceErrorkW
     ))
   );
 
   return {
     series: seriesSummary,
-    finalBatteryStoredEnergyKwh:
-      componentAtStep(finalStep, "battery").state.storedEnergyKwh,
-    maximumBalanceResidualKw
+    finalBatteryStoredEnergykWh:
+      componentAtStep(finalStep, "battery").state.storedEnergykWh,
+    maximumPowerBalanceErrorkW
   };
 }
 
@@ -206,11 +206,11 @@ test("new runtime preserves legacy extrema and checkpoint powers", () => {
 
     for (const [seriesName, legacySeries] of Object.entries(legacyCase.series)) {
       const actualSeries = summary.series[seriesName];
-      assertClose(actualSeries.minimumKw, legacySeries.minimumW / 1000);
-      assertClose(actualSeries.maximumKw, legacySeries.maximumW / 1000);
-      actualSeries.checkpointsKw.forEach((actualPowerKw, checkpointIndex) => {
+      assertClose(actualSeries.minimumkW, legacySeries.minimumW / 1000);
+      assertClose(actualSeries.maximumkW, legacySeries.maximumW / 1000);
+      actualSeries.checkpointskW.forEach((actualPowerkW, checkpointIndex) => {
         assertClose(
-          actualPowerKw,
+          actualPowerkW,
           legacySeries.checkpointsW[checkpointIndex] / 1000
         );
       });
@@ -223,31 +223,31 @@ test("corrected battery boundaries match reviewed daily-energy results", () => {
     const summary = summariesByCase[caseName];
     const legacyCase = legacyExpectedResults.cases[caseName];
 
-    for (const [seriesName, expectedEnergyKwh] of Object.entries(
-      expectedCase.integratedEnergyKwh
+    for (const [seriesName, expectedEnergykWh] of Object.entries(
+      expectedCase.integratedEnergykWh
     )) {
       assertClose(
-        summary.series[seriesName].integratedEnergyKwh,
-        expectedEnergyKwh
+        summary.series[seriesName].integratedEnergykWh,
+        expectedEnergykWh
       );
     }
-    assert.equal(summary.finalBatteryStoredEnergyKwh, 0);
+    assert.equal(summary.finalBatteryStoredEnergykWh, 0);
     assert.ok(legacyCase.finalBatteryChargeKwh < 0);
     assertClose(
-      summary.maximumBalanceResidualKw,
-      expectedCase.maximumBalanceResidualKw,
+      summary.maximumPowerBalanceErrorkW,
+      expectedCase.maximumPowerBalanceErrorkW,
       1e-15
     );
-    assert.ok(summary.maximumBalanceResidualKw < 1e-12);
+    assert.ok(summary.maximumPowerBalanceErrorkW < 1e-12);
 
-    const supplyEnergyKwh =
-      summary.series["solar supply"].integratedEnergyKwh +
-      summary.series["from battery"].integratedEnergyKwh +
-      summary.series["grid supply"].integratedEnergyKwh;
-    const demandEnergyKwh =
-      summary.series.load.integratedEnergyKwh +
-      summary.series["to battery"].integratedEnergyKwh +
-      summary.series["grid export"].integratedEnergyKwh;
-    assertClose(supplyEnergyKwh, demandEnergyKwh);
+    const supplyEnergykWh =
+      summary.series["solar supply"].integratedEnergykWh +
+      summary.series["from battery"].integratedEnergykWh +
+      summary.series["grid supply"].integratedEnergykWh;
+    const demandEnergykWh =
+      summary.series.load.integratedEnergykWh +
+      summary.series["to battery"].integratedEnergykWh +
+      summary.series["grid export"].integratedEnergykWh;
+    assertClose(supplyEnergykWh, demandEnergykWh);
   }
 });

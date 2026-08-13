@@ -92,9 +92,9 @@ function storeOptions(overrides = {}) {
       waterDensityKgPerM3: 1000,
       specificHeatCapacityKjPerKgK: 3.6,
       maximumTemperatureC: 100,
-      heatLossCoefficientKwPerK: 0,
-      maximumChargeHeatFlowKw: 100,
-      maximumDischargeHeatFlowKw: 100,
+      heatLossCoefficientkWPerK: 0,
+      maximumChargeHeatFlowkW: 100,
+      maximumDischargeHeatFlowkW: 100,
       minimumUsefulTemperatureC: 70,
       ...overrides.parameters
     },
@@ -108,10 +108,10 @@ function storeOptions(overrides = {}) {
 
 function storeCommand(overrides = {}) {
   return {
-    chargeHeatFlowKw: 0,
+    chargeHeatFlowkW: 0,
     chargeSourceTemperatureC: 100,
     chargeDeliveryTemperatureC: 100,
-    dischargeHeatFlowKw: 0,
+    dischargeHeatFlowkW: 0,
     ambientTemperatureC: 20,
     ...overrides
   };
@@ -120,40 +120,40 @@ function storeCommand(overrides = {}) {
 test("electric heater conserves its declared conversion efficiency", () => {
   const component = preparedComponent(electricHeaterDefinition, {
     parameters: {
-      maximumElectricalInputPowerKw: 400,
+      maximumElectricalInputPowerkW: 400,
       efficiency: 0.9,
       supplyTemperatureC: 85
     }
   });
   const limits = component.definition.model.getOperatingLimits(component);
   const evaluation = component.definition.model.evaluate(component, {
-    powerKw: -100,
-    heatOutputKw: 90
+    powerkW: -100,
+    heatOutputkW: 90
   }, stepContext(component));
 
   assert.deepEqual(limits, {
-    minimumPowerKw: -400,
-    maximumPowerKw: 0,
+    minimumPowerkW: -400,
+    maximumPowerkW: 0,
     heatOutputPerElectricalInput: 0.9,
-    maximumHeatOutputKw: 360,
+    maximumHeatOutputkW: 360,
     supplyTemperatureC: 85
   });
   assert.deepEqual(evaluation.portFlows, {
-    "electricity-in": { powerKw: 100 },
+    "electricity-in": { powerkW: 100 },
     "heat-out": {
-      heatFlowKw: 90,
+      heatFlowkW: 90,
       sourceTemperatureC: 85,
       deliveryTemperatureC: 85
     }
   });
   assert.deepEqual(evaluation.outputs, {
-    electricalInputPowerKw: 100,
-    heatOutputKw: 90,
+    electricalInputPowerkW: 100,
+    heatOutputkW: 90,
     supplyTemperatureC: 85
   });
   assert.equal(
-    evaluation.outputs.heatOutputKw,
-    evaluation.outputs.electricalInputPowerKw * component.parameters.efficiency
+    evaluation.outputs.heatOutputkW,
+    evaluation.outputs.electricalInputPowerkW * component.parameters.efficiency
   );
 });
 
@@ -170,15 +170,15 @@ test("electric heater rejects zero efficiency and invalid actual power direction
   assert.throws(
     () => component.definition.model.evaluate(
       component,
-      { powerKw: 1, heatOutputKw: 0 },
+      { powerkW: 1, heatOutputkW: 0 },
       stepContext(component)
     ),
-    /powerKw and heatOutputKw/u
+    /powerkW and heatOutputkW/u
   );
   assert.throws(
     () => component.definition.model.evaluate(
       component,
-      { powerKw: -10, heatOutputKw: 5 },
+      { powerkW: -10, heatOutputkW: 5 },
       stepContext(component)
     ),
     /conversion efficiency/u
@@ -199,24 +199,24 @@ test("heat demand distinguishes served, unmet, and low-temperature heat", () => 
   });
   const limits = component.definition.model.getOperatingLimits(component, context);
   const served = component.definition.model.evaluate(component, {
-    heatFlowKw: 60,
+    heatFlowkW: 60,
     sourceTemperatureC: 80,
     deliveryTemperatureC: 75
   }, context);
   const tooCold = component.definition.model.evaluate(component, {
-    heatFlowKw: 60,
+    heatFlowkW: 60,
     sourceTemperatureC: 65,
     deliveryTemperatureC: 65
   }, context);
 
   assert.deepEqual(limits, {
-    maximumHeatFlowKw: 80,
+    maximumHeatFlowkW: 80,
     minimumDeliveryTemperatureC: 70
   });
   assert.deepEqual(served.outputs, {
-    demandHeatFlowKw: 80,
-    servedHeatFlowKw: 60,
-    unmetHeatFlowKw: 20,
+    demandHeatFlowkW: 80,
+    servedHeatFlowkW: 60,
+    unmetHeatFlowkW: 20,
     deliveryTemperatureC: 75,
     deliveryTemperatureMarginK: 5
   });
@@ -224,8 +224,8 @@ test("heat demand distinguishes served, unmet, and low-temperature heat", () => 
     served.diagnostics.map((diagnostic) => diagnostic.code),
     ["thermal.heat-demand.unmet-heat"]
   );
-  assert.equal(tooCold.outputs.servedHeatFlowKw, 0);
-  assert.equal(tooCold.outputs.unmetHeatFlowKw, 80);
+  assert.equal(tooCold.outputs.servedHeatFlowkW, 0);
+  assert.equal(tooCold.outputs.unmetHeatFlowkW, 80);
   assert.equal(tooCold.outputs.deliveryTemperatureMarginK, -5);
 });
 
@@ -251,7 +251,7 @@ test("ambient boundary provides the timestep temperature for rejected heat", () 
     seriesValues: { "ambient-temperature": 15 }
   });
   const evaluation = component.definition.model.evaluate(component, {
-    heatFlowKw: 10,
+    heatFlowkW: 10,
     sourceTemperatureC: 60
   }, context);
 
@@ -260,13 +260,13 @@ test("ambient boundary provides the timestep temperature for rejected heat", () 
     { ambientTemperatureC: 15 }
   );
   assert.deepEqual(evaluation.portFlows["heat-in"], {
-    heatFlowKw: 10,
+    heatFlowkW: 10,
     sourceTemperatureC: 60,
     deliveryTemperatureC: 15
   });
   assert.deepEqual(evaluation.outputs, {
     ambientTemperatureC: 15,
-    receivedHeatFlowKw: 10
+    receivedHeatFlowkW: 10
   });
 });
 
@@ -282,20 +282,20 @@ test("hot-water store limits charge and useful discharge by state and timestep",
   );
 
   assert.deepEqual(oneHour, {
-    maximumChargeHeatFlowKw: 20,
-    maximumDischargeHeatFlowKw: 10,
+    maximumChargeHeatFlowkW: 20,
+    maximumDischargeHeatFlowkW: 10,
     sourceTemperatureC: 80,
-    thermalCapacityKwhPerK: 1,
-    heatLossCoefficientKwPerK: 0,
+    thermalCapacitykWhPerK: 1,
+    heatLossCoefficientkWPerK: 0,
     minimumUsefulTemperatureC: 70,
     maximumTemperatureC: 100
   });
   assert.deepEqual(halfHour, {
-    maximumChargeHeatFlowKw: 40,
-    maximumDischargeHeatFlowKw: 20,
+    maximumChargeHeatFlowkW: 40,
+    maximumDischargeHeatFlowkW: 20,
     sourceTemperatureC: 80,
-    thermalCapacityKwhPerK: 1,
-    heatLossCoefficientKwPerK: 0,
+    thermalCapacitykWhPerK: 1,
+    heatLossCoefficientkWPerK: 0,
     minimumUsefulTemperatureC: 70,
     maximumTemperatureC: 100
   });
@@ -307,46 +307,46 @@ test("hot-water store limits charge and useful discharge by state and timestep",
     belowUseful.definition.model.getOperatingLimits(
       belowUseful,
       stepContext(belowUseful)
-    ).maximumDischargeHeatFlowKw,
+    ).maximumDischargeHeatFlowkW,
     0
   );
 });
 
 test("hot-water store conserves charge, discharge, loss, and state energy", () => {
   const component = preparedComponent(hotWaterStoreDefinition, storeOptions({
-    parameters: { heatLossCoefficientKwPerK: 0.1 }
+    parameters: { heatLossCoefficientkWPerK: 0.1 }
   }));
   const context = stepContext(component);
   const evaluation = component.definition.model.evaluate(
     component,
-    storeCommand({ dischargeHeatFlowKw: 4 }),
+    storeCommand({ dischargeHeatFlowkW: 4 }),
     context
   );
-  const storedEnergyChangeKwh = component.modelData.thermalCapacityKwhPerK *
+  const storedEnergyChangekWh = component.modelData.thermalCapacitykWhPerK *
     (evaluation.nextState.temperatureC - context.state.temperatureC);
 
   assert.deepEqual(evaluation.portFlows["heat-out"], {
-    heatFlowKw: 4,
+    heatFlowkW: 4,
     sourceTemperatureC: 80,
     deliveryTemperatureC: 80
   });
   assert.deepEqual(evaluation.portFlows["heat-loss"], {
-    heatFlowKw: 6,
+    heatFlowkW: 6,
     sourceTemperatureC: 80,
     deliveryTemperatureC: 20
   });
   assert.deepEqual(evaluation.outputs, {
-    chargeHeatFlowKw: 0,
-    dischargeHeatFlowKw: 4,
-    heatLossKw: 6,
-    netHeatFlowKw: -10,
+    chargeHeatFlowkW: 0,
+    dischargeHeatFlowkW: 4,
+    heatLosskW: 6,
+    netHeatFlowkW: -10,
     temperatureC: 70,
-    usableEnergyKwh: 0,
+    usableEnergykWh: 0,
     deliveryTemperatureMarginK: 10
   });
   assertClose(
-    storedEnergyChangeKwh,
-    evaluation.outputs.netHeatFlowKw * context.durationHours
+    storedEnergyChangekWh,
+    evaluation.outputs.netHeatFlowkW * context.durationHours
   );
 });
 
@@ -354,14 +354,14 @@ test("hot-water store accepts bounded charging at a sufficient temperature", () 
   const component = preparedComponent(hotWaterStoreDefinition, storeOptions());
   const evaluation = component.definition.model.evaluate(
     component,
-    storeCommand({ chargeHeatFlowKw: 10 }),
+    storeCommand({ chargeHeatFlowkW: 10 }),
     stepContext(component)
   );
 
   assert.equal(evaluation.nextState.temperatureC, 90);
-  assert.equal(evaluation.outputs.usableEnergyKwh, 20);
+  assert.equal(evaluation.outputs.usableEnergykWh, 20);
   assert.deepEqual(evaluation.portFlows["heat-in"], {
-    heatFlowKw: 10,
+    heatFlowkW: 10,
     sourceTemperatureC: 100,
     deliveryTemperatureC: 100
   });
@@ -370,7 +370,7 @@ test("hot-water store accepts bounded charging at a sufficient temperature", () 
     () => component.definition.model.evaluate(
       component,
       storeCommand({
-        chargeHeatFlowKw: 10,
+        chargeHeatFlowkW: 10,
         chargeSourceTemperatureC: 75,
         chargeDeliveryTemperatureC: 75
       }),
@@ -382,7 +382,7 @@ test("hot-water store accepts bounded charging at a sufficient temperature", () 
     () => component.definition.model.evaluate(
       component,
       storeCommand({
-        chargeHeatFlowKw: 10,
+        chargeHeatFlowkW: 10,
         chargeSourceTemperatureC: 85,
         chargeDeliveryTemperatureC: 85
       }),
@@ -393,7 +393,7 @@ test("hot-water store accepts bounded charging at a sufficient temperature", () 
   assert.throws(
     () => component.definition.model.evaluate(
       component,
-      storeCommand({ chargeHeatFlowKw: 21 }),
+      storeCommand({ chargeHeatFlowkW: 21 }),
       stepContext(component)
     ),
     /operating limit/u
@@ -403,7 +403,7 @@ test("hot-water store accepts bounded charging at a sufficient temperature", () 
 test("hot-water store loss cannot cool it through the ambient boundary", () => {
   const component = preparedComponent(hotWaterStoreDefinition, storeOptions({
     parameters: {
-      heatLossCoefficientKwPerK: 10,
+      heatLossCoefficientkWPerK: 10,
       minimumUsefulTemperatureC: 0
     },
     initialState: { temperatureC: 21 }
@@ -414,13 +414,13 @@ test("hot-water store loss cannot cool it through the ambient boundary", () => {
     stepContext(component)
   );
 
-  assert.equal(evaluation.outputs.heatLossKw, 1);
+  assert.equal(evaluation.outputs.heatLosskW, 1);
   assert.equal(evaluation.nextState.temperatureC, 20);
 });
 
 test("hot-water store explicit heat loss converges under timestep refinement", () => {
   const component = preparedComponent(hotWaterStoreDefinition, storeOptions({
-    parameters: { heatLossCoefficientKwPerK: 0.1 }
+    parameters: { heatLossCoefficientkWPerK: 0.1 }
   }));
   const initialState = { temperatureC: 80 };
   const coarse = component.definition.model.evaluate(

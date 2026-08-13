@@ -89,17 +89,51 @@ of current component operating limits, so it can coordinate operation without
 duplicating component equations. The resolver still clamps requests and owns
 physical balance.
 
-For active electrical power commands, positive `powerKw` exports from a
-component and negative `powerKw` imports into it. Directed ports report
-non-negative flow in their declared direction; bidirectional ports report
-positive export and negative import. Connection power is signed from the
-persisted `from` endpoint towards `to`.
+### Flow types and connections
 
-Directed thermal ports use the `thermal.heat-flow` medium. Every reported flow
-has exactly:
+A small central `FlowType` contract owns the exact fields, units, and boundary
+validation for each kind of flow. The current types are
+`electricity.active-power` and `thermal.heat-flow`. Their prefixes imply the
+broad engineering domain; do not store a separate `domain` or `medium` field.
+This is a fixed core contract, not a plugin system or generic physics engine.
+
+Keep ownership precise:
+
+| Owner | Stored contract |
+| --- | --- |
+| `ModelComponent` | Identity, definition version, parameter values, and initial state |
+| `ComponentDefinition` | Ports, parameter/state/output specifications, equations, validation, and editor metadata |
+| Port | `{ id, flowType, direction }`, where direction is `in`, `out`, or `bidirectional` |
+| Persisted connection | Identity, name, and `from`/`to` component-port references only |
+| Runtime connection | Resolved endpoints and the `flowType` derived from their ports |
+| Runtime connection result | `{ connectionId, flowType, flow }` |
+| Layout/UI | Link geometry, selection, highlighting, and other presentation state |
+
+A connection is ideal, lossless, and non-accumulating. Both endpoint flows must
+match after direction normalisation. Conversion, loss, storage, splitting, and
+mixing belong in explicit components and resolvers. A mismatch produces a
+`runtime.connection-balance` diagnostic; it is not returned as a public
+residual field.
+
+The persisted `from` and `to` endpoints define the connection's reference
+orientation. Static port direction defines permitted flow. Directed ports
+report non-negative flow in their declared direction. A bidirectional port may
+report a signed value. For active electrical power commands, positive
+`powerkW` exports from a component and negative `powerkW` imports into it.
+Connection `powerkW` is positive from `from` towards `to`. For example, a
+battery-to-bus connection is positive while discharging and negative while
+charging.
+
+Every active-power flow has exactly:
 
 ```text
-heatFlowKw
+powerkW
+```
+
+Every directed thermal heat flow has exactly:
+
+```text
+heatFlowkW
 sourceTemperatureC
 deliveryTemperatureC
 ```
@@ -131,16 +165,16 @@ capacity, and temperature limits, allocates standing loss to ambient, and calls
 the existing electrical-bus resolver with the heater's feasible input. Store,
 demand, and ambient commands are resolver-owned and do not receive independent
 policy requests. Thermal connection results contain the allocated heat flow and
-both boundary temperatures. Thermal branching requires a future explicit
-resolver; it is not inferred from component order or treated as a general
-junction problem.
+both boundary temperatures inside their `flow` object. Thermal branching
+requires a future explicit resolver; it is not inferred from component order or
+treated as a general junction problem.
 
 A fixed component reports equal minimum and maximum operating power and needs
 no policy request. A non-grid component with variable limits requires an
 explicit policy request. In the single-bus electrical runtime, exactly one grid
 boundary is resolver-owned: it receives no policy request and its actual power
-removes the residual after all fixed and policy-controlled operation. Positive
-grid power imports energy into the model; negative grid power exports it.
+balances all fixed and policy-controlled operation. Positive grid power imports
+energy into the model; negative grid power exports it.
 
 ## Data and state rules
 

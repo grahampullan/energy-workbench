@@ -85,12 +85,12 @@ export function requestPolicyOperation(
     if (
       !isRecord(command) ||
       Object.keys(command).length !== 1 ||
-      !Object.hasOwn(command, "powerKw") ||
-      !Number.isFinite(command.powerKw)
+      !Object.hasOwn(command, "powerkW") ||
+      !Number.isFinite(command.powerkW)
     ) {
       diagnostics.push(policyDiagnostic(
         "runtime.policy-command-contract",
-        "An electrical policy command must contain only a finite powerKw value",
+        "An electrical policy command must contain only a finite powerkW value",
         stepContext.stepIndex,
         `/${componentId}`
       ));

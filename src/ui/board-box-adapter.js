@@ -207,10 +207,10 @@ function renderConnections(
       (connection) => connection.id === view.highlightedConnectionId
     )
     .attr("marker-start", (connection) =>
-      connection.powerKw < -1e-9 ? "url(#flow-arrow)" : null
+      connection.signedFlow < -1e-9 ? "url(#flow-arrow)" : null
     )
     .attr("marker-end", (connection) =>
-      connection.powerKw > 1e-9 ? "url(#flow-arrow)" : null
+      connection.signedFlow > 1e-9 ? "url(#flow-arrow)" : null
     )
     .on("pointerenter", (event, connection) => onConnectionHighlight(connection.id))
     .on("pointerleave", () => onConnectionHighlight(null));
@@ -233,7 +233,7 @@ function renderConnections(
 
   labels
     .select("text")
-    .text((connection) => connection.displayPower);
+    .text((connection) => connection.displayFlow);
 }
 
 export function createTopologyBoard({

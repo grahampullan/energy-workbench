@@ -1,9 +1,9 @@
 import {
   ABSOLUTE_ZERO_C,
   calculateStandingHeatLoss,
-  createThermalFlow,
-  THERMAL_FLOW_MEDIUM
+  createThermalFlow
 } from "../../core/thermal-flow.js";
+import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
 
 function componentValue(values, specifications, field) {
   return Object.hasOwn(values, field)
@@ -11,7 +11,7 @@ function componentValue(values, specifications, field) {
     : specifications[field].default;
 }
 
-function thermalCapacityKwhPerK(parameters) {
+function thermalCapacitykWhPerK(parameters) {
   return parameters.volumeM3 *
     parameters.waterDensityKgPerM3 *
     parameters.specificHeatCapacityKjPerKgK /
@@ -33,10 +33,10 @@ function requireTemperature(command, field) {
 }
 
 const STORE_COMMAND_FIELDS = new Set([
-  "chargeHeatFlowKw",
+  "chargeHeatFlowkW",
   "chargeSourceTemperatureC",
   "chargeDeliveryTemperatureC",
-  "dischargeHeatFlowKw",
+  "dischargeHeatFlowkW",
   "ambientTemperatureC"
 ]);
 
@@ -57,7 +57,7 @@ function requireStoreCommand(command) {
 
 export const hotWaterStoreDefinition = {
   type: "thermal.hot-water-store",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Hot-water store",
 
   parameters: {
@@ -85,19 +85,19 @@ export const hotWaterStoreDefinition = {
       hardBounds: { minimum: ABSOLUTE_ZERO_C },
       editor: { minimum: 40, maximum: 150, step: 1 }
     },
-    heatLossCoefficientKwPerK: {
+    heatLossCoefficientkWPerK: {
       unit: "kW/K",
       default: 1.2,
       hardBounds: { minimum: 0 },
       editor: { minimum: 0, maximum: 10, step: 0.1 }
     },
-    maximumChargeHeatFlowKw: {
+    maximumChargeHeatFlowkW: {
       unit: "kW",
       default: 800,
       hardBounds: { minimum: 0 },
       editor: { minimum: 0, maximum: 2000, step: 10 }
     },
-    maximumDischargeHeatFlowKw: {
+    maximumDischargeHeatFlowkW: {
       unit: "kW",
       default: 800,
       hardBounds: { minimum: 0 },
@@ -121,28 +121,28 @@ export const hotWaterStoreDefinition = {
   ports: [
     {
       id: "heat-in",
-      medium: THERMAL_FLOW_MEDIUM,
+      flowType: THERMAL_HEAT_FLOW_TYPE,
       direction: "in"
     },
     {
       id: "heat-out",
-      medium: THERMAL_FLOW_MEDIUM,
+      flowType: THERMAL_HEAT_FLOW_TYPE,
       direction: "out"
     },
     {
       id: "heat-loss",
-      medium: THERMAL_FLOW_MEDIUM,
+      flowType: THERMAL_HEAT_FLOW_TYPE,
       direction: "out"
     }
   ],
 
   outputs: {
-    chargeHeatFlowKw: { unit: "kW" },
-    dischargeHeatFlowKw: { unit: "kW" },
-    heatLossKw: { unit: "kW" },
-    netHeatFlowKw: { unit: "kW" },
+    chargeHeatFlowkW: { unit: "kW" },
+    dischargeHeatFlowkW: { unit: "kW" },
+    heatLosskW: { unit: "kW" },
+    netHeatFlowkW: { unit: "kW" },
     temperatureC: { unit: "°C" },
-    usableEnergyKwh: { unit: "kWh" },
+    usableEnergykWh: { unit: "kWh" },
     deliveryTemperatureMarginK: { unit: "K" }
   },
 
@@ -161,15 +161,15 @@ export const hotWaterStoreDefinition = {
         id: "limits",
         label: "Heat-flow limits",
         parameters: [
-          "maximumChargeHeatFlowKw",
-          "maximumDischargeHeatFlowKw"
+          "maximumChargeHeatFlowkW",
+          "maximumDischargeHeatFlowkW"
         ]
       },
       {
         id: "losses",
         label: "Thermal properties",
         parameters: [
-          "heatLossCoefficientKwPerK",
+          "heatLossCoefficientkWPerK",
           "waterDensityKgPerM3",
           "specificHeatCapacityKjPerKgK"
         ]
@@ -258,7 +258,7 @@ export const hotWaterStoreDefinition = {
   model: {
     prepare(modelComponent) {
       return {
-        thermalCapacityKwhPerK: thermalCapacityKwhPerK(modelComponent.parameters)
+        thermalCapacitykWhPerK: thermalCapacitykWhPerK(modelComponent.parameters)
       };
     },
 
@@ -267,36 +267,36 @@ export const hotWaterStoreDefinition = {
     },
 
     getOperatingLimits(runtimeComponent, stepContext) {
-      const { thermalCapacityKwhPerK } = runtimeComponent.modelData;
+      const { thermalCapacitykWhPerK } = runtimeComponent.modelData;
       const {
-        maximumChargeHeatFlowKw,
-        maximumDischargeHeatFlowKw,
+        maximumChargeHeatFlowkW,
+        maximumDischargeHeatFlowkW,
         maximumTemperatureC,
         minimumUsefulTemperatureC
       } = runtimeComponent.parameters;
       const temperatureC = stepContext.state.temperatureC;
-      const maximumChargeFromCapacityKw =
-        thermalCapacityKwhPerK *
+      const maximumChargeFromCapacitykW =
+        thermalCapacitykWhPerK *
         Math.max(0, maximumTemperatureC - temperatureC) /
         stepContext.durationHours;
-      const maximumDischargeFromUsefulHeatKw =
-        thermalCapacityKwhPerK *
+      const maximumDischargeFromUsefulHeatkW =
+        thermalCapacitykWhPerK *
         Math.max(0, temperatureC - minimumUsefulTemperatureC) /
         stepContext.durationHours;
 
       return {
-        maximumChargeHeatFlowKw: Math.min(
-          maximumChargeHeatFlowKw,
-          maximumChargeFromCapacityKw
+        maximumChargeHeatFlowkW: Math.min(
+          maximumChargeHeatFlowkW,
+          maximumChargeFromCapacitykW
         ),
-        maximumDischargeHeatFlowKw: Math.min(
-          maximumDischargeHeatFlowKw,
-          maximumDischargeFromUsefulHeatKw
+        maximumDischargeHeatFlowkW: Math.min(
+          maximumDischargeHeatFlowkW,
+          maximumDischargeFromUsefulHeatkW
         ),
         sourceTemperatureC: temperatureC,
-        thermalCapacityKwhPerK,
-        heatLossCoefficientKwPerK:
-          runtimeComponent.parameters.heatLossCoefficientKwPerK,
+        thermalCapacitykWhPerK,
+        heatLossCoefficientkWPerK:
+          runtimeComponent.parameters.heatLossCoefficientkWPerK,
         minimumUsefulTemperatureC,
         maximumTemperatureC
       };
@@ -304,13 +304,13 @@ export const hotWaterStoreDefinition = {
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
       requireStoreCommand(actualCommand);
-      const chargeHeatFlowKw = requireNonNegativePower(
+      const chargeHeatFlowkW = requireNonNegativePower(
         actualCommand,
-        "chargeHeatFlowKw"
+        "chargeHeatFlowkW"
       );
-      const dischargeHeatFlowKw = requireNonNegativePower(
+      const dischargeHeatFlowkW = requireNonNegativePower(
         actualCommand,
-        "dischargeHeatFlowKw"
+        "dischargeHeatFlowkW"
       );
       const chargeSourceTemperatureC = requireTemperature(
         actualCommand,
@@ -326,11 +326,11 @@ export const hotWaterStoreDefinition = {
       );
       const temperatureC = stepContext.state.temperatureC;
       const {
-        heatLossCoefficientKwPerK,
+        heatLossCoefficientkWPerK,
         maximumTemperatureC,
         minimumUsefulTemperatureC
       } = runtimeComponent.parameters;
-      const { thermalCapacityKwhPerK } = runtimeComponent.modelData;
+      const { thermalCapacitykWhPerK } = runtimeComponent.modelData;
       const { durationHours } = stepContext;
       const operatingLimits = hotWaterStoreDefinition.model.getOperatingLimits(
         runtimeComponent,
@@ -338,25 +338,25 @@ export const hotWaterStoreDefinition = {
       );
 
       if (
-        chargeHeatFlowKw >
-          operatingLimits.maximumChargeHeatFlowKw + 1e-9
+        chargeHeatFlowkW >
+          operatingLimits.maximumChargeHeatFlowkW + 1e-9
       ) {
         throw new RangeError("Store charge heat flow exceeds its operating limit");
       }
       if (
-        dischargeHeatFlowKw >
-          operatingLimits.maximumDischargeHeatFlowKw + 1e-9
+        dischargeHeatFlowkW >
+          operatingLimits.maximumDischargeHeatFlowkW + 1e-9
       ) {
         throw new RangeError("Store discharge heat flow exceeds its operating limit");
       }
 
       const chargeFlow = createThermalFlow({
-        heatFlowKw: chargeHeatFlowKw,
+        heatFlowkW: chargeHeatFlowkW,
         sourceTemperatureC: chargeSourceTemperatureC,
         deliveryTemperatureC: chargeDeliveryTemperatureC
       });
       if (
-        chargeHeatFlowKw > 0 &&
+        chargeHeatFlowkW > 0 &&
         chargeDeliveryTemperatureC < temperatureC
       ) {
         throw new RangeError(
@@ -364,21 +364,21 @@ export const hotWaterStoreDefinition = {
         );
       }
 
-      const { heatLossKw } = calculateStandingHeatLoss({
-        thermalCapacityKwhPerK,
-        heatLossCoefficientKwPerK,
+      const { heatLosskW } = calculateStandingHeatLoss({
+        thermalCapacitykWhPerK,
+        heatLossCoefficientkWPerK,
         temperatureC,
         ambientTemperatureC,
-        chargeHeatFlowKw,
-        dischargeHeatFlowKw,
+        chargeHeatFlowkW,
+        dischargeHeatFlowkW,
         durationHours
       });
-      const netHeatFlowKw =
-        chargeHeatFlowKw - dischargeHeatFlowKw - heatLossKw;
+      const netHeatFlowkW =
+        chargeHeatFlowkW - dischargeHeatFlowkW - heatLosskW;
       const calculatedTemperatureC = temperatureC +
-        netHeatFlowKw * durationHours / thermalCapacityKwhPerK;
+        netHeatFlowkW * durationHours / thermalCapacitykWhPerK;
       if (
-        chargeHeatFlowKw > 0 &&
+        chargeHeatFlowkW > 0 &&
         calculatedTemperatureC > chargeDeliveryTemperatureC + 1e-9
       ) {
         throw new RangeError(
@@ -397,23 +397,23 @@ export const hotWaterStoreDefinition = {
         portFlows: {
           "heat-in": chargeFlow,
           "heat-out": createThermalFlow({
-            heatFlowKw: dischargeHeatFlowKw,
+            heatFlowkW: dischargeHeatFlowkW,
             sourceTemperatureC: temperatureC,
             deliveryTemperatureC: temperatureC
           }),
           "heat-loss": createThermalFlow({
-            heatFlowKw: heatLossKw,
+            heatFlowkW: heatLosskW,
             sourceTemperatureC: temperatureC,
             deliveryTemperatureC: ambientTemperatureC
           })
         },
         outputs: {
-          chargeHeatFlowKw,
-          dischargeHeatFlowKw,
-          heatLossKw,
-          netHeatFlowKw,
+          chargeHeatFlowkW,
+          dischargeHeatFlowkW,
+          heatLosskW,
+          netHeatFlowkW,
           temperatureC: nextTemperatureC,
-          usableEnergyKwh: thermalCapacityKwhPerK * Math.max(
+          usableEnergykWh: thermalCapacitykWhPerK * Math.max(
             0,
             nextTemperatureC - minimumUsefulTemperatureC
           ),

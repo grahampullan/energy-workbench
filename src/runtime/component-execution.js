@@ -4,12 +4,10 @@ import {
   NonJsonValueError
 } from "../core/json-value.js";
 import {
-  THERMAL_FLOW_MEDIUM,
-  thermalFlowValidationMessage
-} from "../core/thermal-flow.js";
+  ACTIVE_POWER_FLOW_TYPE,
+  flowValidationMessage
+} from "../core/flow-types.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
-
-const ACTIVE_POWER_MEDIUM = "electricity.active-power";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -117,19 +115,19 @@ export function getComponentOperatingLimits(runtimeModel, stepContext, diagnosti
       return;
     }
     const hasElectricalPort = component.ports.some(
-      (port) => port.medium === ACTIVE_POWER_MEDIUM
+      (port) => port.flowType === ACTIVE_POWER_FLOW_TYPE
     );
     if (
       hasElectricalPort &&
       (
-        !Number.isFinite(limits.minimumPowerKw) ||
-        !Number.isFinite(limits.maximumPowerKw) ||
-        limits.minimumPowerKw > limits.maximumPowerKw
+        !Number.isFinite(limits.minimumPowerkW) ||
+        !Number.isFinite(limits.maximumPowerkW) ||
+        limits.minimumPowerkW > limits.maximumPowerkW
       )
     ) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.component-limits-contract",
-        `${component.type}.model.getOperatingLimits must include finite minimumPowerKw and maximumPowerKw values in order`,
+        `${component.type}.model.getOperatingLimits must include finite minimumPowerkW and maximumPowerkW values in order`,
         path
       ));
       return;
@@ -218,28 +216,16 @@ function validateEvaluationShape(evaluation, component, stepIndex, diagnostics) 
   }
   for (const [portId, flow] of Object.entries(evaluation.portFlows)) {
     const port = component.ports.find((candidate) => candidate.id === portId);
-    if (port?.medium === THERMAL_FLOW_MEDIUM) {
-      const validationMessage = thermalFlowValidationMessage(flow);
-      if (validationMessage) {
-        diagnostics.push(runtimeDiagnostic(
-          "runtime.component-port-flow-contract",
-          `Thermal port ${portId} is invalid: ${validationMessage}`,
-          `${path}/portFlows/${portId}`
-        ));
-      }
+    if (!port) {
       continue;
     }
-    const permitsSignedFlow = port?.direction === "bidirectional";
-    if (
-      !isRecord(flow) ||
-      !Number.isFinite(flow.powerKw) ||
-      (!permitsSignedFlow && flow.powerKw < 0)
-    ) {
+    const validationMessage = flowValidationMessage(port.flowType, flow, {
+      direction: port.direction
+    });
+    if (validationMessage) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.component-port-flow-contract",
-        permitsSignedFlow
-          ? `Bidirectional port ${portId} must return a finite signed powerKw flow`
-          : `Directed port ${portId} must return a finite, non-negative powerKw flow`,
+        `${port.flowType} port ${portId} is invalid: ${validationMessage}`,
         `${path}/portFlows/${portId}`
       ));
     }

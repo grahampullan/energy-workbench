@@ -4,35 +4,35 @@ function componentValue(values, specifications, field) {
     : specifications[field].default;
 }
 
-function normaliseStoredEnergyKwh(storedEnergyKwh, capacityKwh) {
-  if (storedEnergyKwh <= 0) {
+function normaliseStoredEnergykWh(storedEnergykWh, capacitykWh) {
+  if (storedEnergykWh <= 0) {
     return 0;
   }
-  if (storedEnergyKwh >= capacityKwh) {
-    return capacityKwh;
+  if (storedEnergykWh >= capacitykWh) {
+    return capacitykWh;
   }
-  return storedEnergyKwh;
+  return storedEnergykWh;
 }
 
 export const electricalBatteryDefinition = {
   type: "electrical.battery",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Electrical battery",
 
   parameters: {
-    capacityKwh: {
+    capacitykWh: {
       unit: "kWh",
       default: 5,
       hardBounds: { minimum: 0 },
       editor: { minimum: 0, maximum: 20, step: 0.5 }
     },
-    maximumChargePowerKw: {
+    maximumChargePowerkW: {
       unit: "kW",
       default: 3,
       hardBounds: { minimum: 0 },
       editor: { minimum: 0, maximum: 10, step: 0.25 }
     },
-    maximumDischargePowerKw: {
+    maximumDischargePowerkW: {
       unit: "kW",
       default: 3,
       hardBounds: { minimum: 0 },
@@ -53,7 +53,7 @@ export const electricalBatteryDefinition = {
   },
 
   initialState: {
-    storedEnergyKwh: {
+    storedEnergykWh: {
       unit: "kWh",
       default: 0
     }
@@ -62,16 +62,16 @@ export const electricalBatteryDefinition = {
   ports: [
     {
       id: "electricity",
-      medium: "electricity.active-power",
+      flowType: ACTIVE_POWER_FLOW_TYPE,
       direction: "bidirectional"
     }
   ],
 
   outputs: {
-    chargePowerKw: { unit: "kW" },
-    dischargePowerKw: { unit: "kW" },
-    netPowerKw: { unit: "kW" },
-    storedEnergyKwh: { unit: "kWh" },
+    chargePowerkW: { unit: "kW" },
+    dischargePowerkW: { unit: "kW" },
+    netPowerkW: { unit: "kW" },
+    storedEnergykWh: { unit: "kWh" },
     stateOfChargeFraction: { unit: "1" }
   },
 
@@ -80,12 +80,12 @@ export const electricalBatteryDefinition = {
       {
         id: "storage",
         label: "Storage",
-        parameters: ["capacityKwh"]
+        parameters: ["capacitykWh"]
       },
       {
         id: "power",
         label: "Power limits",
-        parameters: ["maximumChargePowerKw", "maximumDischargePowerKw"]
+        parameters: ["maximumChargePowerkW", "maximumDischargePowerkW"]
       },
       {
         id: "efficiency",
@@ -97,15 +97,15 @@ export const electricalBatteryDefinition = {
 
   validate(modelComponent) {
     const diagnostics = [];
-    const capacityKwh = componentValue(
+    const capacitykWh = componentValue(
       modelComponent.parameters,
       electricalBatteryDefinition.parameters,
-      "capacityKwh"
+      "capacitykWh"
     );
-    const storedEnergyKwh = componentValue(
+    const storedEnergykWh = componentValue(
       modelComponent.initialState,
       electricalBatteryDefinition.initialState,
-      "storedEnergyKwh"
+      "storedEnergykWh"
     );
     const chargingEfficiency = componentValue(
       modelComponent.parameters,
@@ -119,10 +119,10 @@ export const electricalBatteryDefinition = {
     );
 
     if (
-      !Number.isFinite(storedEnergyKwh) ||
-      !Number.isFinite(capacityKwh) ||
-      storedEnergyKwh < 0 ||
-      storedEnergyKwh > capacityKwh
+      !Number.isFinite(storedEnergykWh) ||
+      !Number.isFinite(capacitykWh) ||
+      storedEnergykWh < 0 ||
+      storedEnergykWh > capacitykWh
     ) {
       diagnostics.push({
         code: "electrical.battery.initial-energy-range",
@@ -156,59 +156,60 @@ export const electricalBatteryDefinition = {
 
     getOperatingLimits(runtimeComponent, stepContext) {
       const {
-        capacityKwh,
-        maximumChargePowerKw,
-        maximumDischargePowerKw,
+        capacitykWh,
+        maximumChargePowerkW,
+        maximumDischargePowerkW,
         chargingEfficiency,
         dischargingEfficiency
       } = runtimeComponent.parameters;
-      const storedEnergyKwh = stepContext.state.storedEnergyKwh;
-      const remainingCapacityKwh = Math.max(0, capacityKwh - storedEnergyKwh);
-      const availableChargePowerKw = Math.min(
-        maximumChargePowerKw,
-        remainingCapacityKwh / chargingEfficiency / stepContext.durationHours
+      const storedEnergykWh = stepContext.state.storedEnergykWh;
+      const remainingCapacitykWh = Math.max(0, capacitykWh - storedEnergykWh);
+      const availableChargePowerkW = Math.min(
+        maximumChargePowerkW,
+        remainingCapacitykWh / chargingEfficiency / stepContext.durationHours
       );
-      const availableDischargePowerKw = Math.min(
-        maximumDischargePowerKw,
-        storedEnergyKwh * dischargingEfficiency / stepContext.durationHours
+      const availableDischargePowerkW = Math.min(
+        maximumDischargePowerkW,
+        storedEnergykWh * dischargingEfficiency / stepContext.durationHours
       );
 
       return {
-        minimumPowerKw: availableChargePowerKw === 0 ? 0 : -availableChargePowerKw,
-        maximumPowerKw: availableDischargePowerKw
+        minimumPowerkW: availableChargePowerkW === 0 ? 0 : -availableChargePowerkW,
+        maximumPowerkW: availableDischargePowerkW
       };
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
       const {
-        capacityKwh,
+        capacitykWh,
         chargingEfficiency,
         dischargingEfficiency
       } = runtimeComponent.parameters;
-      const netPowerKw = actualCommand.powerKw === 0 ? 0 : actualCommand.powerKw;
-      const chargePowerKw = netPowerKw < 0 ? -netPowerKw : 0;
-      const dischargePowerKw = netPowerKw > 0 ? netPowerKw : 0;
-      const storedEnergyKwh = normaliseStoredEnergyKwh(
-        stepContext.state.storedEnergyKwh +
-          chargingEfficiency * chargePowerKw * stepContext.durationHours -
-          dischargePowerKw * stepContext.durationHours / dischargingEfficiency,
-        capacityKwh
+      const netPowerkW = actualCommand.powerkW === 0 ? 0 : actualCommand.powerkW;
+      const chargePowerkW = netPowerkW < 0 ? -netPowerkW : 0;
+      const dischargePowerkW = netPowerkW > 0 ? netPowerkW : 0;
+      const storedEnergykWh = normaliseStoredEnergykWh(
+        stepContext.state.storedEnergykWh +
+          chargingEfficiency * chargePowerkW * stepContext.durationHours -
+          dischargePowerkW * stepContext.durationHours / dischargingEfficiency,
+        capacitykWh
       );
 
       return {
         portFlows: {
-          electricity: { powerKw: netPowerKw }
+          electricity: { powerkW: netPowerkW }
         },
         outputs: {
-          chargePowerKw,
-          dischargePowerKw,
-          netPowerKw,
-          storedEnergyKwh,
-          stateOfChargeFraction: capacityKwh === 0 ? 0 : storedEnergyKwh / capacityKwh
+          chargePowerkW,
+          dischargePowerkW,
+          netPowerkW,
+          storedEnergykWh,
+          stateOfChargeFraction: capacitykWh === 0 ? 0 : storedEnergykWh / capacitykWh
         },
-        nextState: { storedEnergyKwh },
+        nextState: { storedEnergykWh },
         diagnostics: []
       };
     }
   }
 };
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

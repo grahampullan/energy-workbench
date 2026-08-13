@@ -1,16 +1,16 @@
 export const electricalGridDefinition = {
   type: "electrical.grid",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Electrical grid",
 
   parameters: {
-    maximumImportPowerKw: {
+    maximumImportPowerkW: {
       unit: "kW",
       default: 1000,
       hardBounds: { minimum: 0 },
       editor: { minimum: 0, maximum: 1000, step: 10 }
     },
-    maximumExportPowerKw: {
+    maximumExportPowerkW: {
       unit: "kW",
       default: 1000,
       hardBounds: { minimum: 0 },
@@ -23,15 +23,15 @@ export const electricalGridDefinition = {
   ports: [
     {
       id: "electricity",
-      medium: "electricity.active-power",
+      flowType: ACTIVE_POWER_FLOW_TYPE,
       direction: "bidirectional"
     }
   ],
 
   outputs: {
-    importPowerKw: { unit: "kW" },
-    exportPowerKw: { unit: "kW" },
-    netPowerKw: { unit: "kW" }
+    importPowerkW: { unit: "kW" },
+    exportPowerkW: { unit: "kW" },
+    netPowerkW: { unit: "kW" }
   },
 
   editor: {
@@ -39,7 +39,7 @@ export const electricalGridDefinition = {
       {
         id: "limits",
         label: "Grid limits",
-        parameters: ["maximumImportPowerKw", "maximumExportPowerKw"]
+        parameters: ["maximumImportPowerkW", "maximumExportPowerkW"]
       }
     ]
   },
@@ -59,21 +59,21 @@ export const electricalGridDefinition = {
 
     getOperatingLimits(runtimeComponent) {
       return {
-        minimumPowerKw: -runtimeComponent.parameters.maximumExportPowerKw,
-        maximumPowerKw: runtimeComponent.parameters.maximumImportPowerKw
+        minimumPowerkW: -runtimeComponent.parameters.maximumExportPowerkW,
+        maximumPowerkW: runtimeComponent.parameters.maximumImportPowerkW
       };
     },
 
     evaluate(runtimeComponent, actualCommand) {
-      const netPowerKw = actualCommand.powerKw;
+      const netPowerkW = actualCommand.powerkW;
       return {
         portFlows: {
-          electricity: { powerKw: netPowerKw }
+          electricity: { powerkW: netPowerkW }
         },
         outputs: {
-          importPowerKw: Math.max(0, netPowerKw),
-          exportPowerKw: Math.max(0, -netPowerKw),
-          netPowerKw
+          importPowerkW: Math.max(0, netPowerkW),
+          exportPowerkW: Math.max(0, -netPowerkW),
+          netPowerkW
         },
         nextState: {},
         diagnostics: []
@@ -81,3 +81,4 @@ export const electricalGridDefinition = {
     }
   }
 };
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

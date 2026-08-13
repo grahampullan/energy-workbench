@@ -1,8 +1,11 @@
 import {
   ABSOLUTE_ZERO_C,
-  createThermalFlow,
-  THERMAL_FLOW_MEDIUM
+  createThermalFlow
 } from "../../core/thermal-flow.js";
+import {
+  ACTIVE_POWER_FLOW_TYPE,
+  THERMAL_HEAT_FLOW_TYPE
+} from "../../core/flow-types.js";
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -12,11 +15,11 @@ function parameterValue(component, parameter) {
 
 export const electricHeaterDefinition = {
   type: "thermal.electric-heater",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Electric heater",
 
   parameters: {
-    maximumElectricalInputPowerKw: {
+    maximumElectricalInputPowerkW: {
       unit: "kW",
       default: 400,
       hardBounds: { minimum: 0 },
@@ -41,19 +44,19 @@ export const electricHeaterDefinition = {
   ports: [
     {
       id: "electricity-in",
-      medium: "electricity.active-power",
+      flowType: ACTIVE_POWER_FLOW_TYPE,
       direction: "in"
     },
     {
       id: "heat-out",
-      medium: THERMAL_FLOW_MEDIUM,
+      flowType: THERMAL_HEAT_FLOW_TYPE,
       direction: "out"
     }
   ],
 
   outputs: {
-    electricalInputPowerKw: { unit: "kW" },
-    heatOutputKw: { unit: "kW" },
+    electricalInputPowerkW: { unit: "kW" },
+    heatOutputkW: { unit: "kW" },
     supplyTemperatureC: { unit: "°C" }
   },
 
@@ -62,7 +65,7 @@ export const electricHeaterDefinition = {
       {
         id: "rating",
         label: "Rating",
-        parameters: ["maximumElectricalInputPowerKw"]
+        parameters: ["maximumElectricalInputPowerkW"]
       },
       {
         id: "conversion",
@@ -95,14 +98,14 @@ export const electricHeaterDefinition = {
     getOperatingLimits(runtimeComponent) {
       const {
         efficiency,
-        maximumElectricalInputPowerKw,
+        maximumElectricalInputPowerkW,
         supplyTemperatureC
       } = runtimeComponent.parameters;
       return {
-        minimumPowerKw: -maximumElectricalInputPowerKw,
-        maximumPowerKw: 0,
+        minimumPowerkW: -maximumElectricalInputPowerkW,
+        maximumPowerkW: 0,
         heatOutputPerElectricalInput: efficiency,
-        maximumHeatOutputKw: maximumElectricalInputPowerKw * efficiency,
+        maximumHeatOutputkW: maximumElectricalInputPowerkW * efficiency,
         supplyTemperatureC
       };
     },
@@ -111,38 +114,38 @@ export const electricHeaterDefinition = {
       if (
         !actualCommand ||
         Object.keys(actualCommand).length !== 2 ||
-        !Number.isFinite(actualCommand.powerKw) ||
-        actualCommand.powerKw > 0 ||
-        !Number.isFinite(actualCommand.heatOutputKw) ||
-        actualCommand.heatOutputKw < 0
+        !Number.isFinite(actualCommand.powerkW) ||
+        actualCommand.powerkW > 0 ||
+        !Number.isFinite(actualCommand.heatOutputkW) ||
+        actualCommand.heatOutputkW < 0
       ) {
         throw new TypeError(
-          "Electric-heater actual command must contain finite powerKw and heatOutputKw values"
+          "Electric-heater actual command must contain finite powerkW and heatOutputkW values"
         );
       }
-      const electricalInputPowerKw = -actualCommand.powerKw;
-      const expectedHeatOutputKw =
-        electricalInputPowerKw * runtimeComponent.parameters.efficiency;
-      if (Math.abs(actualCommand.heatOutputKw - expectedHeatOutputKw) > 1e-9) {
+      const electricalInputPowerkW = -actualCommand.powerkW;
+      const expectedHeatOutputkW =
+        electricalInputPowerkW * runtimeComponent.parameters.efficiency;
+      if (Math.abs(actualCommand.heatOutputkW - expectedHeatOutputkW) > 1e-9) {
         throw new RangeError(
           "Electric-heater actual command violates its conversion efficiency"
         );
       }
-      const heatOutputKw = actualCommand.heatOutputKw;
+      const heatOutputkW = actualCommand.heatOutputkW;
       const supplyTemperatureC = runtimeComponent.parameters.supplyTemperatureC;
 
       return {
         portFlows: {
-          "electricity-in": { powerKw: electricalInputPowerKw },
+          "electricity-in": { powerkW: electricalInputPowerkW },
           "heat-out": createThermalFlow({
-            heatFlowKw: heatOutputKw,
+            heatFlowkW: heatOutputkW,
             sourceTemperatureC: supplyTemperatureC,
             deliveryTemperatureC: supplyTemperatureC
           })
         },
         outputs: {
-          electricalInputPowerKw,
-          heatOutputKw,
+          electricalInputPowerkW,
+          heatOutputkW,
           supplyTemperatureC
         },
         nextState: {},

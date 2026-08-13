@@ -23,18 +23,18 @@ const model = {
     {
       id: "grid",
       type: "electrical.grid",
-      definitionVersion: "0.1.0",
+      definitionVersion: "0.2.0",
       name: "Grid",
       parameters: {
-        maximumImportPowerKw: 1000,
-        maximumExportPowerKw: 1000
+        maximumImportPowerkW: 1000,
+        maximumExportPowerkW: 1000
       },
       initialState: {}
     },
     {
       id: "bus",
       type: "electrical.bus",
-      definitionVersion: "0.1.0",
+      definitionVersion: "0.2.0",
       name: "Electrical bus",
       parameters: {},
       initialState: {}
@@ -42,7 +42,7 @@ const model = {
     {
       id: "pv",
       type: "electrical.pv",
-      definitionVersion: "0.1.0",
+      definitionVersion: "0.2.0",
       name: "Solar PV",
       parameters: {
         generationSeriesId: "solar-generation",
@@ -53,7 +53,7 @@ const model = {
     {
       id: "load",
       type: "electrical.load",
-      definitionVersion: "0.1.0",
+      definitionVersion: "0.2.0",
       name: "Electrical load",
       parameters: {
         demandSeriesId: "electrical-demand",
@@ -64,17 +64,17 @@ const model = {
     {
       id: "battery",
       type: "electrical.battery",
-      definitionVersion: "0.1.0",
+      definitionVersion: "0.2.0",
       name: "Battery",
       parameters: {
-        capacityKwh: 5,
-        maximumChargePowerKw: 3,
-        maximumDischargePowerKw: 3,
+        capacitykWh: 5,
+        maximumChargePowerkW: 3,
+        maximumDischargePowerkW: 3,
         chargingEfficiency: 1,
         dischargingEfficiency: 1
       },
       initialState: {
-        storedEnergyKwh: 0
+        storedEnergykWh: 0
       }
     }
   ],
@@ -170,7 +170,7 @@ const variants = [
       name: "Double battery capacity",
       baseModelId: model.id,
       parameterOverrides: [
-        { componentId: "battery", parameter: "capacityKwh", value: 10 }
+        { componentId: "battery", parameter: "capacitykWh", value: 10 }
       ]
     }
   }

@@ -22,6 +22,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
   color: var(--ink);
   background:
     radial-gradient(circle at 8% 4%, rgb(168 213 195 / 24%), transparent 28rem),
@@ -34,16 +35,20 @@ input {
 }
 
 .app-shell {
+  display: grid;
+  height: 100dvh;
   width: min(1460px, calc(100% - 48px));
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   margin: 0 auto;
-  padding: 32px 0 40px;
+  padding: 18px 0;
 }
 
 .app-header,
+.app-header-tools,
 .brand,
+.project-actions,
 .study-summary,
 .panel-heading,
-.timeline-heading,
 .results-heading,
 .results-view-controls,
 .flow-legend {
@@ -54,7 +59,49 @@ input {
 .app-header {
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 10px;
+}
+
+.app-header-tools {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.project-actions {
+  gap: 6px;
+}
+
+.project-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: rgb(255 255 255 / 78%);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.project-actions button:hover {
+  border-color: #bdc9c5;
+  background: white;
+}
+
+.document-status {
+  min-height: 18px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.document-status:empty {
+  visibility: hidden;
+}
+
+.document-status[data-error="true"] {
+  color: #8d3e39;
 }
 
 .brand {
@@ -148,8 +195,8 @@ h2 {
 
 .study-summary {
   gap: 0;
-  min-height: 74px;
-  margin-bottom: 18px;
+  min-height: 58px;
+  margin-bottom: 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgb(255 255 255 / 80%);
@@ -177,15 +224,17 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 18px;
+  min-height: 0;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 12px;
 }
 
 .topology-panel,
 .inspector-panel,
 .results-panel,
-.timeline-panel,
 .fatal-error {
+  min-height: 0;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--paper);
@@ -193,15 +242,18 @@ h2 {
 }
 
 .topology-panel {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  flex-direction: column;
   overflow: hidden;
 }
 
 .panel-heading,
-.timeline-heading,
 .results-heading {
   justify-content: space-between;
   gap: 24px;
-  padding: 20px 22px 18px;
+  padding: 12px 18px 11px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -212,8 +264,9 @@ h2 {
 }
 
 .topology-frame {
-  height: 550px;
-  padding: 12px;
+  min-height: 0;
+  flex: 1;
+  padding: 8px;
   background: var(--canvas);
 }
 
@@ -412,8 +465,8 @@ h2 {
 
 .flow-legend {
   justify-content: space-between;
-  min-height: 44px;
-  padding: 0 22px;
+  min-height: 34px;
+  padding: 0 18px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 11px;
@@ -433,7 +486,8 @@ h2 {
 }
 
 .inspector-panel {
-  max-height: 675px;
+  grid-column: 2;
+  grid-row: 1 / -1;
   overflow: auto;
 }
 
@@ -667,7 +721,10 @@ h2 {
 }
 
 .results-panel {
-  margin-top: 18px;
+  display: flex;
+  grid-column: 1;
+  grid-row: 2;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -703,14 +760,23 @@ h2 {
 }
 
 .results-chart {
-  padding: 8px 16px 0;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  padding: 2px 12px 0;
 }
 
 .results-chart-svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   overflow: visible;
+}
+
+.results-chart-svg:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
 }
 
 .results-chart-axis,
@@ -794,7 +860,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
-  padding: 0 22px 20px;
+  padding: 0 14px 8px;
 }
 
 .results-legend-item {
@@ -803,7 +869,7 @@ h2 {
   grid-template-columns: 10px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  padding: 9px 10px;
+  padding: 5px 8px;
   border: 0;
   border-radius: 8px;
   color: var(--ink);
@@ -842,41 +908,6 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-.timeline-panel {
-  margin-top: 18px;
-  padding-bottom: 18px;
-}
-
-.timeline-heading {
-  border-bottom: 0;
-  padding-bottom: 8px;
-}
-
-#timeline-label {
-  color: var(--green);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-
-#timeline {
-  display: block;
-  width: calc(100% - 44px);
-  height: 22px;
-  margin: 6px 22px 0;
-  accent-color: var(--green);
-  cursor: ew-resize;
-}
-
-.timeline-extents {
-  display: flex;
-  justify-content: space-between;
-  padding: 0 24px;
-  color: var(--muted);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
 .fatal-error {
   padding: 36px;
 }
@@ -886,13 +917,58 @@ h2 {
   color: #8d3e39;
 }
 
-@media (max-width: 940px) {
+@media (max-width: 940px), (max-height: 700px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    display: block;
+    height: auto;
+    padding: 24px 0 40px;
+  }
+
+  .app-header {
+    margin-bottom: 18px;
+  }
+
+  .document-status {
+    margin: -12px 0 12px;
+  }
+
+  .study-summary {
+    min-height: 68px;
+    margin-bottom: 18px;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 18px;
+  }
+
+  .topology-panel,
+  .results-panel,
+  .inspector-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .topology-frame {
+    height: 490px;
+    flex: none;
   }
 
   .inspector-panel {
     max-height: none;
+  }
+  .results-chart {
+    display: block;
+    padding: 8px 16px 0;
+  }
+
+  .results-chart-svg {
+    height: auto;
   }
 }
 
@@ -905,6 +981,21 @@ h2 {
   .app-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .app-header-tools {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .project-actions button {
+    flex: 1;
+  }
+
+  .document-status {
+    margin-top: -12px;
+    text-align: left;
   }
 
   .study-summary {
@@ -938,12 +1029,6 @@ h2 {
 
   .flow-legend span:last-child {
     display: none;
-  }
-
-  .timeline-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
   }
 
   .results-heading {

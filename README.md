@@ -30,7 +30,9 @@ component inspector, linked directional-power and integrated-energy charts, and
 timestep scrubbing. Numeric parameter controls create temporary preview runs
 which can be reset or applied to the in-memory working model. Components can
 also be moved and resized as temporary layout changes; reloading restores the
-saved model and layout.
+saved layout. The applied working model can be downloaded and opened again as
+JSON, while a completed preview can be downloaded separately as a named
+parameter variant.
 
 ## Development
 

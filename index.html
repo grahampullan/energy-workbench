@@ -17,11 +17,25 @@
             <h1 id="model-name">Loading study…</h1>
           </div>
         </div>
-        <div class="run-status" id="run-status" role="status" aria-live="polite">
-          <span class="status-dot" aria-hidden="true"></span>
-          Preparing runtime
+        <div class="app-header-tools">
+          <div class="project-actions" aria-label="Model file actions">
+            <input
+              id="open-model-file"
+              type="file"
+              accept=".json,application/json"
+              hidden
+            >
+            <button id="open-model" type="button">Open model</button>
+            <button id="save-model" type="button">Save model</button>
+          </div>
+          <div class="run-status" id="run-status" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            Preparing runtime
+          </div>
         </div>
       </header>
+
+      <p id="document-status" class="document-status" role="status" aria-live="polite"></p>
 
       <section class="study-summary" aria-label="Study summary">
         <div>
@@ -56,6 +70,25 @@
           </div>
         </section>
 
+        <section class="results-panel" aria-labelledby="results-chart-title">
+          <div class="results-heading">
+            <div>
+              <p class="eyebrow">Run results</p>
+              <h2 id="results-chart-title">Power over time</h2>
+            </div>
+            <div class="results-view-controls" aria-label="Results chart view">
+              <button id="show-power-chart" type="button" aria-pressed="true">Power</button>
+              <button id="show-energy-chart" type="button" aria-pressed="false">Energy</button>
+            </div>
+          </div>
+          <div id="results-chart" class="results-chart"></div>
+          <div
+            id="results-chart-legend"
+            class="results-chart-legend"
+            aria-label="Result series"
+          ></div>
+        </section>
+
         <aside class="inspector-panel" aria-labelledby="inspector-title">
           <div id="inspector" class="inspector-empty">
             <p class="eyebrow">Component inspector</p>
@@ -63,40 +96,6 @@
             <p>Choose a component on the board to inspect its definition and current results.</p>
           </div>
         </aside>
-      </section>
-
-      <section class="results-panel" aria-labelledby="results-chart-title">
-        <div class="results-heading">
-          <div>
-            <p class="eyebrow">Run results</p>
-            <h2 id="results-chart-title">Power over time</h2>
-          </div>
-          <div class="results-view-controls" aria-label="Results chart view">
-            <button id="show-power-chart" type="button" aria-pressed="true">Power</button>
-            <button id="show-energy-chart" type="button" aria-pressed="false">Energy</button>
-          </div>
-        </div>
-        <div id="results-chart" class="results-chart"></div>
-        <div
-          id="results-chart-legend"
-          class="results-chart-legend"
-          aria-label="Result series"
-        ></div>
-      </section>
-
-      <section class="timeline-panel" aria-labelledby="timeline-title">
-        <div class="timeline-heading">
-          <div>
-            <p class="eyebrow">Reference day</p>
-            <h2 id="timeline-title">Timeline</h2>
-          </div>
-          <output id="timeline-label" for="timeline">—</output>
-        </div>
-        <input id="timeline" type="range" min="0" max="0" value="0" step="1" disabled>
-        <div class="timeline-extents" aria-hidden="true">
-          <span>00:00</span>
-          <span>24:00</span>
-        </div>
       </section>
     </main>
 

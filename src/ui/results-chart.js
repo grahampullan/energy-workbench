@@ -13,9 +13,9 @@ import { createFrameRenderer } from "./animation-frame.js";
 import { formatEngineeringValue } from "./workbench-view-model.js";
 
 const WIDTH = 1200;
-const HEIGHT = 370;
-const POWER_MARGIN = { top: 22, right: 28, bottom: 48, left: 66 };
-const ENERGY_MARGIN = { top: 22, right: 28, bottom: 112, left: 66 };
+const HEIGHT = 230;
+const POWER_MARGIN = { top: 16, right: 24, bottom: 40, left: 62 };
+const ENERGY_MARGIN = { top: 16, right: 24, bottom: 78, left: 62 };
 const SERIES_COLOURS = [
   "#2e6285",
   "#8b5a3c",
@@ -35,6 +35,45 @@ function formatChartTime(elapsedSeconds) {
   const minutes = minutesWithinDay % 60;
   const clock = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   return days ? `D${days + 1} ${clock}` : clock;
+}
+
+export function nextChartStepIndex({
+  key,
+  stepIndex,
+  stepCount,
+  timeStepSeconds
+}) {
+  if (
+    !Number.isInteger(stepIndex) ||
+    !Number.isInteger(stepCount) ||
+    stepCount < 1 ||
+    stepIndex < 0 ||
+    stepIndex >= stepCount ||
+    !Number.isFinite(timeStepSeconds) ||
+    timeStepSeconds <= 0
+  ) {
+    throw new TypeError("Valid chart step state is required");
+  }
+
+  const pageSize = Math.max(1, Math.round(3600 / timeStepSeconds));
+  const offsetByKey = new Map([
+    ["ArrowLeft", -1],
+    ["ArrowDown", -1],
+    ["ArrowRight", 1],
+    ["ArrowUp", 1],
+    ["PageDown", -pageSize],
+    ["PageUp", pageSize]
+  ]);
+  if (key === "Home") {
+    return 0;
+  }
+  if (key === "End") {
+    return stepCount - 1;
+  }
+  if (!offsetByKey.has(key)) {
+    return null;
+  }
+  return Math.max(0, Math.min(stepCount - 1, stepIndex + offsetByKey.get(key)));
 }
 
 function seriesIsEmphasised(series, selectedComponentId, highlightedConnectionId) {
@@ -88,8 +127,7 @@ export function createResultsChart({
     .append("svg")
     .attr("class", "results-chart-svg")
     .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
-    .attr("preserveAspectRatio", "xMidYMid meet")
-    .attr("role", "img");
+    .attr("preserveAspectRatio", "xMidYMid meet");
   const title = svg.append("title");
   const gridLayer = svg.append("g").attr("class", "results-chart-grid");
   const xAxisLayer = svg.append("g").attr("class", "results-chart-axis");
@@ -366,6 +404,33 @@ export function createResultsChart({
     }
   }
 
+  function updateAccessibility() {
+    if (mode === "energy") {
+      svg
+        .attr("role", "img")
+        .attr("tabindex", null)
+        .attr("aria-label", "Integrated directional electrical energy")
+        .attr("aria-valuemin", null)
+        .attr("aria-valuemax", null)
+        .attr("aria-valuenow", null)
+        .attr("aria-valuetext", null);
+      return;
+    }
+
+    const elapsedSeconds = state.model.elapsedSeconds[state.stepIndex];
+    svg
+      .attr("role", "slider")
+      .attr("tabindex", 0)
+      .attr("aria-label", "Power results timeline")
+      .attr("aria-valuemin", 1)
+      .attr("aria-valuemax", state.model.stepCount)
+      .attr("aria-valuenow", state.stepIndex + 1)
+      .attr(
+        "aria-valuetext",
+        `${formatChartTime(elapsedSeconds)}, step ${state.stepIndex + 1} of ${state.model.stepCount}`
+      );
+  }
+
   function renderChart() {
     if (state.model !== renderedModel) {
       rebuildLegend(state.model);
@@ -390,6 +455,7 @@ export function createResultsChart({
       updateEmphasis();
       updateCursor();
       updateLegend();
+      updateAccessibility();
     }
   });
 
@@ -425,8 +491,27 @@ export function createResultsChart({
 
   const showPower = () => setMode("power");
   const showEnergy = () => setMode("energy");
+  const handleKeyDown = (event) => {
+    if (mode !== "power" || !state) {
+      return;
+    }
+    const nextStepIndex = nextChartStepIndex({
+      key: event.key,
+      stepIndex: state.stepIndex,
+      stepCount: state.model.stepCount,
+      timeStepSeconds: state.model.timeStepSeconds
+    });
+    if (nextStepIndex === null) {
+      return;
+    }
+    event.preventDefault();
+    if (nextStepIndex !== state.stepIndex) {
+      onStepChange(nextStepIndex);
+    }
+  };
   powerButton.addEventListener("click", showPower);
   energyButton.addEventListener("click", showEnergy);
+  svg.on("keydown", handleKeyDown);
 
   return Object.freeze({
     update,
@@ -435,6 +520,7 @@ export function createResultsChart({
       frameRenderer.dispose();
       powerButton.removeEventListener("click", showPower);
       energyButton.removeEventListener("click", showEnergy);
+      svg.on("keydown", null);
       legendTarget.replaceChildren();
       svg.remove();
     }

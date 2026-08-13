@@ -157,6 +157,6 @@ expected values are locked by `tests/regression/blog-electrical.test.js`.
 - Slider and numeric controls show a changed value immediately.
 - Rapid input is coalesced, the released value is evaluated, and stale results
   cannot replace newer results.
-- Graph, power chart, integrated-energy view, and KPIs update together.
+- Graph, power chart, and integrated-energy view update together.
 - Graph/result highlighting works in both directions.
 - Preview can be reset or applied, and the applied model saves and reloads.

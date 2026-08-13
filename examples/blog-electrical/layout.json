@@ -6,27 +6,27 @@
     {
       "componentId": "pv",
       "x": 20,
-      "y": 40
+      "y": 20
     },
     {
       "componentId": "grid",
       "x": 20,
-      "y": 220
+      "y": 130
     },
     {
       "componentId": "bus",
       "x": 260,
-      "y": 130
+      "y": 75
     },
     {
       "componentId": "battery",
-      "x": 260,
-      "y": 370
+      "x": 500,
+      "y": 130
     },
     {
       "componentId": "load",
       "x": 500,
-      "y": 40
+      "y": 20
     }
   ]
 }

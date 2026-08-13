@@ -46,7 +46,8 @@ export function createComponentInspector({
   target,
   onParameterInput,
   onReset,
-  onApply
+  onApply,
+  onSaveVariant
 }) {
   let selectedComponentId = null;
   let bindings = [];
@@ -56,6 +57,7 @@ export function createComponentInspector({
   let previewStatus;
   let resetButton;
   let applyButton;
+  let saveVariantButton;
   let diagnosticsView;
 
   function disposeBindings() {
@@ -184,7 +186,12 @@ export function createComponentInspector({
     applyButton.className = "primary-button";
     applyButton.textContent = "Apply";
     applyButton.addEventListener("click", onApply);
-    buttons.append(resetButton, applyButton);
+    saveVariantButton = document.createElement("button");
+    saveVariantButton.type = "button";
+    saveVariantButton.className = "secondary-button";
+    saveVariantButton.textContent = "Save variant";
+    saveVariantButton.addEventListener("click", onSaveVariant);
+    buttons.append(resetButton, applyButton, saveVariantButton);
     diagnosticsView = document.createElement("ul");
     diagnosticsView.className = "preview-diagnostics";
     actions.append(previewStatus, buttons, diagnosticsView);
@@ -219,6 +226,7 @@ export function createComponentInspector({
     }
     resetButton.disabled = previewCount === 0;
     applyButton.disabled = previewCount === 0 || busy || !canApply;
+    saveVariantButton.disabled = previewCount === 0 || busy || !canApply;
     previewStatus.textContent = busy
       ? "Updating preview…"
       : previewCount === 0
@@ -248,5 +256,9 @@ export function createComponentInspector({
     target.replaceChildren();
   }
 
-  return Object.freeze({ render, dispose });
+  return Object.freeze({
+    render,
+    updatePreview: updatePreviewState,
+    dispose
+  });
 }

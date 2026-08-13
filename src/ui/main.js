@@ -5,6 +5,7 @@ import { electricalLoadDefinition } from "../components/electrical/load.js";
 import { electricalPvDefinition } from "../components/electrical/pv.js";
 import { electricalSourceDefinition } from "../components/electrical/source.js";
 import { createComponentRegistry } from "../core/component-registry.js";
+import { validateVariant } from "../core/validation/validate-documents.js";
 import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-self-consumption.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
@@ -17,6 +18,11 @@ import {
 import { createPreviewRunScheduler } from "./preview-run-scheduler.js";
 import { createResultsChartModel } from "./results-chart-model.js";
 import { createResultsChart } from "./results-chart.js";
+import {
+  createParameterVariant,
+  downloadJsonDocument,
+  parseWorkbenchModel
+} from "./study-document-files.js";
 import { createWorkbenchView } from "./workbench-view-model.js";
 
 const EXAMPLE_ROOT = "/examples/blog-electrical";
@@ -62,6 +68,17 @@ function uniqueDiagnostics(diagnostics) {
   return [...diagnosticsByIdentity.values()];
 }
 
+function diagnosticsMessage(diagnostics) {
+  const diagnostic = diagnostics.find((candidate) => candidate.severity === "error") ??
+    diagnostics[0];
+  if (!diagnostic) {
+    return "The document could not be used";
+  }
+  return diagnostic.path
+    ? `${diagnostic.path}: ${diagnostic.message}`
+    : diagnostic.message;
+}
+
 function runtimeFailure(run) {
   const message = run.diagnostics.map((diagnostic) => diagnostic.message).join("; ");
   const error = new Error(message || "The runtime did not complete");
@@ -76,7 +93,6 @@ function showFatalError(error) {
   errorView.querySelector(".fatal-error-message").textContent = error.message;
   document.querySelector(".workspace")?.replaceWith(errorView);
   document.querySelector(".results-panel")?.remove();
-  document.querySelector(".timeline-panel")?.remove();
   const status = element("run-status");
   status.classList.add("run-status--error");
   status.lastChild.textContent = " Runtime stopped";
@@ -128,6 +144,12 @@ async function startWorkbench() {
   let chartModel;
   let chartModelSource = null;
   let chartResultsSource = null;
+
+  function setDocumentStatus(message, { error = false } = {}) {
+    const status = element("document-status");
+    status.textContent = message;
+    status.dataset.error = String(error);
+  }
 
   function overrideList() {
     return [...previewOverrides.values()];
@@ -184,7 +206,6 @@ async function startWorkbench() {
       return;
     }
     stepIndex = nextStepIndex;
-    element("timeline").value = String(stepIndex);
     updateResultViews();
   }
 
@@ -245,9 +266,7 @@ async function startWorkbench() {
 
   function updateResultViews({ rebuildParameters = false, updateTopology = true } = {}) {
     view = createView();
-    element("timeline-label").textContent = view.timelineLabel;
-    element("summary-time").textContent = view.timelineLabel.split(" · ")[0];
-    element("timeline").value = String(stepIndex);
+    element("summary-time").textContent = view.timelineLabel;
     if (updateTopology) {
       topology.update();
     }
@@ -295,6 +314,7 @@ async function startWorkbench() {
     onStateChange(state) {
       schedulerState = state;
       if (view && inspector) {
+        inspector.updatePreview(previewState());
         setRunStatus();
       }
     },
@@ -392,12 +412,102 @@ async function startWorkbench() {
     updateResultViews({ rebuildParameters: true });
   }
 
+  function saveWorkingModel() {
+    const filename = downloadJsonDocument(workingModel);
+    const previewNote = previewOverrides.size > 0
+      ? "; temporary preview changes were not included"
+      : "";
+    setDocumentStatus(`Downloaded ${filename}${previewNote}`);
+  }
+
+  function savePreviewVariant() {
+    const suggestedName = `${workingModel.name} alternative`;
+    const name = window.prompt("Name this variant", suggestedName);
+    if (name === null) {
+      return;
+    }
+
+    let variant;
+    try {
+      variant = createParameterVariant({
+        model: workingModel,
+        name,
+        overrides: overrideList()
+      });
+    } catch (error) {
+      setDocumentStatus(error.message, { error: true });
+      return;
+    }
+    const validation = validateVariant(variant, { model: workingModel, registry });
+    if (!validation.valid) {
+      setDocumentStatus(diagnosticsMessage(validation.diagnostics), { error: true });
+      return;
+    }
+
+    const filename = downloadJsonDocument(variant);
+    setDocumentStatus(`Downloaded ${filename}; the preview remains temporary`);
+  }
+
+  function replaceWorkingModel(model, sourceName) {
+    const run = execute(model);
+    scheduler.invalidate();
+    previewOverrides.clear();
+    workingModel = model;
+    baselineRun = run;
+    activeModel = model;
+    activeRun = run;
+    pendingModel = null;
+    previewDiagnostics = run.diagnostics;
+    previewReady = false;
+    highlightedConnectionId = null;
+    stepIndex = Math.min(stepIndex, run.results.steps.length - 1);
+    element("model-name").textContent = model.name;
+    element("summary-topology").textContent =
+      `${model.components.length} components · ${model.connections.length} connections`;
+    updateResultViews({ rebuildParameters: true });
+    setDocumentStatus(`Loaded ${sourceName}`);
+  }
+
+  async function openWorkingModel(file) {
+    let text;
+    try {
+      text = await file.text();
+    } catch (error) {
+      setDocumentStatus(`Could not read ${file.name}: ${error.message}`, { error: true });
+      return;
+    }
+    const imported = parseWorkbenchModel(text, {
+      registry,
+      referenceModel: loadedModel
+    });
+    if (!imported.valid) {
+      setDocumentStatus(
+        `Could not load ${file.name}: ${diagnosticsMessage(imported.diagnostics)}`,
+        { error: true }
+      );
+      return;
+    }
+
+    try {
+      replaceWorkingModel(imported.model, file.name);
+    } catch (error) {
+      setDocumentStatus(
+        `Could not run ${file.name}: ${diagnosticsMessage(error.diagnostics ?? [{
+          severity: "error",
+          message: error.message
+        }])}`,
+        { error: true }
+      );
+    }
+  }
+
   view = createView();
   inspector = createComponentInspector({
     target: element("inspector"),
     onParameterInput: requestPreview,
     onReset: resetPreview,
-    onApply: applyPreview
+    onApply: applyPreview,
+    onSaveVariant: savePreviewVariant
   });
   resultsChart = createResultsChart({
     target: element("results-chart"),
@@ -442,19 +552,23 @@ async function startWorkbench() {
     onConnectionHighlight: highlightConnection
   });
 
-  const timeline = element("timeline");
-  timeline.max = String(activeRun.results.steps.length - 1);
-  timeline.value = String(stepIndex);
-  timeline.disabled = false;
-  timeline.addEventListener("input", () => {
-    selectStep(Number(timeline.value));
+  const modelFileInput = element("open-model-file");
+  element("open-model").addEventListener("click", () => modelFileInput.click());
+  modelFileInput.addEventListener("change", async () => {
+    const [file] = modelFileInput.files;
+    if (file) {
+      await openWorkingModel(file);
+    }
+    modelFileInput.value = "";
   });
+  element("save-model").addEventListener("click", saveWorkingModel);
 
   element("model-name").textContent = workingModel.name;
   element("scenario-name").textContent = scenario.name;
   element("summary-topology").textContent = `${workingModel.components.length} components · ${workingModel.connections.length} connections`;
   previewDiagnostics = baselineRun.diagnostics;
   updateResultViews({ rebuildParameters: true });
+  setDocumentStatus("Example model loaded; layout changes remain temporary");
 }
 
 startWorkbench().catch(showFatalError);

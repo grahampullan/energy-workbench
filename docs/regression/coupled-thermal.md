@@ -1,0 +1,78 @@
+# Coupled thermal reference specification
+
+## Purpose
+
+This public synthetic example is the Push 1B architectural reference. It proves
+that the same fixed-timestep runtime can resolve an electrical supply and a
+stateful thermal service without reducing both domains to an untyped scalar
+flow.
+
+It is intentionally smaller than the later batch-heating study. It has no
+process modes, schedule optimisation, CSV import, or industrial calibration.
+
+## Example model
+
+The model in `examples/coupled-thermal` has six components:
+
+```text
+Grid -> Electrical bus -> Electric heater -> Hot-water store -> Heat demand
+                                             |
+                                             +----------------> Ambient
+```
+
+The first two connections carry `electricity.active-power`. The remaining
+three carry `thermal.heat-flow`, including source and delivery temperatures.
+The store-to-ambient connection represents standing heat loss, so its direction
+is from the store to the ambient boundary.
+
+The synthetic duty cycle has 12 half-hour steps. The store starts at 80 °C and
+has an exact 10 kWh/K thermal capacity, a 70 °C useful-delivery threshold, an
+80 kW charge limit, and a 120 kW discharge limit. The heater is 90% efficient
+and supplies heat at 90 °C. Ambient temperature and heat demand are inline
+scenario series.
+
+## Operating policy
+
+The demand-following policy asks the heater for enough electrical input to
+match the current thermal demand after conversion efficiency. The resolver then
+finds feasible and actual operation from heater, store, grid, and delivery
+constraints.
+
+The policy is deliberately simple. It does not preheat the store or optimise
+across future timesteps. This keeps policy intent separate from physical
+feasibility and makes constrained operation easy to inspect.
+
+## Engineering contract
+
+The reference case exercises:
+
+- Electrical-to-thermal conversion, with heater heat equal to electrical input
+  multiplied by efficiency.
+- Store temperature state, updated from charge, discharge, and standing loss.
+- Positive standing loss during idle timesteps.
+- The store charge-flow limit when requested heat exceeds 80 kW.
+- The store discharge-flow limit at the first 150 kW peak.
+- The stored usable-energy limit as temperature approaches the 70 °C service
+  threshold.
+- Served and unmet heat as explicit demand outputs.
+
+Unmet-heat diagnostics at steps 4, 5, 6, and 10 are expected warnings. They do
+not make the run fail.
+
+## Reviewed result fixture
+
+`expected-results.json` records the complete 12-step series and integrated
+energy summary produced by the headless runtime. Energy is integrated as a
+fixed-timestep rectangular sum, matching the runtime state update.
+
+The regression checks three independent balances:
+
+```text
+grid import = heater electrical input
+heater heat output = heater electrical input × efficiency
+store energy change = charge - discharge - standing loss
+```
+
+It also checks that total demand equals served plus unmet heat and that the
+electrical bus residual remains below tolerance. These values are locked by
+`tests/regression/coupled-thermal.test.js`.

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "scenario.coupled-thermal-duty-cycle",
+  "name": "Synthetic six-hour heat-duty cycle",
+  "time": {
+    "startTime": "2026-01-01T06:00:00Z",
+    "timeStepSeconds": 1800,
+    "stepCount": 12
+  },
+  "series": [
+    {
+      "id": "thermal-demand",
+      "name": "Thermal demand",
+      "unit": "kW",
+      "data": {
+        "kind": "inline",
+        "values": [
+          0,
+          40,
+          80,
+          120,
+          150,
+          150,
+          100,
+          60,
+          20,
+          0,
+          80,
+          40
+        ]
+      }
+    },
+    {
+      "id": "ambient-temperature",
+      "name": "Ambient temperature",
+      "unit": "°C",
+      "data": {
+        "kind": "inline",
+        "values": [
+          15,
+          14,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          18,
+          17,
+          16,
+          15
+        ]
+      }
+    }
+  ]
+}

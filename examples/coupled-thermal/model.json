@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "model.coupled-thermal",
+  "name": "Coupled electrical and hot-water system",
+  "components": [
+    {
+      "id": "grid",
+      "type": "electrical.grid",
+      "definitionVersion": "0.2.0",
+      "name": "Grid",
+      "parameters": {
+        "maximumImportPowerkW": 120,
+        "maximumExportPowerkW": 0
+      },
+      "initialState": {}
+    },
+    {
+      "id": "bus",
+      "type": "electrical.bus",
+      "definitionVersion": "0.2.0",
+      "name": "Electrical bus",
+      "parameters": {},
+      "initialState": {}
+    },
+    {
+      "id": "heater",
+      "type": "thermal.electric-heater",
+      "definitionVersion": "0.2.0",
+      "name": "Electric heater",
+      "parameters": {
+        "maximumElectricalInputPowerkW": 100,
+        "efficiency": 0.9,
+        "supplyTemperatureC": 90
+      },
+      "initialState": {}
+    },
+    {
+      "id": "store",
+      "type": "thermal.hot-water-store",
+      "definitionVersion": "0.2.0",
+      "name": "Hot-water store",
+      "parameters": {
+        "volumeM3": 10,
+        "waterDensityKgPerM3": 1000,
+        "specificHeatCapacityKjPerKgK": 3.6,
+        "maximumTemperatureC": 90,
+        "heatLossCoefficientkWPerK": 0.05,
+        "maximumChargeHeatFlowkW": 80,
+        "maximumDischargeHeatFlowkW": 120,
+        "minimumUsefulTemperatureC": 70
+      },
+      "initialState": {
+        "temperatureC": 80
+      }
+    },
+    {
+      "id": "heat-demand",
+      "type": "thermal.heat-demand",
+      "definitionVersion": "0.2.0",
+      "name": "Heat demand",
+      "parameters": {
+        "demandSeriesId": "thermal-demand",
+        "profileMultiplier": 1,
+        "minimumDeliveryTemperatureC": 70
+      },
+      "initialState": {}
+    },
+    {
+      "id": "ambient",
+      "type": "thermal.ambient-boundary",
+      "definitionVersion": "0.2.0",
+      "name": "Ambient",
+      "parameters": {
+        "temperatureSeriesId": "ambient-temperature"
+      },
+      "initialState": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "grid-to-bus",
+      "name": "Grid to electrical bus",
+      "from": {
+        "componentId": "grid",
+        "portId": "electricity"
+      },
+      "to": {
+        "componentId": "bus",
+        "portId": "terminal-1"
+      }
+    },
+    {
+      "id": "bus-to-heater",
+      "name": "Electrical bus to heater",
+      "from": {
+        "componentId": "bus",
+        "portId": "terminal-2"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "electricity-in"
+      }
+    },
+    {
+      "id": "heater-to-store",
+      "name": "Heater to hot-water store",
+      "from": {
+        "componentId": "heater",
+        "portId": "heat-out"
+      },
+      "to": {
+        "componentId": "store",
+        "portId": "heat-in"
+      }
+    },
+    {
+      "id": "store-to-demand",
+      "name": "Hot-water store to heat demand",
+      "from": {
+        "componentId": "store",
+        "portId": "heat-out"
+      },
+      "to": {
+        "componentId": "heat-demand",
+        "portId": "heat-in"
+      }
+    },
+    {
+      "id": "store-to-ambient",
+      "name": "Hot-water store heat loss",
+      "from": {
+        "componentId": "store",
+        "portId": "heat-loss"
+      },
+      "to": {
+        "componentId": "ambient",
+        "portId": "heat-in"
+      }
+    }
+  ]
+}

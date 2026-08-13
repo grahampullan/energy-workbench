@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "layout.coupled-thermal",
+  "modelId": "model.coupled-thermal",
+  "components": [
+    {
+      "componentId": "grid",
+      "x": 20,
+      "y": 20
+    },
+    {
+      "componentId": "bus",
+      "x": 260,
+      "y": 20
+    },
+    {
+      "componentId": "heater",
+      "x": 500,
+      "y": 20
+    },
+    {
+      "componentId": "ambient",
+      "x": 20,
+      "y": 180
+    },
+    {
+      "componentId": "store",
+      "x": 260,
+      "y": 180
+    },
+    {
+      "componentId": "heat-demand",
+      "x": 500,
+      "y": 180
+    }
+  ]
+}

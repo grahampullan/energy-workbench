@@ -62,6 +62,23 @@ export const exampleComponentDefinition = {
         maximumPowerkW: runtimeComponent.parameters.ratedPowerkW
       };
     },
+    resolve(runtimeComponent, resolutionContext) {
+      const [connection] = resolutionContext.connections;
+      const powerkW = Math.min(
+        resolutionContext.operatingLimits.maximumPowerkW,
+        Math.max(
+          resolutionContext.operatingLimits.minimumPowerkW,
+          resolutionContext.target.powerkW
+        )
+      );
+      return {
+        feasibleCommand: { powerkW },
+        actualCommand: { powerkW },
+        connectionFlows: {
+          [connection.id]: { powerkW }
+        }
+      };
+    },
     evaluate(runtimeComponent, actualCommand, stepContext) {
       return {
         portFlows: {
@@ -101,6 +118,9 @@ the first runtime slice.
 - `initialise` creates state for one run; it does not modify the persisted
   component.
 - `getOperatingLimits` reports what is feasible from current state.
+- `resolve` owns the component's physical reconciliation. It returns
+  `{ feasibleCommand, actualCommand, connectionFlows }`, or `null` when it is
+  waiting for a connected component to settle a flow.
 - `evaluate` receives the actual allocated command and returns port flows,
   outputs, diagnostics, and proposed next state.
 - The runtime checks balances before committing next state.
@@ -133,9 +153,9 @@ initialises isolated state, and runs every scenario step synchronously.
 
 - The runtime evaluates every component's current operating limits once before
   requesting policy operation.
-- `policy.request(runtimeModel, stepContext, policyContext)` returns an object
-  keyed by non-grid controllable component ID, with commands shaped as
-  `{ powerkW }`.
+- `policy.request(runtimeModel, stepContext, policyContext)` returns
+  `{ targets, balancingComponentId }`. Targets are keyed by component ID. The
+  balancing component is explicit and must not also receive a target.
 - `policyContext.operatingLimitsByComponentId` is a read-only plain-object
   snapshot. Policies may use it to coordinate components without repeating
   component equations.
@@ -144,8 +164,8 @@ initialises isolated state, and runs every scenario step synchronously.
 - For an active-power component, `getOperatingLimits` includes finite
   `minimumPowerkW` and `maximumPowerkW` values. Equal values prescribe fixed
   operation and need no policy request. Thermal components return the explicit
-  heat-rate, temperature, and state-dependent limits required by their current
-  resolver.
+  heat-rate, temperature, and state-dependent capabilities required by their
+  connected components.
 - `stepContext` contains `stepIndex`, `timeStepSeconds`, `durationHours`,
   `elapsedSeconds`, current `seriesValues`, and isolated component state.
 - `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. Electrical
@@ -161,19 +181,17 @@ Each connection result has the shape
 `to`. Endpoint mismatch is a `runtime.connection-balance` diagnostic, not a
 result field.
 
-The current resolver accepts one `electrical.bus` with four bidirectional
-terminals. Each external component has one electrical connection, and each bus
-terminal has at most one. Exactly one `electrical.grid` is the automatic
-balancing boundary: its requested and feasible commands are `null`, and the
-resolver sets its actual command after fixed and explicitly policy-controlled
-operation.
+The current `electrical.bus` has four bidirectional terminals. It waits for its
+non-balancing terminal flows, applies its own conservation equation, and
+settles the terminal connected to the policy's `balancingComponentId`. The
+balancing component then checks that residual against its own limits. A grid is
+one possible balancing component; it is not selected automatically.
 Positive grid power is import into the model; negative grid power is export.
-The grid limits can make a timestep infeasible. This keeps balancing separate
-from policy and avoids treating component array order as dispatch priority.
+The grid limits can make a timestep infeasible.
 
 The current `electrical.pv` is prescribed by its scenario series: equal limits
-make all available generation actual generation. Curtailment is not inferred by
-the resolver; it would require an explicit controllable-component contract.
+make all available generation actual generation. Curtailment would require an
+explicit controllable-component contract and policy target.
 
 ### Restricted thermal ports
 
@@ -211,10 +229,9 @@ Qloss = UA * max(0, T - Tambient)
 Over a coarse timestep, loss is capped at the energy available above ambient so
 standing loss alone cannot cool the store through the ambient boundary.
 
-### Restricted coupled runtime
+### Coupled reference model
 
-`runScenario` keeps the electrical-only path for models without thermal ports.
-For Push 1B it also recognises exactly:
+The Push 1B reference model is:
 
 ```text
 electrical bus -> electric heater -> hot-water store -> heat demand
@@ -222,24 +239,26 @@ electrical bus -> electric heater -> hot-water store -> heat demand
                                       +-> ambient boundary
 ```
 
-`createHeatDemandFollowingPolicy({ heaterComponentId, demandComponentId })`
+`createHeatDemandFollowingPolicy({ heaterComponentId, demandComponentId,
+balancingComponentId })`
 requests heater electrical input from the current heat demand and the heater's
-declared conversion. The coupled resolver then:
+declared conversion. Component resolution then follows the visible topology:
 
-1. allocates useful store discharge up to demand;
-2. clamps heater output by electrical, store-capacity, and temperature limits;
-3. allocates standing loss to ambient; and
-4. passes feasible heater input to the electrical-bus resolver for grid balance.
+1. the store jointly settles charge, useful discharge, temperature limits, and
+   standing loss;
+2. the heater applies its conversion equation to the accepted heat flow;
+3. the electrical bus calculates its balancing-terminal residual; and
+4. the policy-selected balancing component checks and accepts that residual.
 
 The heater's requested command is `{ powerkW }`. Its feasible and actual
 commands also contain `heatOutputkW`, making the cross-domain allocation
-explicit. Store, demand, and ambient commands are resolver-owned. Every thermal
+explicit. Store, demand, and ambient operation follows their component-owned
+equations. Every thermal
 connection is checked for matching heat rate, source temperature, and delivery
 temperature before state is committed.
 
-This is a serial service resolver, not a thermal bus. Additional stores,
-demands, heaters, branches, or junctions require an explicit new topology and
-allocation contract.
+This is not a thermal bus. Thermal branches require a visible junction
+component that owns their allocation or mixing equation.
 
 ### Battery storage
 
@@ -266,13 +285,15 @@ maximumPowerkW =  min(maximumDischargePowerkW,
                       E * dischargingEfficiency / dt)
 ```
 
-The battery therefore requires an explicit policy request. The grid balances
-the remainder after that request is clamped. Stored-energy outputs describe the
-end of the completed timestep, matching the committed next state.
+The battery therefore requires an explicit policy target unless it is selected
+as the balancing component. The battery clamps the target against its own power
+and energy limits. Stored-energy outputs describe the end of the completed
+timestep, matching the committed next state.
 
 ### PV-battery self-consumption policy
 
-`createPvBatterySelfConsumptionPolicy({ batteryComponentId })` implements the
+`createPvBatterySelfConsumptionPolicy({ batteryComponentId,
+balancingComponentId })` implements the
 Push 1A priority without knowing PV or load equations. It sums the fixed
 operating power of every component other than the bus, grid, and target battery,
 then requests the opposite power from the battery:
@@ -281,11 +302,12 @@ then requests the opposite power from the battery:
 battery request = -(fixed generation + fixed demand)
 ```
 
-The resolver clamps that request to battery power and energy limits. The grid
-then balances any remainder. This means surplus serves fixed demand, charges
-the battery, then exports; a deficit uses fixed generation, discharges the
-battery, then imports. The policy rejects any additional variable component,
-because dispatch priority for multiple controllable devices must be explicit.
+The battery clamps that target to its own power and energy limits. The visible
+bus sends any remainder to the named balancing component. This means surplus
+serves fixed demand, charges the battery, then exports; a deficit uses fixed
+generation, discharges the battery, then imports. The policy rejects any
+additional variable component because dispatch priority for multiple
+controllable devices must be explicit.
 
 ## Definition checklist
 

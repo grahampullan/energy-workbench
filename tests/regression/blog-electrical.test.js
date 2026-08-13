@@ -53,7 +53,8 @@ const registry = createComponentRegistry([
   electricalPvDefinition
 ]);
 const policy = createPvBatterySelfConsumptionPolicy({
-  batteryComponentId: "battery"
+  batteryComponentId: "battery",
+  balancingComponentId: "grid"
 });
 const variantsByCase = {
   baseline: null,

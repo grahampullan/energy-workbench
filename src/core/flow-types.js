@@ -91,3 +91,33 @@ export function createFlow(flowType, flow, options) {
   }
   return Object.freeze({ ...flow });
 }
+
+export function connectionFlowsMatch(
+  flowType,
+  expectedFlow,
+  fromFlow,
+  toFlow,
+  { toDirection, powerTolerancekW = 1e-9 } = {}
+) {
+  if (flowType === ACTIVE_POWER_FLOW_TYPE) {
+    const toPowerkW = toDirection === "bidirectional"
+      ? -toFlow?.powerkW
+      : toFlow?.powerkW;
+    return Number.isFinite(expectedFlow?.powerkW) &&
+      Math.abs(fromFlow?.powerkW - expectedFlow.powerkW) <= powerTolerancekW &&
+      Math.abs(toPowerkW - expectedFlow.powerkW) <= powerTolerancekW;
+  }
+
+  if (flowType === THERMAL_HEAT_FLOW_TYPE) {
+    return expectedFlow && [fromFlow, toFlow].every((flow) =>
+      flow && Object.keys(expectedFlow).every((field) =>
+        Number.isFinite(flow[field]) &&
+        Math.abs(flow[field] - expectedFlow[field]) <= (
+          field === "heatFlowkW" ? powerTolerancekW : 1e-9
+        )
+      )
+    );
+  }
+
+  return false;
+}

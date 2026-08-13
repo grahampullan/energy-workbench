@@ -34,9 +34,9 @@ scenario series.
 ## Operating policy
 
 The demand-following policy asks the heater for enough electrical input to
-match the current thermal demand after conversion efficiency. The resolver then
-finds feasible and actual operation from heater, store, grid, and delivery
-constraints.
+match the current thermal demand after conversion efficiency. The store,
+heater, bus, and balancing grid then resolve their own feasible and actual
+operation in topology order.
 
 The policy is deliberately simple. It does not preheat the store or optimise
 across future timesteps. This keeps policy intent separate from physical

@@ -30,11 +30,11 @@ test("component registry accepts later registration but rejects duplicate contra
 
 test("component registry rejects incomplete engineering definitions", () => {
   const missingMethod = createTestComponentDefinition();
-  delete missingMethod.model.evaluate;
+  delete missingMethod.model.resolve;
 
   assert.throws(
     () => createComponentRegistry([missingMethod]),
-    /model\.evaluate must be a function/u
+    /model\.resolve must be a function/u
   );
 });
 

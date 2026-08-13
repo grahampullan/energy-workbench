@@ -1,3 +1,6 @@
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
+import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+
 function componentValue(values, specifications, field) {
   return Object.hasOwn(values, field)
     ? values[field]
@@ -179,6 +182,10 @@ export const electricalBatteryDefinition = {
       };
     },
 
+    resolve(runtimeComponent, context) {
+      return resolveSinglePortActivePower(runtimeComponent, context, "electricity");
+    },
+
     evaluate(runtimeComponent, actualCommand, stepContext) {
       const {
         capacitykWh,
@@ -212,4 +219,3 @@ export const electricalBatteryDefinition = {
     }
   }
 };
-import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

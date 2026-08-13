@@ -27,7 +27,8 @@ function createFixture({
   demandDefinition = heatDemandDefinition,
   policy = createHeatDemandFollowingPolicy({
     heaterComponentId: "heater",
-    demandComponentId: "heat-demand"
+    demandComponentId: "heat-demand",
+    balancingComponentId: "grid"
   })
 } = {}) {
   return {
@@ -323,12 +324,17 @@ test("heat-demand-following policy converts requested heat through heater effici
   assert.deepEqual(step.components[0].actualCommand, { powerkW: 10 });
 });
 
-test("coupled resolver clamps heater operation at the store supply-temperature boundary", () => {
+test("the store clamps heater operation at its supply-temperature boundary", () => {
   const result = runScenario(createFixture({
     demandValues: [0],
     heaterEfficiency: 0.8,
     heaterSupplyTemperatureC: 85,
-    policy: { request: () => ({ heater: { powerkW: -100 } }) }
+    policy: {
+      request: () => ({
+        targets: { heater: { powerkW: -100 } },
+        balancingComponentId: "grid"
+      })
+    }
   }));
 
   assert.equal(result.completed, true);
@@ -361,7 +367,7 @@ test("coupled runtime rejects incomplete thermal topology", () => {
   const result = runScenario(fixture);
 
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.unsupported-thermal-topology"));
+  assert.ok(diagnosticCodes(result).includes("runtime.component-connection-count"));
 });
 
 test("coupled connection balance checks component-evaluated thermal flows", () => {
@@ -399,11 +405,19 @@ test("heat-demand-following policy validates its component contract", () => {
     () => createHeatDemandFollowingPolicy(),
     /heaterComponentId must be a non-empty string/u
   );
+  assert.throws(
+    () => createHeatDemandFollowingPolicy({
+      heaterComponentId: "heater",
+      demandComponentId: "heat-demand"
+    }),
+    /balancingComponentId must be a non-empty string/u
+  );
 
   const result = runScenario(createFixture({
     policy: createHeatDemandFollowingPolicy({
       heaterComponentId: "store",
-      demandComponentId: "heat-demand"
+      demandComponentId: "heat-demand",
+      balancingComponentId: "grid"
     })
   }));
   assert.equal(result.completed, false);

@@ -31,9 +31,9 @@ export function requestPolicyOperation(
   limitsByComponentId,
   diagnostics
 ) {
-  let returnedRequests;
+  let returnedOperation;
   try {
-    returnedRequests = policy.request(
+    returnedOperation = policy.request(
       runtimeModel,
       stepContext,
       createPolicyContext(limitsByComponentId)
@@ -47,32 +47,36 @@ export function requestPolicyOperation(
     return null;
   }
 
-  if (!isRecord(returnedRequests)) {
+  if (
+    !isRecord(returnedOperation) ||
+    !isRecord(returnedOperation.targets) ||
+    !Object.hasOwn(returnedOperation, "balancingComponentId")
+  ) {
     diagnostics.push(policyDiagnostic(
       "runtime.policy-contract",
-      "Policy request must return an object keyed by component ID",
+      "Policy request must return targets and balancingComponentId",
       stepContext.stepIndex
     ));
     return null;
   }
 
-  let requests;
+  let operation;
   try {
-    requests = freezeJsonValue(cloneJsonValue(returnedRequests));
+    operation = freezeJsonValue(cloneJsonValue(returnedOperation));
   } catch (error) {
     if (!(error instanceof NonJsonValueError)) {
       throw error;
     }
     diagnostics.push(policyDiagnostic(
       "runtime.policy-contract",
-      `Policy requests must be JSON-compatible: ${error.message}`,
+      `Policy operation must be JSON-compatible: ${error.message}`,
       stepContext.stepIndex
     ));
     return null;
   }
 
   const componentIds = new Set(runtimeModel.components.map((component) => component.id));
-  for (const [componentId, command] of Object.entries(requests)) {
+  for (const [componentId, target] of Object.entries(operation.targets)) {
     if (!componentIds.has(componentId)) {
       diagnostics.push(policyDiagnostic(
         "runtime.policy-unknown-component",
@@ -82,20 +86,38 @@ export function requestPolicyOperation(
       ));
       continue;
     }
-    if (
-      !isRecord(command) ||
-      Object.keys(command).length !== 1 ||
-      !Object.hasOwn(command, "powerkW") ||
-      !Number.isFinite(command.powerkW)
-    ) {
+    if (!isRecord(target)) {
       diagnostics.push(policyDiagnostic(
-        "runtime.policy-command-contract",
-        "An electrical policy command must contain only a finite powerkW value",
+        "runtime.policy-target-contract",
+        "A policy target must be an object",
         stepContext.stepIndex,
         `/${componentId}`
       ));
     }
   }
 
-  return requests;
+  if (
+    typeof operation.balancingComponentId !== "string" ||
+    operation.balancingComponentId.length === 0 ||
+    !componentIds.has(operation.balancingComponentId)
+  ) {
+    diagnostics.push(policyDiagnostic(
+      "runtime.policy-balancing-component",
+      `Policy balancing component does not exist: ${operation.balancingComponentId}`,
+      stepContext.stepIndex,
+      "/balancingComponentId"
+    ));
+  }
+  if (
+    Object.hasOwn(operation.targets, operation.balancingComponentId)
+  ) {
+    diagnostics.push(policyDiagnostic(
+      "runtime.policy-over-specified",
+      "The balancing component cannot also receive a target",
+      stepContext.stepIndex,
+      `/targets/${operation.balancingComponentId}`
+    ));
+  }
+
+  return operation;
 }

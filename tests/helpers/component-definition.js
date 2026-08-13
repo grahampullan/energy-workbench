@@ -24,6 +24,11 @@ export function createTestComponentDefinition({
       prepare: model.prepare ?? (() => ({})),
       initialise: model.initialise ?? (() => ({})),
       getOperatingLimits: model.getOperatingLimits ?? (() => ({})),
+      resolve: model.resolve ?? (() => ({
+        feasibleCommand: null,
+        actualCommand: {},
+        connectionFlows: {}
+      })),
       evaluate: model.evaluate ?? (() => ({}))
     }
   };

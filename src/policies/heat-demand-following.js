@@ -16,13 +16,17 @@ function requireComponent(runtimeModel, componentId, type, label) {
 
 export function createHeatDemandFollowingPolicy({
   heaterComponentId,
-  demandComponentId
+  demandComponentId,
+  balancingComponentId
 } = {}) {
   if (typeof heaterComponentId !== "string" || heaterComponentId.length === 0) {
     throw new TypeError("heaterComponentId must be a non-empty string");
   }
   if (typeof demandComponentId !== "string" || demandComponentId.length === 0) {
     throw new TypeError("demandComponentId must be a non-empty string");
+  }
+  if (typeof balancingComponentId !== "string" || balancingComponentId.length === 0) {
+    throw new TypeError("balancingComponentId must be a non-empty string");
   }
 
   return Object.freeze({
@@ -63,7 +67,10 @@ export function createHeatDemandFollowingPolicy({
         : -demandHeatFlowkW / conversion;
 
       return {
-        [heaterComponentId]: { powerkW: requestedPowerkW }
+        targets: {
+          [heaterComponentId]: { powerkW: requestedPowerkW }
+        },
+        balancingComponentId
       };
     }
   });

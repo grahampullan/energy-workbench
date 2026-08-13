@@ -112,10 +112,16 @@ async function startWorkbench() {
   const battery = loadedModel.components.find(
     (component) => component.type === "electrical.battery"
   );
-  if (!battery) {
-    throw new Error("The example requires one battery for its dispatch policy");
+  const grid = loadedModel.components.find(
+    (component) => component.type === "electrical.grid"
+  );
+  if (!battery || !grid) {
+    throw new Error("The example requires one battery and one balancing grid");
   }
-  const policy = createPvBatterySelfConsumptionPolicy({ batteryComponentId: battery.id });
+  const policy = createPvBatterySelfConsumptionPolicy({
+    batteryComponentId: battery.id,
+    balancingComponentId: grid.id
+  });
 
   function execute(model) {
     const run = runScenario({ model, scenario, registry, policy });

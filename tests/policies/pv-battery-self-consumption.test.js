@@ -19,7 +19,8 @@ function createFixture({
   pvProfileMultiplier = 1,
   storedEnergykWh = 0,
   policy = createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: "battery"
+    batteryComponentId: "battery",
+    balancingComponentId: "grid"
   })
 } = {}) {
   return {
@@ -206,7 +207,8 @@ test("dispatch consumes fixed component limits including profile multipliers", (
 test("runtime gives policies an immutable operating-limit snapshot", () => {
   let receivedPolicyContext;
   const selfConsumptionPolicy = createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: "battery"
+    batteryComponentId: "battery",
+    balancingComponentId: "grid"
   });
   const fixture = createFixture({
     demandValues: [2],
@@ -246,11 +248,18 @@ test("self-consumption policy rejects invalid battery and extra variable operati
     () => createPvBatterySelfConsumptionPolicy(),
     /batteryComponentId must be a non-empty string/u
   );
+  assert.throws(
+    () => createPvBatterySelfConsumptionPolicy({ batteryComponentId: "battery" }),
+    /balancingComponentId must be a non-empty string/u
+  );
 
   const wrongBattery = createFixture({
     demandValues: [2],
     generationValues: [5],
-    policy: createPvBatterySelfConsumptionPolicy({ batteryComponentId: "grid" })
+    policy: createPvBatterySelfConsumptionPolicy({
+      batteryComponentId: "grid",
+      balancingComponentId: "grid"
+    })
   });
   const wrongBatteryResult = runScenario(wrongBattery);
   assert.equal(wrongBatteryResult.completed, false);

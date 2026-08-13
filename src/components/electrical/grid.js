@@ -1,3 +1,6 @@
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
+import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+
 export const electricalGridDefinition = {
   type: "electrical.grid",
   version: "0.2.0",
@@ -64,6 +67,10 @@ export const electricalGridDefinition = {
       };
     },
 
+    resolve(runtimeComponent, context) {
+      return resolveSinglePortActivePower(runtimeComponent, context, "electricity");
+    },
+
     evaluate(runtimeComponent, actualCommand) {
       const netPowerkW = actualCommand.powerkW;
       return {
@@ -81,4 +88,3 @@ export const electricalGridDefinition = {
     }
   }
 };
-import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

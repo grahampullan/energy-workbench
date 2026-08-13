@@ -4,6 +4,10 @@ import {
   createThermalFlow
 } from "../../core/thermal-flow.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
+import {
+  resolutionError,
+  singleConnection
+} from "../model-resolution.js";
 
 function componentValue(values, specifications, field) {
   return Object.hasOwn(values, field)
@@ -16,6 +20,163 @@ function thermalCapacitykWhPerK(parameters) {
     parameters.waterDensityKgPerM3 *
     parameters.specificHeatCapacityKjPerKgK /
     3600;
+}
+
+function otherComponent(component, connection) {
+  return connection.from.component === component
+    ? connection.to.component
+    : connection.from.component;
+}
+
+function finiteCapability(limits, field, { positive = false } = {}) {
+  const value = limits?.[field];
+  if (!Number.isFinite(value) || (positive ? value <= 0 : value < 0)) {
+    throw resolutionError(
+      "runtime.thermal-capability-contract",
+      `Thermal capability ${field} is missing or invalid`
+    );
+  }
+  return value;
+}
+
+function resolveStore(runtimeComponent, context, stepContext) {
+  const chargeConnection = singleConnection(runtimeComponent, context, "heat-in");
+  const demandConnection = singleConnection(runtimeComponent, context, "heat-out");
+  const lossConnection = singleConnection(runtimeComponent, context, "heat-loss");
+  if (
+    chargeConnection.to.component !== runtimeComponent ||
+    demandConnection.from.component !== runtimeComponent ||
+    lossConnection.from.component !== runtimeComponent
+  ) {
+    throw resolutionError(
+      "runtime.unsupported-thermal-topology",
+      `Thermal connections around ${runtimeComponent.id} have the wrong direction`
+    );
+  }
+
+  const heater = otherComponent(runtimeComponent, chargeConnection);
+  const demand = otherComponent(runtimeComponent, demandConnection);
+  const ambient = otherComponent(runtimeComponent, lossConnection);
+  const heaterTarget = context.getTarget(heater.id);
+  if (!heaterTarget || !Number.isFinite(heaterTarget.powerkW)) {
+    throw resolutionError(
+      "runtime.missing-policy-target",
+      `Policy did not provide a finite power target for ${heater.id}`
+    );
+  }
+
+  const heaterLimits = context.getOperatingLimits(heater.id);
+  const demandLimits = context.getOperatingLimits(demand.id);
+  const ambientLimits = context.getOperatingLimits(ambient.id);
+  const storeLimits = context.operatingLimits;
+  const conversion = finiteCapability(
+    heaterLimits,
+    "heatOutputPerElectricalInput",
+    { positive: true }
+  );
+  const maximumHeatOutputkW = finiteCapability(
+    heaterLimits,
+    "maximumHeatOutputkW"
+  );
+  const supplyTemperatureC = heaterLimits?.supplyTemperatureC;
+  const maximumDemandHeatFlowkW = finiteCapability(
+    demandLimits,
+    "maximumHeatFlowkW"
+  );
+  const minimumDeliveryTemperatureC = demandLimits?.minimumDeliveryTemperatureC;
+  const ambientTemperatureC = ambientLimits?.ambientTemperatureC;
+  if (
+    !Number.isFinite(supplyTemperatureC) ||
+    !Number.isFinite(minimumDeliveryTemperatureC) ||
+    !Number.isFinite(ambientTemperatureC)
+  ) {
+    throw resolutionError(
+      "runtime.thermal-capability-contract",
+      "Thermal temperature capabilities are missing or invalid"
+    );
+  }
+
+  const requestedPowerkW = Math.min(
+    heaterLimits.maximumPowerkW,
+    Math.max(heaterLimits.minimumPowerkW, heaterTarget.powerkW)
+  );
+  const requestedHeatOutputkW = Math.min(
+    maximumHeatOutputkW,
+    -requestedPowerkW * conversion
+  );
+  const storeTemperatureC = storeLimits.sourceTemperatureC;
+  const dischargeHeatFlowkW =
+    storeTemperatureC >= minimumDeliveryTemperatureC
+      ? Math.min(
+          maximumDemandHeatFlowkW,
+          storeLimits.maximumDischargeHeatFlowkW
+        )
+      : 0;
+  const standingLoss = calculateStandingHeatLoss({
+    thermalCapacitykWhPerK: storeLimits.thermalCapacitykWhPerK,
+    heatLossCoefficientkWPerK: storeLimits.heatLossCoefficientkWPerK,
+    temperatureC: storeTemperatureC,
+    ambientTemperatureC,
+    chargeHeatFlowkW: requestedHeatOutputkW,
+    dischargeHeatFlowkW,
+    durationHours: stepContext.durationHours
+  });
+  const maximumChargeAtSupplyTemperaturekW = supplyTemperatureC < storeTemperatureC
+    ? 0
+    : Math.max(
+        0,
+        dischargeHeatFlowkW +
+          standingLoss.unconstrainedHeatLosskW +
+          storeLimits.thermalCapacitykWhPerK *
+            (supplyTemperatureC - storeTemperatureC) /
+            stepContext.durationHours
+      );
+  const chargeHeatFlowkW = Math.min(
+    requestedHeatOutputkW,
+    storeLimits.maximumChargeHeatFlowkW,
+    maximumChargeAtSupplyTemperaturekW
+  );
+  const { heatLosskW } = calculateStandingHeatLoss({
+    thermalCapacitykWhPerK: storeLimits.thermalCapacitykWhPerK,
+    heatLossCoefficientkWPerK: storeLimits.heatLossCoefficientkWPerK,
+    temperatureC: storeTemperatureC,
+    ambientTemperatureC,
+    chargeHeatFlowkW,
+    dischargeHeatFlowkW,
+    durationHours: stepContext.durationHours
+  });
+
+  const chargeFlow = createThermalFlow({
+    heatFlowkW: chargeHeatFlowkW,
+    sourceTemperatureC: supplyTemperatureC,
+    deliveryTemperatureC: supplyTemperatureC
+  });
+  const demandFlow = createThermalFlow({
+    heatFlowkW: dischargeHeatFlowkW,
+    sourceTemperatureC: storeTemperatureC,
+    deliveryTemperatureC: storeTemperatureC
+  });
+  const lossFlow = createThermalFlow({
+    heatFlowkW: heatLosskW,
+    sourceTemperatureC: storeTemperatureC,
+    deliveryTemperatureC: ambientTemperatureC
+  });
+
+  return {
+    feasibleCommand: null,
+    actualCommand: {
+      chargeHeatFlowkW,
+      chargeSourceTemperatureC: supplyTemperatureC,
+      chargeDeliveryTemperatureC: supplyTemperatureC,
+      dischargeHeatFlowkW,
+      ambientTemperatureC
+    },
+    connectionFlows: {
+      [chargeConnection.id]: chargeFlow,
+      [demandConnection.id]: demandFlow,
+      [lossConnection.id]: lossFlow
+    }
+  };
 }
 
 function requireNonNegativePower(command, field) {
@@ -300,6 +461,10 @@ export const hotWaterStoreDefinition = {
         minimumUsefulTemperatureC,
         maximumTemperatureC
       };
+    },
+
+    resolve(runtimeComponent, context, stepContext) {
+      return resolveStore(runtimeComponent, context, stepContext);
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {

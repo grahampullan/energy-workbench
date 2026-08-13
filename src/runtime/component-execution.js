@@ -28,6 +28,12 @@ function componentStepContext(stepContext, component) {
   });
 }
 
+function componentConnections(runtimeModel, component) {
+  return Object.freeze(runtimeModel.connections.filter((connection) =>
+    connection.from.component === component || connection.to.component === component
+  ));
+}
+
 function hasExactFields(value, declaredFields) {
   const fields = Object.keys(value);
   return fields.length === declaredFields.size &&
@@ -148,6 +154,215 @@ export function getComponentOperatingLimits(runtimeModel, stepContext, diagnosti
   });
 
   return limitsByComponentId;
+}
+
+function resolutionContext({
+  runtimeModel,
+  component,
+  operation,
+  limitsByComponentId,
+  connectionFlows,
+  tolerancekW
+}) {
+  return Object.freeze({
+    target: operation.targets[component.id] ?? null,
+    balancingComponentId: operation.balancingComponentId,
+    operatingLimits: limitsByComponentId.get(component.id),
+    connections: componentConnections(runtimeModel, component),
+    tolerancekW,
+    getTarget(componentId) {
+      return operation.targets[componentId] ?? null;
+    },
+    getOperatingLimits(componentId) {
+      return limitsByComponentId.get(componentId);
+    },
+    getConnectionFlow(connectionId) {
+      return connectionFlows.get(connectionId);
+    }
+  });
+}
+
+function validateResolution(
+  resolution,
+  component,
+  runtimeModel,
+  connectionFlows,
+  stepIndex,
+  diagnostics
+) {
+  const path = `/steps/${stepIndex}/components/${component.id}`;
+  if (
+    !isRecord(resolution) ||
+    !(resolution.feasibleCommand === null || isRecord(resolution.feasibleCommand)) ||
+    !isRecord(resolution.actualCommand) ||
+    !isRecord(resolution.connectionFlows)
+  ) {
+    diagnostics.push(runtimeDiagnostic(
+      "runtime.component-resolution-contract",
+      `${component.type}.model.resolve must return feasibleCommand, actualCommand, and connectionFlows`,
+      path
+    ));
+    return null;
+  }
+
+  let cloned;
+  try {
+    cloned = cloneAndFreeze(resolution);
+  } catch (error) {
+    if (!(error instanceof NonJsonValueError)) {
+      throw error;
+    }
+    diagnostics.push(runtimeDiagnostic(
+      "runtime.component-resolution-contract",
+      `${component.type}.model.resolve must return JSON-compatible data: ${error.message}`,
+      path
+    ));
+    return null;
+  }
+
+  for (const [connectionId, flow] of Object.entries(cloned.connectionFlows)) {
+    const connection = runtimeModel.connections.find(
+      (candidate) => candidate.id === connectionId
+    );
+    if (
+      !connection ||
+      (
+        connection.from.component !== component &&
+        connection.to.component !== component
+      )
+    ) {
+      diagnostics.push(runtimeDiagnostic(
+        "runtime.component-resolution-contract",
+        `${component.type}.model.resolve settled an unconnected connection: ${connectionId}`,
+        `${path}/connectionFlows/${connectionId}`
+      ));
+      continue;
+    }
+    if (connectionFlows.has(connectionId)) {
+      diagnostics.push(runtimeDiagnostic(
+        "runtime.connection-over-specified",
+        `Connection ${connectionId} was settled by more than one component`,
+        `${path}/connectionFlows/${connectionId}`
+      ));
+      continue;
+    }
+    const validationMessage = flowValidationMessage(
+      connection.flowType,
+      flow,
+      { direction: connection.from.port.direction }
+    );
+    if (validationMessage) {
+      diagnostics.push(runtimeDiagnostic(
+        "runtime.component-resolution-contract",
+        `${component.type}.model.resolve returned an invalid flow for ${connectionId}: ${validationMessage}`,
+        `${path}/connectionFlows/${connectionId}`
+      ));
+    }
+  }
+
+  return cloned;
+}
+
+export function resolveRuntimeComponents(
+  runtimeModel,
+  operation,
+  limitsByComponentId,
+  stepContext,
+  tolerancekW,
+  diagnostics
+) {
+  const feasibleCommands = new Map();
+  const actualCommands = new Map();
+  const connectionFlows = new Map();
+  const unresolved = new Set(runtimeModel.components);
+
+  while (unresolved.size > 0) {
+    let progress = false;
+
+    for (const component of unresolved) {
+      let returnedResolution;
+      try {
+        returnedResolution = component.definition.model.resolve(
+          component,
+          resolutionContext({
+            runtimeModel,
+            component,
+            operation,
+            limitsByComponentId,
+            connectionFlows,
+            tolerancekW
+          }),
+          componentStepContext(stepContext, component)
+        );
+      } catch (error) {
+        diagnostics.push(runtimeDiagnostic(
+          error.code ?? "runtime.component-resolution-failed",
+          `${component.type} resolution failed: ${error.message}`,
+          `/steps/${stepContext.stepIndex}/components/${component.id}`
+        ));
+        unresolved.delete(component);
+        continue;
+      }
+
+      if (returnedResolution === null) {
+        continue;
+      }
+      const resolution = validateResolution(
+        returnedResolution,
+        component,
+        runtimeModel,
+        connectionFlows,
+        stepContext.stepIndex,
+        diagnostics
+      );
+      unresolved.delete(component);
+      if (resolution === null) {
+        continue;
+      }
+
+      feasibleCommands.set(component.id, resolution.feasibleCommand);
+      actualCommands.set(component.id, resolution.actualCommand);
+      for (const [connectionId, flow] of Object.entries(resolution.connectionFlows)) {
+        if (!connectionFlows.has(connectionId)) {
+          connectionFlows.set(connectionId, flow);
+        }
+      }
+      progress = true;
+    }
+
+    if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      break;
+    }
+    if (!progress) {
+      diagnostics.push(runtimeDiagnostic(
+        "runtime.unresolved-component-operation",
+        `Component operation could not be settled: ${[...unresolved].map((component) => component.id).join(", ")}`,
+        `/steps/${stepContext.stepIndex}`
+      ));
+      break;
+    }
+  }
+
+  if (
+    !diagnostics.some((diagnostic) => diagnostic.severity === "error") &&
+    connectionFlows.size !== runtimeModel.connections.length
+  ) {
+    const unsettled = runtimeModel.connections
+      .filter((connection) => !connectionFlows.has(connection.id))
+      .map((connection) => connection.id);
+    diagnostics.push(runtimeDiagnostic(
+      "runtime.unsettled-connection",
+      `Connection flow was not settled: ${unsettled.join(", ")}`,
+      `/steps/${stepContext.stepIndex}/connections`
+    ));
+  }
+
+  return {
+    resolved: !diagnostics.some((diagnostic) => diagnostic.severity === "error"),
+    feasibleCommands,
+    actualCommands,
+    connectionFlows
+  };
 }
 
 function appendEvaluationDiagnostics(

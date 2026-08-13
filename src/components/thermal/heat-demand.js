@@ -3,6 +3,7 @@ import {
   createThermalFlow
 } from "../../core/thermal-flow.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
+import { singleConnection } from "../model-resolution.js";
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -109,6 +110,19 @@ export const heatDemandDefinition = {
         maximumHeatFlowkW: demandHeatFlowkW(runtimeComponent, stepContext),
         minimumDeliveryTemperatureC:
           runtimeComponent.parameters.minimumDeliveryTemperatureC
+      };
+    },
+
+    resolve(runtimeComponent, context) {
+      const connection = singleConnection(runtimeComponent, context, "heat-in");
+      const flow = context.getConnectionFlow(connection.id);
+      if (flow === undefined) {
+        return null;
+      }
+      return {
+        feasibleCommand: null,
+        actualCommand: flow,
+        connectionFlows: {}
       };
     },
 

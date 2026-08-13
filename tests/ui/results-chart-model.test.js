@@ -39,7 +39,10 @@ const run = runScenario({
   model,
   scenario,
   registry,
-  policy: createPvBatterySelfConsumptionPolicy({ batteryComponentId: "battery" })
+  policy: createPvBatterySelfConsumptionPolicy({
+    batteryComponentId: "battery",
+    balancingComponentId: "grid"
+  })
 });
 
 test("chart model derives directional power series from canonical connection results", () => {

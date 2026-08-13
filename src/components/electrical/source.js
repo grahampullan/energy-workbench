@@ -1,3 +1,6 @@
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
+import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+
 export const electricalSourceDefinition = {
   type: "electrical.source",
   version: "0.2.0",
@@ -52,6 +55,14 @@ export const electricalSourceDefinition = {
       };
     },
 
+    resolve(runtimeComponent, context) {
+      return resolveSinglePortActivePower(
+        runtimeComponent,
+        context,
+        "electricity-out"
+      );
+    },
+
     evaluate(runtimeComponent, actualCommand, stepContext) {
       return {
         portFlows: {
@@ -66,4 +77,3 @@ export const electricalSourceDefinition = {
     }
   }
 };
-import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

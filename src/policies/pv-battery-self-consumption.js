@@ -1,6 +1,4 @@
 const BATTERY_TYPE = "electrical.battery";
-const BUS_TYPE = "electrical.bus";
-const GRID_TYPE = "electrical.grid";
 
 function requireBattery(runtimeModel, batteryComponentId) {
   const battery = runtimeModel.components.find(
@@ -17,14 +15,18 @@ function requireBattery(runtimeModel, batteryComponentId) {
   return battery;
 }
 
-function fixedExternalPowerkW(runtimeModel, battery, operatingLimitsByComponentId) {
+function fixedExternalPowerkW(
+  runtimeModel,
+  battery,
+  balancingComponentId,
+  operatingLimitsByComponentId
+) {
   let powerkW = 0;
 
   for (const component of runtimeModel.components) {
     if (
       component === battery ||
-      component.type === BUS_TYPE ||
-      component.type === GRID_TYPE
+      component.id === balancingComponentId
     ) {
       continue;
     }
@@ -43,9 +45,15 @@ function fixedExternalPowerkW(runtimeModel, battery, operatingLimitsByComponentI
   return powerkW;
 }
 
-export function createPvBatterySelfConsumptionPolicy({ batteryComponentId } = {}) {
+export function createPvBatterySelfConsumptionPolicy({
+  batteryComponentId,
+  balancingComponentId
+} = {}) {
   if (typeof batteryComponentId !== "string" || batteryComponentId.length === 0) {
     throw new TypeError("batteryComponentId must be a non-empty string");
+  }
+  if (typeof balancingComponentId !== "string" || balancingComponentId.length === 0) {
+    throw new TypeError("balancingComponentId must be a non-empty string");
   }
 
   return Object.freeze({
@@ -59,12 +67,16 @@ export function createPvBatterySelfConsumptionPolicy({ batteryComponentId } = {}
       const fixedPowerkW = fixedExternalPowerkW(
         runtimeModel,
         battery,
+        balancingComponentId,
         operatingLimitsByComponentId
       );
       const requestedBatteryPowerkW = fixedPowerkW === 0 ? 0 : -fixedPowerkW;
 
       return {
-        [batteryComponentId]: { powerkW: requestedBatteryPowerkW }
+        targets: {
+          [batteryComponentId]: { powerkW: requestedBatteryPowerkW }
+        },
+        balancingComponentId
       };
     }
   });

@@ -11,15 +11,16 @@ rather than rewriting its history.
 | --- | --- | --- |
 | [0001](0001-project-foundation.md) | Project foundation | Accepted |
 | [0002](0002-json-study-documents.md) | JSON study documents | Accepted |
-| [0003](0003-component-and-runtime-contract.md) | Component and runtime contract | Accepted |
+| [0003](0003-component-and-runtime-contract.md) | Component and runtime contract | Partly superseded by 0015 |
 | [0004](0004-preview-commands-and-history.md) | Preview, commands, and history | Accepted |
 | [0005](0005-runtime-preparation.md) | Runtime preparation | Accepted |
-| [0006](0006-fixed-timestep-electrical-runtime.md) | Fixed-timestep electrical runtime | Accepted |
-| [0007](0007-single-electrical-bus.md) | Single electrical bus | Accepted |
-| [0008](0008-residual-grid-and-fixed-pv.md) | Residual grid and fixed PV | Accepted |
+| [0006](0006-fixed-timestep-electrical-runtime.md) | Fixed-timestep electrical runtime | Partly superseded by 0015 |
+| [0007](0007-single-electrical-bus.md) | Single electrical bus | Partly superseded by 0015 |
+| [0008](0008-residual-grid-and-fixed-pv.md) | Residual grid and fixed PV | Partly superseded by 0015 |
 | [0009](0009-single-port-battery.md) | Single-port battery storage | Accepted |
-| [0010](0010-self-consumption-dispatch.md) | Self-consumption dispatch | Accepted |
+| [0010](0010-self-consumption-dispatch.md) | Self-consumption dispatch | Partly superseded by 0015 |
 | [0011](0011-browser-presentation-boundary.md) | Browser presentation boundary | Accepted |
 | [0012](0012-restricted-thermal-flow.md) | Restricted thermal flow and storage | Accepted |
-| [0013](0013-restricted-coupled-resolver.md) | Restricted coupled resolver | Accepted |
-| [0014](0014-flow-type-and-connection-result-contract.md) | Flow type and connection-result contract | Accepted |
+| [0013](0013-restricted-coupled-resolver.md) | Restricted coupled resolver | Superseded by 0015 |
+| [0014](0014-flow-type-and-connection-result-contract.md) | Flow type and connection-result contract | Partly superseded by 0015 |
+| [0015](0015-component-owned-resolution.md) | Component-owned resolution | Accepted |

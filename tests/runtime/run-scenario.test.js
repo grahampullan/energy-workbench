@@ -21,7 +21,9 @@ function createFixture({
   generationValues = [5, 40],
   timeStepSeconds = 900,
   pvInitialState = {},
-  policy = { request: () => ({}) }
+  policy = {
+    request: () => ({ targets: {}, balancingComponentId: "grid" })
+  }
 } = {}) {
   const model = {
     schemaVersion: "0.1.0",
@@ -346,15 +348,20 @@ test("the grid remains idle when fixed PV exactly supplies fixed demand", () => 
   });
 });
 
-test("the grid is resolver-owned and cannot receive a policy request", () => {
+test("the balancing component cannot also receive a policy target", () => {
   const fixture = createFixture({
-    policy: { request: () => ({ grid: { powerkW: 0 } }) }
+    policy: {
+      request: () => ({
+        targets: { grid: { powerkW: 0 } },
+        balancingComponentId: "grid"
+      })
+    }
   });
 
   const result = runScenario(fixture);
 
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.grid-policy-request"));
+  assert.ok(diagnosticCodes(result).includes("runtime.policy-over-specified"));
 });
 
 test("a non-grid controllable component requires an explicit valid policy request", () => {
@@ -362,21 +369,31 @@ test("a non-grid controllable component requires an explicit valid policy reques
   addDispatchableSource(missingRequest);
   const missingResult = runScenario(missingRequest);
   assert.equal(missingResult.completed, false);
-  assert.ok(diagnosticCodes(missingResult).includes("runtime.missing-policy-request"));
+  assert.ok(diagnosticCodes(missingResult).includes("runtime.missing-policy-target"));
 
   const malformedRequest = createFixture({
-    policy: { request: () => ({ source: { powerkW: "maximum" } }) }
+    policy: {
+      request: () => ({
+        targets: { source: { powerkW: "maximum" } },
+        balancingComponentId: "grid"
+      })
+    }
   });
   addDispatchableSource(malformedRequest);
   const malformedResult = runScenario(malformedRequest);
   assert.equal(malformedResult.completed, false);
-  assert.ok(diagnosticCodes(malformedResult).includes("runtime.policy-command-contract"));
+  assert.ok(diagnosticCodes(malformedResult).includes("runtime.missing-policy-target"));
 });
 
 test("policy fixes controllable operation before the grid balances the remainder", () => {
   const fixture = createFixture({
     maximumExportPowerkW: 100,
-    policy: { request: () => ({ source: { powerkW: 100 } }) }
+    policy: {
+      request: () => ({
+        targets: { source: { powerkW: 100 } },
+        balancingComponentId: "grid"
+      })
+    }
   });
   addDispatchableSource(fixture);
 
@@ -466,7 +483,7 @@ test("connection balance is checked against component-evaluated port flows", () 
   assert.ok(diagnosticCodes(result).includes("runtime.connection-balance"));
 });
 
-test("the bus resolver balances branching electrical loads through the grid", () => {
+test("the bus balances branching electrical loads through the selected component", () => {
   const fixture = createFixture();
   fixture.model.components.push({
     id: "second-load",
@@ -499,7 +516,32 @@ test("the bus resolver balances branching electrical loads through the grid", ()
   );
 });
 
-test("the bus runtime requires exactly one grid boundary", () => {
+test("policy can select a non-grid component to balance the bus", () => {
+  const fixture = createFixture({
+    loadProfileMultiplier: 1,
+    demandValues: [15],
+    generationValues: [5],
+    policy: {
+      request: () => ({ targets: {}, balancingComponentId: "source" })
+    }
+  });
+  fixture.model.components = fixture.model.components.filter(
+    (component) => component.id !== "grid"
+  );
+  fixture.model.connections = fixture.model.connections.filter(
+    (connection) => connection.id !== "grid-to-bus"
+  );
+  addDispatchableSource(fixture);
+
+  const result = runScenario(fixture);
+
+  assert.equal(result.completed, true);
+  assert.deepEqual(result.results.steps[0].components.at(-1).actualCommand, {
+    powerkW: 10
+  });
+});
+
+test("policy must name an existing balancing component", () => {
   const fixture = createFixture();
   fixture.model.components = fixture.model.components.filter(
     (component) => component.id !== "grid"
@@ -511,5 +553,5 @@ test("the bus runtime requires exactly one grid boundary", () => {
   const result = runScenario(fixture);
 
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.electrical-grid-count"));
+  assert.ok(diagnosticCodes(result).includes("runtime.policy-balancing-component"));
 });

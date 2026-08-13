@@ -169,6 +169,7 @@ function assertComponentDefinition(definition) {
   assertFunction(definition.model.prepare, `${definition.type}.model.prepare`);
   assertFunction(definition.model.initialise, `${definition.type}.model.initialise`);
   assertFunction(definition.model.getOperatingLimits, `${definition.type}.model.getOperatingLimits`);
+  assertFunction(definition.model.resolve, `${definition.type}.model.resolve`);
   assertFunction(definition.model.evaluate, `${definition.type}.model.evaluate`);
 }
 

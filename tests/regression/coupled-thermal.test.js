@@ -47,7 +47,8 @@ const registry = createComponentRegistry([
 ]);
 const policy = createHeatDemandFollowingPolicy({
   heaterComponentId: "heater",
-  demandComponentId: "heat-demand"
+  demandComponentId: "heat-demand",
+  balancingComponentId: "grid"
 });
 const runResult = runScenario({ model, scenario, policy, registry });
 const storeModelComponent = model.components.find(

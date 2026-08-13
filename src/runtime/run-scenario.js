@@ -1,22 +1,17 @@
 import { cloneJsonValue, freezeJsonValue } from "../core/json-value.js";
-import {
-  ACTIVE_POWER_FLOW_TYPE,
-  flowValidationMessage,
-  THERMAL_HEAT_FLOW_TYPE
-} from "../core/flow-types.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
 import {
   commitComponentStates,
   evaluateRuntimeComponents,
   getComponentOperatingLimits,
-  initialiseComponentStates
+  initialiseComponentStates,
+  resolveRuntimeComponents
 } from "./component-execution.js";
+import { checkConnectionBalances } from "./connection-execution.js";
 import { requestPolicyOperation } from "./policy-request.js";
 import { prepareRuntimeModel } from "./prepare-runtime-model.js";
-import { resolveEnergyModel } from "./resolve-energy-model.js";
 
 const DEFAULT_BALANCE_TOLERANCE_KILOWATTS = 1e-9;
-const DEFAULT_TEMPERATURE_TOLERANCE_C = 1e-9;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -77,104 +72,10 @@ function createStepContext(runtimeModel, states, stepIndex) {
   });
 }
 
-function checkConnectionBalances(
-  runtimeModel,
-  evaluationsByComponentId,
-  connectionFlows,
-  stepIndex,
-  tolerancekW,
-  diagnostics
-) {
-  return runtimeModel.connections.map((connection) => {
-    const expectedFlow = connectionFlows.get(connection.id);
-    const fromFlow = evaluationsByComponentId.get(connection.from.component.id)
-      .portFlows[connection.from.port.id];
-    const reportedToFlow = evaluationsByComponentId.get(connection.to.component.id)
-      .portFlows[connection.to.port.id];
-    const allocatedFlowValidationMessage = flowValidationMessage(
-      connection.flowType,
-      expectedFlow,
-      { direction: connection.from.port.direction }
-    );
-    if (allocatedFlowValidationMessage) {
-      diagnostics.push(runtimeDiagnostic(
-        "runtime.connection-flow-contract",
-        `Connection ${connection.id} has an invalid allocated flow: ${allocatedFlowValidationMessage}`,
-        `/steps/${stepIndex}/connections/${connection.id}`
-      ));
-    }
-
-    if (connection.flowType === ACTIVE_POWER_FLOW_TYPE) {
-      const expectedPowerkW = expectedFlow?.powerkW;
-      const fromPowerkW = fromFlow.powerkW;
-      const toPowerkW = connection.to.port.direction === "bidirectional"
-        ? -reportedToFlow.powerkW
-        : reportedToFlow.powerkW;
-      if (
-        !Number.isFinite(expectedPowerkW) ||
-        Math.abs(fromPowerkW - expectedPowerkW) > tolerancekW ||
-        Math.abs(toPowerkW - expectedPowerkW) > tolerancekW
-      ) {
-        diagnostics.push(runtimeDiagnostic(
-          "runtime.connection-balance",
-          `Connection ${connection.id} expected ${expectedPowerkW} kW but endpoints evaluated ${fromPowerkW} and ${toPowerkW} kW`,
-          `/steps/${stepIndex}/connections/${connection.id}`
-        ));
-      }
-
-      return {
-        connectionId: connection.id,
-        flowType: connection.flowType,
-        flow: expectedFlow === undefined ? null : cloneJsonValue(expectedFlow)
-      };
-    }
-
-    if (connection.flowType === THERMAL_HEAT_FLOW_TYPE) {
-      const heatBalanced =
-        expectedFlow &&
-        Math.abs(fromFlow.heatFlowkW - expectedFlow.heatFlowkW) <= tolerancekW &&
-        Math.abs(reportedToFlow.heatFlowkW - expectedFlow.heatFlowkW) <= tolerancekW;
-      const temperaturesBalanced = expectedFlow && [fromFlow, reportedToFlow].every(
-        (flow) =>
-          Math.abs(
-            flow.sourceTemperatureC - expectedFlow.sourceTemperatureC
-          ) <= DEFAULT_TEMPERATURE_TOLERANCE_C &&
-          Math.abs(
-            flow.deliveryTemperatureC - expectedFlow.deliveryTemperatureC
-          ) <= DEFAULT_TEMPERATURE_TOLERANCE_C
-      );
-      if (!heatBalanced || !temperaturesBalanced) {
-        diagnostics.push(runtimeDiagnostic(
-          "runtime.connection-balance",
-          `Thermal connection ${connection.id} endpoint flows do not match its allocated heat and temperatures`,
-          `/steps/${stepIndex}/connections/${connection.id}`
-        ));
-      }
-
-      return {
-        connectionId: connection.id,
-        flowType: connection.flowType,
-        flow: expectedFlow === undefined ? null : cloneJsonValue(expectedFlow)
-      };
-    }
-
-    diagnostics.push(runtimeDiagnostic(
-      "runtime.unsupported-flow-type",
-      `Runtime does not support connection flowType: ${connection.flowType}`,
-      `/steps/${stepIndex}/connections/${connection.id}`
-    ));
-    return {
-      connectionId: connection.id,
-      flowType: connection.flowType,
-      flow: expectedFlow === undefined ? null : cloneJsonValue(expectedFlow)
-    };
-  });
-}
-
 function stepResults({
   runtimeModel,
   stepContext,
-  requests,
+  operation,
   limitsByComponentId,
   resolution,
   evaluationsByComponentId,
@@ -187,7 +88,7 @@ function stepResults({
       const evaluation = evaluationsByComponentId.get(component.id);
       return {
         componentId: component.id,
-        requestedCommand: requests[component.id] ?? null,
+        requestedCommand: operation.targets[component.id] ?? null,
         operatingLimits: limitsByComponentId.get(component.id),
         feasibleCommand: resolution.feasibleCommands.get(component.id),
         actualCommand: resolution.actualCommands.get(component.id),
@@ -250,25 +151,25 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       return failure(diagnostics);
     }
 
-    const requests = requestPolicyOperation(
+    const operation = requestPolicyOperation(
       policy,
       runtimeModel,
       stepContext,
       limitsByComponentId,
       diagnostics
     );
-    if (requests === null || hasErrors(diagnostics)) {
+    if (operation === null || hasErrors(diagnostics)) {
       return failure(diagnostics);
     }
 
-    const resolution = resolveEnergyModel({
+    const resolution = resolveRuntimeComponents(
       runtimeModel,
-      requests,
+      operation,
       limitsByComponentId,
       stepContext,
-      tolerancekW
-    });
-    diagnostics.push(...resolution.diagnostics);
+      tolerancekW,
+      diagnostics
+    );
     if (!resolution.resolved) {
       return failure(diagnostics);
     }
@@ -298,7 +199,7 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
     steps.push(stepResults({
       runtimeModel,
       stepContext,
-      requests,
+      operation,
       limitsByComponentId,
       resolution,
       evaluationsByComponentId,

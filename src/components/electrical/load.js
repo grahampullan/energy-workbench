@@ -1,3 +1,6 @@
+import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
+import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+
 function parameterValue(component, definition, parameter) {
   return Object.hasOwn(component.parameters, parameter)
     ? component.parameters[parameter]
@@ -99,6 +102,14 @@ export const electricalLoadDefinition = {
       };
     },
 
+    resolve(runtimeComponent, context) {
+      return resolveSinglePortActivePower(
+        runtimeComponent,
+        context,
+        "electricity-in"
+      );
+    },
+
     evaluate(runtimeComponent, actualCommand, stepContext) {
       const demand = demandPowerkW(runtimeComponent, stepContext);
       return {
@@ -115,4 +126,3 @@ export const electricalLoadDefinition = {
     }
   }
 };
-import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";

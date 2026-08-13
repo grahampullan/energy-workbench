@@ -85,7 +85,10 @@ function createBatteryFixture({
     policy: {
       request(runtimeModel, stepContext) {
         return {
-          battery: { powerkW: requestedPowerkW[stepContext.stepIndex] }
+          targets: {
+            battery: { powerkW: requestedPowerkW[stepContext.stepIndex] }
+          },
+          balancingComponentId: "grid"
         };
       }
     },

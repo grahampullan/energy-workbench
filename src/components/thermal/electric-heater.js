@@ -6,6 +6,13 @@ import {
   ACTIVE_POWER_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../../core/flow-types.js";
+import {
+  connectionFlowForComponentPower
+} from "../electrical/resolve-single-active-power-port.js";
+import {
+  resolutionError,
+  singleConnection
+} from "../model-resolution.js";
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -107,6 +114,63 @@ export const electricHeaterDefinition = {
         heatOutputPerElectricalInput: efficiency,
         maximumHeatOutputkW: maximumElectricalInputPowerkW * efficiency,
         supplyTemperatureC
+      };
+    },
+
+    resolve(runtimeComponent, context) {
+      if (context.balancingComponentId === runtimeComponent.id) {
+        throw resolutionError(
+          "runtime.unsupported-balancing-component",
+          "The coupled electric heater cannot be the electrical balancing component"
+        );
+      }
+      if (!context.target || !Number.isFinite(context.target.powerkW)) {
+        throw resolutionError(
+          "runtime.missing-policy-target",
+          `Policy did not provide a finite power target for ${runtimeComponent.id}`
+        );
+      }
+
+      const heatConnection = singleConnection(
+        runtimeComponent,
+        context,
+        "heat-out"
+      );
+      const heatFlow = context.getConnectionFlow(heatConnection.id);
+      if (heatFlow === undefined) {
+        return null;
+      }
+      const electricityConnection = singleConnection(
+        runtimeComponent,
+        context,
+        "electricity-in"
+      );
+      const { efficiency, supplyTemperatureC } = runtimeComponent.parameters;
+      const powerkW = heatFlow.heatFlowkW === 0
+        ? 0
+        : -heatFlow.heatFlowkW / efficiency;
+      if (
+        powerkW < context.operatingLimits.minimumPowerkW - context.tolerancekW ||
+        powerkW > context.operatingLimits.maximumPowerkW + context.tolerancekW ||
+        Math.abs(heatFlow.sourceTemperatureC - supplyTemperatureC) > context.tolerancekW ||
+        Math.abs(heatFlow.deliveryTemperatureC - supplyTemperatureC) > context.tolerancekW
+      ) {
+        throw resolutionError(
+          "runtime.heater-operation-infeasible",
+          `Settled heat flow is infeasible for ${runtimeComponent.id}`
+        );
+      }
+      const command = { powerkW, heatOutputkW: heatFlow.heatFlowkW };
+      return {
+        feasibleCommand: command,
+        actualCommand: command,
+        connectionFlows: {
+          [electricityConnection.id]: connectionFlowForComponentPower(
+            runtimeComponent,
+            electricityConnection,
+            powerkW
+          )
+        }
       };
     },
 

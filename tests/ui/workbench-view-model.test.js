@@ -39,7 +39,10 @@ const run = runScenario({
   model,
   scenario,
   registry,
-  policy: createPvBatterySelfConsumptionPolicy({ batteryComponentId: "battery" })
+  policy: createPvBatterySelfConsumptionPolicy({
+    batteryComponentId: "battery",
+    balancingComponentId: "grid"
+  })
 });
 
 test("browser presentation derives the selected timestep from canonical results", () => {

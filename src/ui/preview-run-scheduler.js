@@ -1,3 +1,8 @@
+import {
+  defaultCancelFrame,
+  defaultRequestFrame
+} from "./animation-frame.js";
+
 function noOperation() {}
 
 export function createPreviewRunScheduler({
@@ -6,19 +11,21 @@ export function createPreviewRunScheduler({
   onError = noOperation,
   onStateChange = noOperation,
   onCallbackError = noOperation,
-  delayMs = 80
+  requestFrame = defaultRequestFrame,
+  cancelFrame = defaultCancelFrame
 } = {}) {
   if (typeof run !== "function") {
     throw new TypeError("Preview scheduler requires a run function");
   }
-  if (!Number.isFinite(delayMs) || delayMs < 0) {
-    throw new TypeError("delayMs must be a finite, non-negative number");
+  if (typeof requestFrame !== "function" || typeof cancelFrame !== "function") {
+    throw new TypeError("Preview scheduler requires frame request and cancellation functions");
   }
 
   let disposed = false;
   let running = false;
   let pending = null;
-  let timer = null;
+  let frameScheduled = false;
+  let frameHandle = null;
   let latestRequestId = 0;
   let idleWaiters = [];
 
@@ -35,13 +42,13 @@ export function createPreviewRunScheduler({
   }
 
   function isIdle() {
-    return !running && pending === null && timer === null;
+    return !running && pending === null && !frameScheduled;
   }
 
   function notifyState() {
     safelyCall(onStateChange, Object.freeze({
       running,
-      pending: pending !== null || timer !== null,
+      pending: pending !== null,
       latestRequestId
     }));
     if (isIdle()) {
@@ -51,20 +58,28 @@ export function createPreviewRunScheduler({
     }
   }
 
-  function clearScheduledRun() {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
+  function clearScheduledStart() {
+    if (!frameScheduled) {
+      return;
     }
+    cancelFrame(frameHandle);
+    frameScheduled = false;
+    frameHandle = null;
   }
 
-  function schedule(delay) {
-    clearScheduledRun();
-    timer = setTimeout(startPendingRun, delay);
+  function scheduleStart() {
+    if (disposed || running || pending === null || frameScheduled) {
+      return;
+    }
+    frameScheduled = true;
+    frameHandle = requestFrame(() => {
+      frameScheduled = false;
+      frameHandle = null;
+      void startPendingRun();
+    });
   }
 
   async function startPendingRun() {
-    timer = null;
     if (disposed || running || pending === null) {
       notifyState();
       return;
@@ -76,7 +91,7 @@ export function createPreviewRunScheduler({
     notifyState();
 
     try {
-      const result = await run(current.request);
+      const result = await Promise.resolve().then(() => run(current.request));
       if (!disposed && current.id === latestRequestId) {
         safelyCall(onResult, result, current.request, current.id);
       }
@@ -87,7 +102,7 @@ export function createPreviewRunScheduler({
     } finally {
       running = false;
       if (!disposed && pending !== null) {
-        schedule(0);
+        scheduleStart();
       }
       notifyState();
     }
@@ -100,7 +115,7 @@ export function createPreviewRunScheduler({
     latestRequestId += 1;
     pending = { id: latestRequestId, request: requestData };
     if (!running) {
-      schedule(delayMs);
+      scheduleStart();
     }
     notifyState();
     return latestRequestId;
@@ -112,7 +127,7 @@ export function createPreviewRunScheduler({
     }
     latestRequestId += 1;
     pending = null;
-    clearScheduledRun();
+    clearScheduledStart();
     notifyState();
   }
 

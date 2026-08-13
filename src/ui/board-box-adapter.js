@@ -7,6 +7,8 @@ import {
 } from "board-box";
 import { select } from "d3";
 
+import { createFrameRenderer } from "./animation-frame.js";
+
 const BOX_WIDTH = 164;
 const BOX_HEIGHT = 104;
 
@@ -112,12 +114,13 @@ class WorkbenchComponent extends BoardBoxComponent {
     if (!this.button) {
       return;
     }
-    const { component, selected } = this.getView(this.componentId);
+    const { component, selected, highlighted } = this.getView(this.componentId);
     this.typeElement.textContent = component.definitionName;
     this.nameElement.textContent = component.name;
     this.valueElement.textContent = component.metric.displayValue;
     this.metricElement.textContent = component.metric.label;
     this.button.dataset.powerTone = component.powerTone;
+    this.button.dataset.highlighted = String(highlighted);
     this.button.setAttribute("aria-label", `${component.name}, ${component.metric.label}: ${component.metric.displayValue}`);
     this.button.setAttribute("aria-pressed", String(selected));
   }
@@ -182,7 +185,12 @@ function connectionGeometry(boxesByComponentId, connections) {
   });
 }
 
-function renderConnections(content, boxesByComponentId, view) {
+function renderConnections(
+  content,
+  boxesByComponentId,
+  view,
+  onConnectionHighlight
+) {
   const connections = connectionGeometry(boxesByComponentId, view.connections);
 
   content
@@ -194,12 +202,18 @@ function renderConnections(content, boxesByComponentId, view) {
     .attr("y1", (connection) => connection.y1)
     .attr("x2", (connection) => connection.x2)
     .attr("y2", (connection) => connection.y2)
+    .classed(
+      "connection-line--highlighted",
+      (connection) => connection.id === view.highlightedConnectionId
+    )
     .attr("marker-start", (connection) =>
       connection.powerKw < -1e-9 ? "url(#flow-arrow)" : null
     )
     .attr("marker-end", (connection) =>
       connection.powerKw > 1e-9 ? "url(#flow-arrow)" : null
-    );
+    )
+    .on("pointerenter", (event, connection) => onConnectionHighlight(connection.id))
+    .on("pointerleave", () => onConnectionHighlight(null));
 
   const labels = content
     .selectAll("g.connection-label")
@@ -209,6 +223,10 @@ function renderConnections(content, boxesByComponentId, view) {
       label.append("text").attr("x", 0).attr("y", 0).attr("dy", "0.35em");
       return label;
     })
+    .classed(
+      "connection-label--highlighted",
+      (connection) => connection.id === view.highlightedConnectionId
+    )
     .attr("transform", (connection) =>
       `translate(${(connection.x1 + connection.x2) / 2} ${(connection.y1 + connection.y2) / 2})`
     );
@@ -218,7 +236,14 @@ function renderConnections(content, boxesByComponentId, view) {
     .text((connection) => connection.displayPower);
 }
 
-export function createTopologyBoard({ targetId, model, layout, getView, onSelect }) {
+export function createTopologyBoard({
+  targetId,
+  model,
+  layout,
+  getView,
+  onSelect,
+  onConnectionHighlight = () => {}
+}) {
   const target = document.getElementById(targetId);
   if (!target) {
     throw new Error(`Board target does not exist: ${targetId}`);
@@ -246,9 +271,17 @@ export function createTopologyBoard({ targetId, model, layout, getView, onSelect
     .attr("class", "connection-content");
 
   const boxesByComponentId = new Map();
-  const updateConnections = () => {
-    renderConnections(connectionContent, boxesByComponentId, getView());
-  };
+  const connectionRenderer = createFrameRenderer({
+    render() {
+      renderConnections(
+        connectionContent,
+        boxesByComponentId,
+        getView(),
+        onConnectionHighlight
+      );
+    }
+  });
+  const updateConnections = () => connectionRenderer.request();
   for (const component of model.components) {
     const position = positionsByComponentId.get(component.id);
     if (!position) {
@@ -277,10 +310,15 @@ export function createTopologyBoard({ targetId, model, layout, getView, onSelect
 
   board.customOnUpdateEnd = updateConnections;
   board.make();
+  updateConnections();
 
   return Object.freeze({
     update() {
       board.update();
+    },
+    dispose() {
+      connectionRenderer.dispose();
+      svg.remove();
     }
   });
 }

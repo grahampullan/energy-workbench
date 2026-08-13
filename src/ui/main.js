@@ -15,6 +15,8 @@ import {
   resolvedParameterValue
 } from "./preview-model.js";
 import { createPreviewRunScheduler } from "./preview-run-scheduler.js";
+import { createResultsChartModel } from "./results-chart-model.js";
+import { createResultsChart } from "./results-chart.js";
 import { createWorkbenchView } from "./workbench-view-model.js";
 
 const EXAMPLE_ROOT = "/examples/blog-electrical";
@@ -73,6 +75,7 @@ function showFatalError(error) {
   const errorView = template.content.cloneNode(true);
   errorView.querySelector(".fatal-error-message").textContent = error.message;
   document.querySelector(".workspace")?.replaceWith(errorView);
+  document.querySelector(".results-panel")?.remove();
   document.querySelector(".timeline-panel")?.remove();
   const status = element("run-status");
   status.classList.add("run-status--error");
@@ -112,6 +115,7 @@ async function startWorkbench() {
   let activeRun = baselineRun;
   let pendingModel = null;
   let selectedComponentId = battery.id;
+  let highlightedConnectionId = null;
   let stepIndex = Math.floor(activeRun.results.steps.length / 2);
   let previewDiagnostics = [];
   let previewReady = false;
@@ -120,6 +124,10 @@ async function startWorkbench() {
   let view;
   let topology;
   let inspector;
+  let resultsChart;
+  let chartModel;
+  let chartModelSource = null;
+  let chartResultsSource = null;
 
   function overrideList() {
     return [...previewOverrides.values()];
@@ -143,6 +151,50 @@ async function startWorkbench() {
       throw new Error(`View does not contain component: ${selectedComponentId}`);
     }
     return component;
+  }
+
+  function updateChart() {
+    if (!resultsChart) {
+      return;
+    }
+    if (activeModel !== chartModelSource || activeRun.results !== chartResultsSource) {
+      chartModel = createResultsChartModel({
+        model: activeModel,
+        registry,
+        results: activeRun.results
+      });
+      chartModelSource = activeModel;
+      chartResultsSource = activeRun.results;
+    }
+    resultsChart.update({
+      model: chartModel,
+      stepIndex,
+      selectedComponentId,
+      highlightedConnectionId
+    });
+  }
+
+  function selectStep(nextStepIndex) {
+    if (
+      !Number.isInteger(nextStepIndex) ||
+      nextStepIndex < 0 ||
+      nextStepIndex >= activeRun.results.steps.length ||
+      nextStepIndex === stepIndex
+    ) {
+      return;
+    }
+    stepIndex = nextStepIndex;
+    element("timeline").value = String(stepIndex);
+    updateResultViews();
+  }
+
+  function highlightConnection(connectionId) {
+    if (connectionId === highlightedConnectionId) {
+      return;
+    }
+    highlightedConnectionId = connectionId;
+    topology?.update();
+    updateChart();
   }
 
   function previewState(rebuildParameters = false) {
@@ -195,10 +247,12 @@ async function startWorkbench() {
     view = createView();
     element("timeline-label").textContent = view.timelineLabel;
     element("summary-time").textContent = view.timelineLabel.split(" · ")[0];
+    element("timeline").value = String(stepIndex);
     if (updateTopology) {
       topology.update();
     }
     updateInspector(rebuildParameters);
+    updateChart();
     setRunStatus();
   }
 
@@ -212,7 +266,6 @@ async function startWorkbench() {
   }
 
   const scheduler = createPreviewRunScheduler({
-    delayMs: 80,
     run({ model, diagnostics }) {
       const run = execute(model);
       return {
@@ -241,7 +294,9 @@ async function startWorkbench() {
     },
     onStateChange(state) {
       schedulerState = state;
-      updatePreviewChrome();
+      if (view && inspector) {
+        setRunStatus();
+      }
     },
     onCallbackError(error) {
       console.error("Preview presentation callback failed", error);
@@ -285,12 +340,10 @@ async function startWorkbench() {
       overrides: overrideList()
     });
     previewDiagnostics = uniqueDiagnostics(candidate.diagnostics);
-    view = createView();
-    updateInspector();
     if (!candidate.applied) {
       pendingModel = null;
       scheduler.invalidate();
-      setRunStatus();
+      updatePreviewChrome();
       return;
     }
 
@@ -299,6 +352,7 @@ async function startWorkbench() {
       model: candidate.model,
       diagnostics: candidate.diagnostics
     });
+    updatePreviewChrome();
   }
 
   function resetPreview() {
@@ -345,25 +399,47 @@ async function startWorkbench() {
     onReset: resetPreview,
     onApply: applyPreview
   });
+  resultsChart = createResultsChart({
+    target: element("results-chart"),
+    legendTarget: element("results-chart-legend"),
+    powerButton: element("show-power-chart"),
+    energyButton: element("show-energy-chart"),
+    headingTarget: element("results-chart-title"),
+    onStepChange: selectStep,
+    onHighlightConnection: highlightConnection
+  });
   topology = createTopologyBoard({
     targetId: "topology-board",
     model: workingModel,
     layout,
     getView(componentId) {
       if (!componentId) {
-        return view;
+        return { ...view, highlightedConnectionId };
       }
       const component = view.components.find((candidate) => candidate.id === componentId);
       if (!component) {
         throw new Error(`View does not contain component: ${componentId}`);
       }
-      return { component, selected: componentId === selectedComponentId };
+      const highlightedConnection = view.connections.find(
+        (connection) => connection.id === highlightedConnectionId
+      );
+      const highlighted = highlightedConnection !== undefined && (
+        highlightedConnection.fromComponentId === componentId ||
+        highlightedConnection.toComponentId === componentId
+      );
+      return {
+        component,
+        selected: componentId === selectedComponentId,
+        highlighted
+      };
     },
     onSelect(componentId) {
       selectedComponentId = componentId;
       topology.update();
       updateInspector();
-    }
+      updateChart();
+    },
+    onConnectionHighlight: highlightConnection
   });
 
   const timeline = element("timeline");
@@ -371,8 +447,7 @@ async function startWorkbench() {
   timeline.value = String(stepIndex);
   timeline.disabled = false;
   timeline.addEventListener("input", () => {
-    stepIndex = Number(timeline.value);
-    updateResultViews();
+    selectStep(Number(timeline.value));
   });
 
   element("model-name").textContent = workingModel.name;

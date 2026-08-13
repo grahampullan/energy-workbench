@@ -65,6 +65,25 @@
         </aside>
       </section>
 
+      <section class="results-panel" aria-labelledby="results-chart-title">
+        <div class="results-heading">
+          <div>
+            <p class="eyebrow">Run results</p>
+            <h2 id="results-chart-title">Power over time</h2>
+          </div>
+          <div class="results-view-controls" aria-label="Results chart view">
+            <button id="show-power-chart" type="button" aria-pressed="true">Power</button>
+            <button id="show-energy-chart" type="button" aria-pressed="false">Energy</button>
+          </div>
+        </div>
+        <div id="results-chart" class="results-chart"></div>
+        <div
+          id="results-chart-legend"
+          class="results-chart-legend"
+          aria-label="Result series"
+        ></div>
+      </section>
+
       <section class="timeline-panel" aria-labelledby="timeline-title">
         <div class="timeline-heading">
           <div>

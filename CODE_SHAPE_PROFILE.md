@@ -51,6 +51,8 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
   input data from canonical run results.
 - Continue to use board-box for topology mechanics. Use ordinary DOM APIs for
   semantic interface elements such as forms, buttons, and inspectors.
+- Coalesce continuous drag, resize, scrub, and chart rendering to one animation
+  frame. Preview scheduling must still preserve the latest pending value.
 
 ## Test defaults
 

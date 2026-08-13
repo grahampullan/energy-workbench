@@ -3,7 +3,13 @@ import {
   freezeJsonValue,
   NonJsonValueError
 } from "../core/json-value.js";
+import {
+  THERMAL_FLOW_MEDIUM,
+  thermalFlowValidationMessage
+} from "../core/thermal-flow.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
+
+const ACTIVE_POWER_MEDIUM = "electricity.active-power";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -102,25 +108,45 @@ export function getComponentOperatingLimits(runtimeModel, stepContext, diagnosti
       return;
     }
 
+    if (!isRecord(limits)) {
+      diagnostics.push(runtimeDiagnostic(
+        "runtime.component-limits-contract",
+        `${component.type}.model.getOperatingLimits must return a plain object`,
+        path
+      ));
+      return;
+    }
+    const hasElectricalPort = component.ports.some(
+      (port) => port.medium === ACTIVE_POWER_MEDIUM
+    );
     if (
-      !isRecord(limits) ||
-      Object.keys(limits).length !== 2 ||
-      !Number.isFinite(limits.minimumPowerKw) ||
-      !Number.isFinite(limits.maximumPowerKw) ||
-      limits.minimumPowerKw > limits.maximumPowerKw
+      hasElectricalPort &&
+      (
+        !Number.isFinite(limits.minimumPowerKw) ||
+        !Number.isFinite(limits.maximumPowerKw) ||
+        limits.minimumPowerKw > limits.maximumPowerKw
+      )
     ) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.component-limits-contract",
-        `${component.type}.model.getOperatingLimits must return finite minimumPowerKw and maximumPowerKw values in order`,
+        `${component.type}.model.getOperatingLimits must include finite minimumPowerKw and maximumPowerKw values in order`,
         path
       ));
       return;
     }
 
-    limitsByComponentId.set(component.id, Object.freeze({
-      minimumPowerKw: limits.minimumPowerKw,
-      maximumPowerKw: limits.maximumPowerKw
-    }));
+    try {
+      limitsByComponentId.set(component.id, cloneAndFreeze(limits));
+    } catch (error) {
+      if (!(error instanceof NonJsonValueError)) {
+        throw error;
+      }
+      diagnostics.push(runtimeDiagnostic(
+        "runtime.component-limits-contract",
+        `${component.type}.model.getOperatingLimits must return JSON-compatible limits: ${error.message}`,
+        path
+      ));
+    }
   });
 
   return limitsByComponentId;
@@ -192,6 +218,17 @@ function validateEvaluationShape(evaluation, component, stepIndex, diagnostics) 
   }
   for (const [portId, flow] of Object.entries(evaluation.portFlows)) {
     const port = component.ports.find((candidate) => candidate.id === portId);
+    if (port?.medium === THERMAL_FLOW_MEDIUM) {
+      const validationMessage = thermalFlowValidationMessage(flow);
+      if (validationMessage) {
+        diagnostics.push(runtimeDiagnostic(
+          "runtime.component-port-flow-contract",
+          `Thermal port ${portId} is invalid: ${validationMessage}`,
+          `${path}/portFlows/${portId}`
+        ));
+      }
+      continue;
+    }
     const permitsSignedFlow = port?.direction === "bidirectional";
     if (
       !isRecord(flow) ||

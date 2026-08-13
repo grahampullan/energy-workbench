@@ -95,6 +95,46 @@ non-negative flow in their declared direction; bidirectional ports report
 positive export and negative import. Connection power is signed from the
 persisted `from` endpoint towards `to`.
 
+Directed thermal ports use the `thermal.heat-flow` medium. Every reported flow
+has exactly:
+
+```text
+heatFlowKw
+sourceTemperatureC
+deliveryTemperatureC
+```
+
+Heat flow is non-negative in the declared direction. For positive flow,
+delivery temperature cannot exceed source temperature. The connected
+components own source-temperature availability and minimum useful delivery
+temperature; a connection adds no fluid equations. This restricted contract
+does not represent mass flow, pressure, mixing, enthalpy transport, or pipe
+delay.
+
+The hot-water store actual command keeps its independently allocated boundary
+conditions explicit: charge heat flow and its source/delivery temperatures,
+discharge heat flow, and ambient temperature. Its temperature state advances
+by explicit integration over `durationHours`; it does not hide a second flow
+allocation inside the component.
+
+The Push 1B coupled resolver supports one deliberately fixed thermal topology:
+
+```text
+electrical bus -> electric heater -> hot-water store -> heat demand
+                                      |
+                                      +-> ambient boundary
+```
+
+The policy requests signed electrical input for the heater. The resolver then
+allocates useful store discharge, clamps heater/store charge by current power,
+capacity, and temperature limits, allocates standing loss to ambient, and calls
+the existing electrical-bus resolver with the heater's feasible input. Store,
+demand, and ambient commands are resolver-owned and do not receive independent
+policy requests. Thermal connection results contain the allocated heat flow and
+both boundary temperatures. Thermal branching requires a future explicit
+resolver; it is not inferred from component order or treated as a general
+junction problem.
+
 A fixed component reports equal minimum and maximum operating power and needs
 no policy request. A non-grid component with variable limits requires an
 explicit policy request. In the single-bus electrical runtime, exactly one grid

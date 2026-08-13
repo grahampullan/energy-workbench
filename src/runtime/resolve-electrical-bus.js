@@ -1,4 +1,5 @@
 import { createDiagnostic } from "../core/validation/validation-result.js";
+import { THERMAL_FLOW_MEDIUM } from "../core/thermal-flow.js";
 
 const ACTIVE_POWER_MEDIUM = "electricity.active-power";
 const BUS_TYPE = "electrical.bus";
@@ -16,6 +17,10 @@ function resolverDiagnostic(code, message, stepIndex, path = "") {
   });
 }
 
+function hasActivePowerPort(component) {
+  return component.ports.some((port) => port.medium === ACTIVE_POWER_MEDIUM);
+}
+
 function prepareFeasibleCommands({
   runtimeModel,
   requests,
@@ -26,6 +31,9 @@ function prepareFeasibleCommands({
   const feasibleCommands = new Map();
 
   for (const component of runtimeModel.components) {
+    if (!hasActivePowerPort(component)) {
+      continue;
+    }
     const limits = limitsByComponentId.get(component.id);
     const request = requests[component.id];
     if (component.type === GRID_TYPE) {
@@ -90,12 +98,14 @@ function validateBusTopology(runtimeModel, stepIndex, diagnostics) {
 
   for (const connection of runtimeModel.connections) {
     if (connection.medium !== ACTIVE_POWER_MEDIUM) {
-      diagnostics.push(resolverDiagnostic(
-        "runtime.unsupported-medium",
-        `Electrical bus runtime does not support medium: ${connection.medium}`,
-        stepIndex,
-        `/connections/${connection.id}`
-      ));
+      if (connection.medium !== THERMAL_FLOW_MEDIUM) {
+        diagnostics.push(resolverDiagnostic(
+          "runtime.unsupported-medium",
+          `Runtime does not support connection medium: ${connection.medium}`,
+          stepIndex,
+          `/connections/${connection.id}`
+        ));
+      }
       continue;
     }
     const fromIsBus = connection.from.component === bus;
@@ -112,6 +122,9 @@ function validateBusTopology(runtimeModel, stepIndex, diagnostics) {
 
   for (const component of runtimeModel.components) {
     const electricalPorts = component.ports.filter((port) => port.medium === ACTIVE_POWER_MEDIUM);
+    if (electricalPorts.length === 0) {
+      continue;
+    }
     if (component === bus) {
       if (electricalPorts.some((port) => port.connectionIds.length > 1)) {
         diagnostics.push(resolverDiagnostic(
@@ -147,7 +160,9 @@ function allocateBalancedCommands({
   diagnostics
 }) {
   const actualCommands = new Map();
-  const externalComponents = runtimeModel.components.filter((component) => component !== bus);
+  const externalComponents = runtimeModel.components.filter(
+    (component) => component !== bus && hasActivePowerPort(component)
+  );
 
   for (const component of externalComponents) {
     actualCommands.set(
@@ -182,16 +197,19 @@ function allocateBalancedCommands({
 }
 
 function bindConnectionFlows(runtimeModel, bus, actualCommands) {
-  const connectionPowerKw = new Map();
+  const connectionFlows = new Map();
   const busPortPowerKw = Object.fromEntries(bus.ports.map((port) => [port.id, 0]));
 
   for (const connection of runtimeModel.connections) {
+    if (connection.medium !== ACTIVE_POWER_MEDIUM) {
+      continue;
+    }
     const busIsFrom = connection.from.component === bus;
     const externalEndpoint = busIsFrom ? connection.to : connection.from;
     const externalPowerKw = actualCommands.get(externalEndpoint.component.id).powerKw;
     const powerKw = busIsFrom ? -externalPowerKw : externalPowerKw;
 
-    connectionPowerKw.set(connection.id, powerKw);
+    connectionFlows.set(connection.id, { powerKw });
     const busPort = busIsFrom ? connection.from.port : connection.to.port;
     busPortPowerKw[busPort.id] = busIsFrom ? powerKw : -powerKw;
   }
@@ -201,7 +219,7 @@ function bindConnectionFlows(runtimeModel, bus, actualCommands) {
     portPowerKw: busPortPowerKw
   });
 
-  return connectionPowerKw;
+  return connectionFlows;
 }
 
 export function resolveElectricalBus({
@@ -240,13 +258,13 @@ export function resolveElectricalBus({
     return { resolved: false, diagnostics };
   }
 
-  const connectionPowerKw = bindConnectionFlows(runtimeModel, bus, actualCommands);
+  const connectionFlows = bindConnectionFlows(runtimeModel, bus, actualCommands);
 
   return {
     resolved: true,
     feasibleCommands,
     actualCommands,
-    connectionPowerKw,
+    connectionFlows,
     diagnostics
   };
 }

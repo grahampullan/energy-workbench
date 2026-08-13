@@ -141,9 +141,11 @@ initialises isolated state, and runs every scenario step synchronously.
   component equations.
 - Positive command power exports from a component; negative power imports into
   it.
-- `getOperatingLimits` returns finite `minimumPowerKw` and `maximumPowerKw`
-  values. Equal values prescribe fixed operation and need no policy request.
-  Otherwise, clamping an explicit request produces the feasible command.
+- For an active-power component, `getOperatingLimits` includes finite
+  `minimumPowerKw` and `maximumPowerKw` values. Equal values prescribe fixed
+  operation and need no policy request. Thermal components return the explicit
+  heat-rate, temperature, and state-dependent limits required by their current
+  resolver.
 - `stepContext` contains `stepIndex`, `timeStepSeconds`, `durationHours`,
   `elapsedSeconds`, current `seriesValues`, and isolated component state.
 - `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. Electrical
@@ -166,6 +168,72 @@ from policy and avoids treating component array order as dispatch priority.
 The current `electrical.pv` is prescribed by its scenario series: equal limits
 make all available generation actual generation. Curtailment is not inferred by
 the resolver; it would require an explicit controllable-component contract.
+
+### Restricted thermal ports
+
+A directed `thermal.heat-flow` port reports exactly:
+
+```js
+{
+  heatFlowKw,
+  sourceTemperatureC,
+  deliveryTemperatureC
+}
+```
+
+`heatFlowKw` is non-negative in the declared direction. All three values are
+finite, temperatures are in °C and no lower than absolute zero, and positive
+flow cannot have a delivery temperature above its source temperature. A zero
+flow still carries boundary temperatures, which may be in either order.
+
+Components own temperature constraints. For example, the heater declares its
+supply temperature, the hot-water store requires incoming heat to be hot enough
+to charge it, and the demand reports heat below its minimum delivery temperature
+as unmet. Thermal connections do not infer mass flow, pressure, mixing, or pipe
+delay.
+
+The hot-water store has separate `heat-in`, `heat-out`, and `heat-loss` ports.
+Its actual command names charge heat flow and temperatures, discharge heat flow,
+and ambient temperature separately. Its mixed temperature state uses explicit
+integration over `stepContext.durationHours`:
+
+```text
+C * (Tnext - T) / dt = Qcharge - Qdischarge - Qloss
+Qloss = UA * max(0, T - Tambient)
+```
+
+Over a coarse timestep, loss is capped at the energy available above ambient so
+standing loss alone cannot cool the store through the ambient boundary.
+
+### Restricted coupled runtime
+
+`runScenario` keeps the electrical-only path for models without thermal ports.
+For Push 1B it also recognises exactly:
+
+```text
+electrical bus -> electric heater -> hot-water store -> heat demand
+                                      |
+                                      +-> ambient boundary
+```
+
+`createHeatDemandFollowingPolicy({ heaterComponentId, demandComponentId })`
+requests heater electrical input from the current heat demand and the heater's
+declared conversion. The coupled resolver then:
+
+1. allocates useful store discharge up to demand;
+2. clamps heater output by electrical, store-capacity, and temperature limits;
+3. allocates standing loss to ambient; and
+4. passes feasible heater input to the electrical-bus resolver for grid balance.
+
+The heater's requested command is `{ powerKw }`. Its feasible and actual
+commands also contain `heatOutputKw`, making the cross-domain allocation
+explicit. Store, demand, and ambient commands are resolver-owned. Every thermal
+connection is checked for matching heat rate, source temperature, and delivery
+temperature before state is committed.
+
+This is a serial service resolver, not a thermal bus. Additional stores,
+demands, heaters, branches, or junctions require an explicit new topology and
+allocation contract.
 
 ### Battery storage
 

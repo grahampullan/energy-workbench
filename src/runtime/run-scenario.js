@@ -1,4 +1,5 @@
 import { cloneJsonValue, freezeJsonValue } from "../core/json-value.js";
+import { THERMAL_FLOW_MEDIUM } from "../core/thermal-flow.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
 import {
   commitComponentStates,
@@ -8,9 +9,11 @@ import {
 } from "./component-execution.js";
 import { requestPolicyOperation } from "./policy-request.js";
 import { prepareRuntimeModel } from "./prepare-runtime-model.js";
-import { resolveElectricalBus } from "./resolve-electrical-bus.js";
+import { resolveEnergyModel } from "./resolve-energy-model.js";
 
 const DEFAULT_BALANCE_TOLERANCE_KW = 1e-9;
+const DEFAULT_TEMPERATURE_TOLERANCE_C = 1e-9;
+const ACTIVE_POWER_MEDIUM = "electricity.active-power";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -74,39 +77,86 @@ function createStepContext(runtimeModel, states, stepIndex) {
 function checkConnectionBalances(
   runtimeModel,
   evaluationsByComponentId,
-  connectionPowerKw,
+  connectionFlows,
   stepIndex,
   toleranceKw,
   diagnostics
 ) {
   return runtimeModel.connections.map((connection) => {
-    const expectedPowerKw = connectionPowerKw.get(connection.id);
-    const reportedFromPowerKw = evaluationsByComponentId.get(connection.from.component.id)
-      .portFlows[connection.from.port.id].powerKw;
-    const reportedToPowerKw = evaluationsByComponentId.get(connection.to.component.id)
-      .portFlows[connection.to.port.id].powerKw;
-    const fromPowerKw = reportedFromPowerKw;
-    const toPowerKw = connection.to.port.direction === "bidirectional"
-      ? -reportedToPowerKw
-      : reportedToPowerKw;
-    const residualPowerKw = fromPowerKw - toPowerKw;
+    const expectedFlow = connectionFlows.get(connection.id);
+    const fromFlow = evaluationsByComponentId.get(connection.from.component.id)
+      .portFlows[connection.from.port.id];
+    const reportedToFlow = evaluationsByComponentId.get(connection.to.component.id)
+      .portFlows[connection.to.port.id];
 
-    if (
-      Math.abs(fromPowerKw - expectedPowerKw) > toleranceKw ||
-      Math.abs(toPowerKw - expectedPowerKw) > toleranceKw
-    ) {
-      diagnostics.push(runtimeDiagnostic(
-        "runtime.connection-balance",
-        `Connection ${connection.id} expected ${expectedPowerKw} kW but endpoints evaluated ${fromPowerKw} and ${toPowerKw} kW`,
-        `/steps/${stepIndex}/connections/${connection.id}`
-      ));
+    if (connection.medium === ACTIVE_POWER_MEDIUM) {
+      const expectedPowerKw = expectedFlow?.powerKw;
+      const fromPowerKw = fromFlow.powerKw;
+      const toPowerKw = connection.to.port.direction === "bidirectional"
+        ? -reportedToFlow.powerKw
+        : reportedToFlow.powerKw;
+      const residualPowerKw = fromPowerKw - toPowerKw;
+      if (
+        !Number.isFinite(expectedPowerKw) ||
+        Math.abs(fromPowerKw - expectedPowerKw) > toleranceKw ||
+        Math.abs(toPowerKw - expectedPowerKw) > toleranceKw
+      ) {
+        diagnostics.push(runtimeDiagnostic(
+          "runtime.connection-balance",
+          `Connection ${connection.id} expected ${expectedPowerKw} kW but endpoints evaluated ${fromPowerKw} and ${toPowerKw} kW`,
+          `/steps/${stepIndex}/connections/${connection.id}`
+        ));
+      }
+
+      return {
+        connectionId: connection.id,
+        medium: connection.medium,
+        powerKw: expectedPowerKw,
+        residualPowerKw
+      };
     }
 
+    if (connection.medium === THERMAL_FLOW_MEDIUM) {
+      const residualHeatFlowKw = fromFlow.heatFlowKw - reportedToFlow.heatFlowKw;
+      const heatBalanced =
+        expectedFlow &&
+        Math.abs(fromFlow.heatFlowKw - expectedFlow.heatFlowKw) <= toleranceKw &&
+        Math.abs(reportedToFlow.heatFlowKw - expectedFlow.heatFlowKw) <= toleranceKw;
+      const temperaturesBalanced = expectedFlow && [fromFlow, reportedToFlow].every(
+        (flow) =>
+          Math.abs(
+            flow.sourceTemperatureC - expectedFlow.sourceTemperatureC
+          ) <= DEFAULT_TEMPERATURE_TOLERANCE_C &&
+          Math.abs(
+            flow.deliveryTemperatureC - expectedFlow.deliveryTemperatureC
+          ) <= DEFAULT_TEMPERATURE_TOLERANCE_C
+      );
+      if (!heatBalanced || !temperaturesBalanced) {
+        diagnostics.push(runtimeDiagnostic(
+          "runtime.connection-balance",
+          `Thermal connection ${connection.id} endpoint flows do not match its allocated heat and temperatures`,
+          `/steps/${stepIndex}/connections/${connection.id}`
+        ));
+      }
+
+      return {
+        connectionId: connection.id,
+        medium: connection.medium,
+        heatFlowKw: expectedFlow?.heatFlowKw,
+        sourceTemperatureC: expectedFlow?.sourceTemperatureC,
+        deliveryTemperatureC: expectedFlow?.deliveryTemperatureC,
+        residualHeatFlowKw
+      };
+    }
+
+    diagnostics.push(runtimeDiagnostic(
+      "runtime.unsupported-medium",
+      `Runtime does not support connection medium: ${connection.medium}`,
+      `/steps/${stepIndex}/connections/${connection.id}`
+    ));
     return {
       connectionId: connection.id,
-      medium: connection.medium,
-      powerKw: expectedPowerKw,
-      residualPowerKw
+      medium: connection.medium
     };
   });
 }
@@ -201,11 +251,11 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       return failure(diagnostics);
     }
 
-    const resolution = resolveElectricalBus({
+    const resolution = resolveEnergyModel({
       runtimeModel,
       requests,
       limitsByComponentId,
-      stepIndex,
+      stepContext,
       toleranceKw
     });
     diagnostics.push(...resolution.diagnostics);
@@ -226,7 +276,7 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
     const connections = checkConnectionBalances(
       runtimeModel,
       evaluationsByComponentId,
-      resolution.connectionPowerKw,
+      resolution.connectionFlows,
       stepIndex,
       toleranceKw,
       diagnostics

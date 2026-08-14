@@ -3,6 +3,8 @@ import {
   THERMAL_HEAT_FLOW_TYPE
 } from "../core/flow-types.js";
 
+const HOT_WATER_STORE_TYPE = "thermal.hot-water-store";
+
 function definitionFor(registry, component) {
   const definition = registry.get(component.type, component.definitionVersion);
   if (!definition) {
@@ -72,6 +74,78 @@ function flowSeries({
       timeStepSeconds
     )
   };
+}
+
+function componentParameter(component, definition, parameterId) {
+  const value = Object.hasOwn(component.parameters ?? {}, parameterId)
+    ? component.parameters[parameterId]
+    : definition.parameters?.[parameterId]?.default;
+  if (!Number.isFinite(value)) {
+    throw new TypeError(
+      `Component ${component.id} parameter ${parameterId} must be finite`
+    );
+  }
+  return value;
+}
+
+function stateForComponent(entries, componentId, context) {
+  const state = entries?.find((entry) => entry.componentId === componentId)?.state;
+  if (!state) {
+    throw new Error(`${context} does not contain state for component ${componentId}`);
+  }
+  return state;
+}
+
+function createTemperatureSeries({ model, registry, results, timeStepSeconds }) {
+  return model.components
+    .filter((component) => component.type === HOT_WATER_STORE_TYPE)
+    .map((component) => {
+      const definition = definitionFor(registry, component);
+      const initialTemperatureC = stateForComponent(
+        results.initialStates,
+        component.id,
+        "Run results initial states"
+      ).temperatureC;
+      if (!Number.isFinite(initialTemperatureC)) {
+        throw new TypeError(
+          `Component ${component.id} initial temperature must be finite`
+        );
+      }
+      const values = [{
+        stepIndex: -1,
+        elapsedSeconds: 0,
+        temperatureC: initialTemperatureC
+      }, ...results.steps.map((step, stepIndex) => {
+        const temperatureC = stateForComponent(
+          step.components,
+          component.id,
+          `Run results step ${stepIndex}`
+        ).temperatureC;
+        if (!Number.isFinite(temperatureC)) {
+          throw new TypeError(
+            `Component ${component.id} temperature must be finite at step ${stepIndex}`
+          );
+        }
+        return {
+          stepIndex,
+          elapsedSeconds: step.elapsedSeconds + timeStepSeconds,
+          temperatureC
+        };
+      })];
+
+      return {
+        id: `${component.id}:temperature`,
+        connectionId: null,
+        componentIds: [component.id],
+        label: `${component.name} temperature`,
+        thresholdC: componentParameter(
+          component,
+          definition,
+          "minimumUsefulTemperatureC"
+        ),
+        values
+      };
+    });
 }
 
 export function createResultsChartModel({ model, registry, results }) {
@@ -159,6 +233,12 @@ export function createResultsChartModel({ model, registry, results }) {
     timeStepSeconds,
     stepCount: results.steps.length,
     elapsedSeconds,
-    series
+    series,
+    temperatureSeries: createTemperatureSeries({
+      model,
+      registry,
+      results,
+      timeStepSeconds
+    })
   };
 }

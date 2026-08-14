@@ -44,20 +44,7 @@
 
       <p id="document-status" class="document-status" role="status" aria-live="polite"></p>
 
-      <section class="study-summary" aria-label="Study summary">
-        <div>
-          <span class="summary-label">Scenario</span>
-          <strong id="scenario-name">—</strong>
-        </div>
-        <div>
-          <span class="summary-label">Timestep</span>
-          <strong id="summary-time">—</strong>
-        </div>
-        <div>
-          <span class="summary-label">Topology</span>
-          <strong id="summary-topology">—</strong>
-        </div>
-      </section>
+      <section id="run-kpis" class="run-kpis" aria-label="Run KPIs"></section>
 
       <section class="workspace">
         <section class="topology-panel" aria-labelledby="topology-title">
@@ -87,6 +74,12 @@
             <div class="results-view-controls" aria-label="Results chart view">
               <button id="show-power-chart" type="button" aria-pressed="true">Flow</button>
               <button id="show-energy-chart" type="button" aria-pressed="false">Energy</button>
+              <button
+                id="show-temperature-chart"
+                type="button"
+                aria-pressed="false"
+                hidden
+              >Temperature</button>
             </div>
           </div>
           <div id="results-chart" class="results-chart"></div>

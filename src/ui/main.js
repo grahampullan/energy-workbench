@@ -24,6 +24,10 @@ import { createPreviewRunScheduler } from "./preview-run-scheduler.js";
 import { createResultsChartModel } from "./results-chart-model.js";
 import { createResultsChart } from "./results-chart.js";
 import {
+  createCoupledThermalRunKpis,
+  createElectricalRunKpis
+} from "./run-kpi-model.js";
+import {
   createParameterVariant,
   downloadJsonDocument,
   parseWorkbenchModel
@@ -40,6 +44,7 @@ const EXAMPLES = Object.freeze({
     root: "/examples/blog-electrical",
     topologyTitle: "Electrical system",
     initialComponentType: "electrical.battery",
+    createKpis: createElectricalRunKpis,
     createPolicy(model) {
       return createPvBatterySelfConsumptionPolicy({
         batteryComponentId: componentIdForType(model, "electrical.battery"),
@@ -52,6 +57,7 @@ const EXAMPLES = Object.freeze({
     root: "/examples/coupled-thermal",
     topologyTitle: "Electrical and thermal system",
     initialComponentType: "thermal.hot-water-store",
+    createKpis: createCoupledThermalRunKpis,
     createPolicy(model) {
       return createHeatDemandFollowingPolicy({
         heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
@@ -146,6 +152,7 @@ function showFatalError(error) {
   errorView.querySelector(".fatal-error-message").textContent = error.message;
   document.querySelector(".workspace")?.replaceWith(errorView);
   document.querySelector(".results-panel")?.remove();
+  document.querySelector(".run-kpis")?.remove();
   const status = element("run-status");
   status.classList.add("run-status--error");
   status.lastChild.textContent = " Runtime stopped";
@@ -196,6 +203,7 @@ async function startWorkbench() {
   let chartModel;
   let chartModelSource = null;
   let chartResultsSource = null;
+  let kpiResultsSource = null;
 
   function setDocumentStatus(message, { error = false } = {}) {
     const status = element("document-status");
@@ -246,6 +254,25 @@ async function startWorkbench() {
       selectedComponentId,
       highlightedConnectionId
     });
+  }
+
+  function updateKpis() {
+    if (activeRun.results === kpiResultsSource) {
+      return;
+    }
+    const cards = example.createKpis(activeRun.results).map((kpi) => {
+      const card = document.createElement("div");
+      card.className = "run-kpi";
+      card.dataset.tone = kpi.tone;
+      const label = document.createElement("span");
+      label.textContent = kpi.label;
+      const value = document.createElement("strong");
+      value.textContent = kpi.displayValue;
+      card.append(label, value);
+      return card;
+    });
+    element("run-kpis").replaceChildren(...cards);
+    kpiResultsSource = activeRun.results;
   }
 
   function selectStep(nextStepIndex) {
@@ -331,12 +358,12 @@ async function startWorkbench() {
 
   function updateResultViews({ rebuildParameters = false, updateTopology = true } = {}) {
     view = createView();
-    element("summary-time").textContent = view.timelineLabel;
     if (updateTopology) {
       topology.update();
     }
     updateInspector(rebuildParameters);
     updateChart();
+    updateKpis();
     setRunStatus();
   }
 
@@ -527,8 +554,6 @@ async function startWorkbench() {
     highlightedConnectionId = null;
     stepIndex = Math.min(stepIndex, run.results.steps.length - 1);
     element("model-name").textContent = model.name;
-    element("summary-topology").textContent =
-      `${model.components.length} components · ${model.connections.length} connections`;
     updateResultViews({ rebuildParameters: true });
     setDocumentStatus(`Loaded ${sourceName}`);
   }
@@ -579,6 +604,7 @@ async function startWorkbench() {
     legendTarget: element("results-chart-legend"),
     powerButton: element("show-power-chart"),
     energyButton: element("show-energy-chart"),
+    temperatureButton: element("show-temperature-chart"),
     headingTarget: element("results-chart-title"),
     onStepChange: selectStep,
     onHighlightConnection: highlightConnection
@@ -636,9 +662,7 @@ async function startWorkbench() {
   element("save-model").addEventListener("click", saveWorkingModel);
 
   element("model-name").textContent = workingModel.name;
-  element("scenario-name").textContent = scenario.name;
   element("topology-title").textContent = example.topologyTitle;
-  element("summary-topology").textContent = `${workingModel.components.length} components · ${workingModel.connections.length} connections`;
   previewDiagnostics = baselineRun.diagnostics;
   updateResultViews({ rebuildParameters: true });
   setDocumentStatus(`${example.label} example loaded; layout changes remain temporary`);

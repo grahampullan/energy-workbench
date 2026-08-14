@@ -20,6 +20,7 @@ import { createHeatDemandFollowingPolicy } from
   "../../src/policies/heat-demand-following.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import { createResultsChartModel } from "../../src/ui/results-chart-model.js";
+import { createCoupledThermalRunKpis } from "../../src/ui/run-kpi-model.js";
 import {
   createInspectorDiagnosticViews,
   createWorkbenchView
@@ -31,9 +32,10 @@ async function readExampleJson(filename) {
   return JSON.parse(await readFile(new URL(filename, exampleDirectory), "utf8"));
 }
 
-const [model, scenario] = await Promise.all([
+const [model, scenario, expectedResults] = await Promise.all([
   readExampleJson("model.json"),
-  readExampleJson("scenario.json")
+  readExampleJson("scenario.json"),
+  readExampleJson("expected-results.json")
 ]);
 const registry = createComponentRegistry([
   electricalGridDefinition,
@@ -84,6 +86,25 @@ test("coupled chart includes electrical and thermal connection flows", () => {
     run.results.steps.map((step) => step.connections.find(
       (connection) => connection.connectionId === "heater-to-store"
     ).flow.heatFlowkW).map((heatFlowkW) => Math.max(0, heatFlowkW))
+  );
+
+  assert.equal(chart.temperatureSeries.length, 1);
+  const [storeTemperature] = chart.temperatureSeries;
+  assert.equal(storeTemperature.id, "store:temperature");
+  assert.equal(storeTemperature.label, "Hot-water store temperature");
+  assert.equal(storeTemperature.thresholdC, 70);
+  assert.equal(storeTemperature.values.length, 13);
+  assert.deepEqual(
+    storeTemperature.values[0],
+    { stepIndex: -1, elapsedSeconds: 0, temperatureC: 80 }
+  );
+  assert.deepEqual(
+    storeTemperature.values.slice(1).map((point) => point.elapsedSeconds),
+    Array.from({ length: 12 }, (_, index) => (index + 1) * 1800)
+  );
+  assert.deepEqual(
+    storeTemperature.values.slice(1).map((point) => point.temperatureC),
+    expectedResults.series.storeTemperatureC
   );
 });
 
@@ -157,4 +178,23 @@ test("inspector warnings are scoped and explain the selected timestep", () => {
     stepIndex: 3,
     component: demand
   }), []);
+});
+
+test("coupled KPIs use the fixed-timestep engineering totals", () => {
+  const kpis = Object.fromEntries(createCoupledThermalRunKpis(run.results).map(
+    (kpi) => [kpi.id, kpi]
+  ));
+  const expected = expectedResults.summary;
+
+  assert.equal(kpis["grid-import-energy"].value, expected.totalGridImportEnergykWh);
+  assert.equal(kpis["heat-demand-energy"].value, expected.totalDemandEnergykWh);
+  assert.equal(kpis["served-heat-energy"].value, expected.totalServedHeatEnergykWh);
+  assert.equal(kpis["unmet-heat-energy"].value, expected.totalUnmetHeatEnergykWh);
+  assert.equal(
+    kpis["minimum-store-temperature"].value,
+    Math.min(...expectedResults.series.storeTemperatureC)
+  );
+  assert.equal(kpis["final-store-temperature"].value, expected.finalStoreTemperatureC);
+  assert.equal(kpis["unmet-heat-energy"].tone, "warning");
+  assert.equal(kpis["unmet-heat-energy"].displayValue, "55.09 kWh");
 });

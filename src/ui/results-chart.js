@@ -3,6 +3,7 @@ import {
   axisLeft,
   line,
   max,
+  min,
   pointer,
   scaleBand,
   scaleLinear,
@@ -16,6 +17,7 @@ const WIDTH = 1200;
 const HEIGHT = 230;
 const POWER_MARGIN = { top: 16, right: 24, bottom: 40, left: 62 };
 const ENERGY_MARGIN = { top: 16, right: 24, bottom: 78, left: 62 };
+const TEMPERATURE_MARGIN = POWER_MARGIN;
 const SERIES_COLOURS = [
   "#2e6285",
   "#8b5a3c",
@@ -76,14 +78,25 @@ export function nextChartStepIndex({
   return Math.max(0, Math.min(stepCount - 1, stepIndex + offsetByKey.get(key)));
 }
 
-function seriesIsEmphasised(series, selectedComponentId, highlightedConnectionId) {
-  if (highlightedConnectionId !== null) {
+function seriesIsEmphasised(
+  series,
+  selectedComponentId,
+  highlightedConnectionId,
+  highlightedSeriesId
+) {
+  if (highlightedSeriesId !== null) {
+    return series.id === highlightedSeriesId;
+  }
+  if (series.connectionId === null) {
+    return true;
+  }
+  if (highlightedConnectionId !== null && series.connectionId !== null) {
     return series.connectionId === highlightedConnectionId;
   }
   return selectedComponentId === null || series.componentIds.includes(selectedComponentId);
 }
 
-function makeLegendButton(series, colour, onHighlightConnection) {
+function makeLegendButton(series, colour, onHighlightSeries) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "results-legend-item";
@@ -100,10 +113,10 @@ function makeLegendButton(series, colour, onHighlightConnection) {
   value.className = "results-legend-value";
   button.append(swatch, label, value);
 
-  button.addEventListener("pointerenter", () => onHighlightConnection(series.connectionId));
-  button.addEventListener("pointerleave", () => onHighlightConnection(null));
-  button.addEventListener("focus", () => onHighlightConnection(series.connectionId));
-  button.addEventListener("blur", () => onHighlightConnection(null));
+  button.addEventListener("pointerenter", () => onHighlightSeries(series));
+  button.addEventListener("pointerleave", () => onHighlightSeries(null));
+  button.addEventListener("focus", () => onHighlightSeries(series));
+  button.addEventListener("blur", () => onHighlightSeries(null));
   return { button, value };
 }
 
@@ -112,11 +125,19 @@ export function createResultsChart({
   legendTarget,
   powerButton,
   energyButton,
+  temperatureButton,
   headingTarget,
   onStepChange,
   onHighlightConnection
 }) {
-  if (!target || !legendTarget || !powerButton || !energyButton || !headingTarget) {
+  if (
+    !target ||
+    !legendTarget ||
+    !powerButton ||
+    !energyButton ||
+    !temperatureButton ||
+    !headingTarget
+  ) {
     throw new TypeError("Results chart targets are required");
   }
   if (typeof onStepChange !== "function" || typeof onHighlightConnection !== "function") {
@@ -161,32 +182,50 @@ export function createResultsChart({
   let yScale = null;
   let coloursBySeriesId = new Map();
   let legendBySeriesId = new Map();
+  let highlightedSeriesId = null;
 
   function colourFor(seriesId) {
     return coloursBySeriesId.get(seriesId) ?? SERIES_COLOURS[0];
   }
 
+  function visibleSeries(model) {
+    return mode === "temperature" ? model.temperatureSeries : model.series;
+  }
+
+  function setSeriesHighlight(series) {
+    highlightedSeriesId = series?.id ?? null;
+    onHighlightConnection(series?.connectionId ?? null);
+    if (state) {
+      frameRenderer.request();
+    }
+  }
+
   function rebuildLegend(model) {
+    const series = visibleSeries(model);
+    const palette = mode === "temperature"
+      ? ["#1c7258", "#2e6285", "#76579b", "#b96c25"]
+      : SERIES_COLOURS;
     legendTarget.replaceChildren();
-    coloursBySeriesId = new Map(model.series.map((series, index) => [
-      series.id,
-      SERIES_COLOURS[index % SERIES_COLOURS.length]
+    coloursBySeriesId = new Map(series.map((candidate, index) => [
+      candidate.id,
+      palette[index % palette.length]
     ]));
-    legendBySeriesId = new Map(model.series.map((series) => {
+    legendBySeriesId = new Map(series.map((candidate) => {
       const entry = makeLegendButton(
-        series,
-        colourFor(series.id),
-        onHighlightConnection
+        candidate,
+        colourFor(candidate.id),
+        setSeriesHighlight
       );
       legendTarget.append(entry.button);
-      return [series.id, entry];
+      return [candidate.id, entry];
     }));
   }
 
   function stepFromPointer(event) {
     const [pointerX] = pointer(event, svg.node());
-    const elapsedSeconds = state.model.elapsedSeconds;
-    const firstElapsedSeconds = elapsedSeconds[0];
+    const firstElapsedSeconds = mode === "temperature"
+      ? state.model.temperatureSeries[0].values[1].elapsedSeconds
+      : state.model.elapsedSeconds[0];
     const approximateStep = Math.round(
       (xScale.invert(pointerX) - firstElapsedSeconds) / state.model.timeStepSeconds
     );
@@ -194,7 +233,7 @@ export function createResultsChart({
   }
 
   function updateStepFromPointer(event) {
-    if (mode !== "power") {
+    if (mode === "energy") {
       return;
     }
     const nextStepIndex = stepFromPointer(event);
@@ -206,11 +245,11 @@ export function createResultsChart({
   function addSeriesPointerHandlers(selection) {
     selection
       .on("pointerenter", (event, series) => {
-        onHighlightConnection(series.connectionId);
+        setSeriesHighlight(series);
         updateStepFromPointer(event);
       })
       .on("pointermove", updateStepFromPointer)
-      .on("pointerleave", () => onHighlightConnection(null));
+      .on("pointerleave", () => setSeriesHighlight(null));
   }
 
   function renderPower(model) {
@@ -257,6 +296,10 @@ export function createResultsChart({
     title.text("Energy flow rate over time");
 
     barLayer.selectAll("rect.results-energy-bar").remove();
+    lineLayer.selectAll("path.results-temperature-line").remove();
+    lineLayer.selectAll("line.results-temperature-threshold").remove();
+    lineLayer.selectAll("text.results-temperature-threshold-label").remove();
+    interactionLayer.selectAll("path.results-temperature-hit").remove();
     lineLayer
       .selectAll("path.results-power-line")
       .data(model.series, (series) => series.id)
@@ -327,7 +370,11 @@ export function createResultsChart({
     title.text("Integrated transferred energy");
 
     lineLayer.selectAll("path.results-power-line").remove();
+    lineLayer.selectAll("path.results-temperature-line").remove();
+    lineLayer.selectAll("line.results-temperature-threshold").remove();
+    lineLayer.selectAll("text.results-temperature-threshold-label").remove();
     interactionLayer.selectAll("path.results-power-hit").remove();
+    interactionLayer.selectAll("path.results-temperature-hit").remove();
     pointerSurface.attr("display", "none").on("pointermove", null);
     cursorLayer.attr("display", "none");
 
@@ -343,63 +390,201 @@ export function createResultsChart({
       .attr("height", (series) => y(0) - y(series.integratedEnergykWh))
       .attr("fill", (series) => colourFor(series.id));
     bars
-      .on("pointerenter", (event, series) => onHighlightConnection(series.connectionId))
-      .on("pointerleave", () => onHighlightConnection(null));
+      .on("pointerenter", (event, series) => setSeriesHighlight(series))
+      .on("pointerleave", () => setSeriesHighlight(null));
+  }
+
+  function renderTemperature(model) {
+    const margin = TEMPERATURE_MARGIN;
+    const plotWidth = WIDTH - margin.left - margin.right;
+    const plotHeight = HEIGHT - margin.top - margin.bottom;
+    const series = model.temperatureSeries;
+    const firstElapsedSeconds = series[0].values[0].elapsedSeconds;
+    const lastElapsedSeconds = max(series, (candidate) =>
+      candidate.values.at(-1).elapsedSeconds
+    );
+    const minimumTemperatureC = min(series, (candidate) => Math.min(
+      candidate.thresholdC,
+      min(candidate.values, (point) => point.temperatureC)
+    ));
+    const maximumTemperatureC = max(series, (candidate) => max(
+      candidate.values,
+      (point) => point.temperatureC
+    ));
+    const temperatureRangeC = maximumTemperatureC - minimumTemperatureC;
+    const temperaturePaddingC = Math.max(1, temperatureRangeC * 0.12);
+    xScale = scaleLinear()
+      .domain([
+        firstElapsedSeconds,
+        lastElapsedSeconds === firstElapsedSeconds
+          ? firstElapsedSeconds + model.timeStepSeconds
+          : lastElapsedSeconds
+      ])
+      .range([margin.left, WIDTH - margin.right]);
+    yScale = scaleLinear()
+      .domain([
+        minimumTemperatureC - temperaturePaddingC,
+        maximumTemperatureC + temperaturePaddingC
+      ])
+      .nice()
+      .range([HEIGHT - margin.bottom, margin.top]);
+    const temperatureLine = line()
+      .x((point) => xScale(point.elapsedSeconds))
+      .y((point) => yScale(point.temperatureC));
+
+    xAxisLayer
+      .attr("transform", `translate(0 ${HEIGHT - margin.bottom})`)
+      .call(axisBottom(xScale).ticks(8).tickFormat(formatChartTime));
+    xAxisLayer
+      .selectAll("text")
+      .attr("text-anchor", "middle")
+      .attr("transform", null)
+      .attr("dx", null)
+      .attr("dy", "0.71em");
+    yAxisLayer
+      .attr("transform", `translate(${margin.left} 0)`)
+      .call(axisLeft(yScale).ticks(6));
+    gridLayer
+      .attr("transform", `translate(${margin.left} 0)`)
+      .call(axisLeft(yScale).ticks(6).tickSize(-plotWidth).tickFormat(""));
+    yLabel.text("Temperature (°C)");
+    title.text("Hot-water store temperature over time");
+
+    barLayer.selectAll("rect.results-energy-bar").remove();
+    lineLayer.selectAll("path.results-power-line").remove();
+    interactionLayer.selectAll("path.results-power-hit").remove();
+    lineLayer
+      .selectAll("path.results-temperature-line")
+      .data(series, (candidate) => candidate.id)
+      .join("path")
+      .attr("class", "results-temperature-line")
+      .attr("data-series-id", (candidate) => candidate.id)
+      .attr("fill", "none")
+      .attr("stroke", (candidate) => colourFor(candidate.id))
+      .attr("d", (candidate) => temperatureLine(candidate.values));
+    lineLayer
+      .selectAll("line.results-temperature-threshold")
+      .data(series, (candidate) => candidate.id)
+      .join("line")
+      .attr("class", "results-temperature-threshold")
+      .attr("x1", margin.left)
+      .attr("x2", WIDTH - margin.right)
+      .attr("y1", (candidate) => yScale(candidate.thresholdC))
+      .attr("y2", (candidate) => yScale(candidate.thresholdC));
+    lineLayer
+      .selectAll("text.results-temperature-threshold-label")
+      .data(series, (candidate) => candidate.id)
+      .join("text")
+      .attr("class", "results-temperature-threshold-label")
+      .attr("x", WIDTH - margin.right - 5)
+      .attr("y", (candidate) => yScale(candidate.thresholdC) - 5)
+      .attr("text-anchor", "end")
+      .text((candidate) =>
+        `Minimum useful ${formatEngineeringValue(candidate.thresholdC, "°C")}`
+      );
+    const hitLines = interactionLayer
+      .selectAll("path.results-temperature-hit")
+      .data(series, (candidate) => candidate.id)
+      .join("path")
+      .attr("class", "results-temperature-hit")
+      .attr("data-series-id", (candidate) => candidate.id)
+      .attr("fill", "none")
+      .attr("stroke", "transparent")
+      .attr("d", (candidate) => temperatureLine(candidate.values));
+    addSeriesPointerHandlers(hitLines);
+
+    pointerSurface
+      .attr("display", null)
+      .attr("x", margin.left)
+      .attr("y", margin.top)
+      .attr("width", plotWidth)
+      .attr("height", plotHeight)
+      .on("pointermove", updateStepFromPointer);
+    cursorLayer.attr("display", null);
   }
 
   function updateEmphasis() {
     const { selectedComponentId, highlightedConnectionId } = state;
+    const series = visibleSeries(state.model);
+    const effectiveSelectedComponentId = series.some((candidate) =>
+      candidate.componentIds.includes(selectedComponentId)
+    )
+      ? selectedComponentId
+      : null;
     const setEmphasis = (selection) => selection
       .attr("data-emphasised", (series) => String(seriesIsEmphasised(
         series,
-        selectedComponentId,
-        highlightedConnectionId
+        effectiveSelectedComponentId,
+        highlightedConnectionId,
+        highlightedSeriesId
       )))
-      .attr("data-highlighted", (series) =>
-        String(series.connectionId === highlightedConnectionId)
-      );
+      .attr("data-highlighted", (series) => String(
+        series.id === highlightedSeriesId ||
+        (
+          series.connectionId !== null &&
+          series.connectionId === highlightedConnectionId
+        )
+      ));
     setEmphasis(lineLayer.selectAll("path.results-power-line"));
+    setEmphasis(lineLayer.selectAll("path.results-temperature-line"));
     setEmphasis(barLayer.selectAll("rect.results-energy-bar"));
-    for (const series of state.model.series) {
-      const entry = legendBySeriesId.get(series.id);
+    for (const candidate of series) {
+      const entry = legendBySeriesId.get(candidate.id);
       entry.button.dataset.emphasised = String(seriesIsEmphasised(
-        series,
-        selectedComponentId,
-        highlightedConnectionId
+        candidate,
+        effectiveSelectedComponentId,
+        highlightedConnectionId,
+        highlightedSeriesId
       ));
       entry.button.dataset.highlighted = String(
-        series.connectionId === highlightedConnectionId
+        candidate.id === highlightedSeriesId ||
+        (
+          candidate.connectionId !== null &&
+          candidate.connectionId === highlightedConnectionId
+        )
       );
     }
   }
 
   function updateCursor() {
-    if (mode !== "power") {
+    if (mode === "energy") {
       return;
     }
-    const elapsedSeconds = state.model.elapsedSeconds[state.stepIndex];
+    const series = visibleSeries(state.model);
+    const elapsedSeconds = mode === "temperature"
+      ? series[0].values[state.stepIndex + 1].elapsedSeconds
+      : state.model.elapsedSeconds[state.stepIndex];
     const cursorX = xScale(elapsedSeconds);
     cursorLine
       .attr("x1", cursorX)
       .attr("x2", cursorX)
-      .attr("y1", POWER_MARGIN.top)
-      .attr("y2", HEIGHT - POWER_MARGIN.bottom);
+      .attr("y1", mode === "temperature" ? TEMPERATURE_MARGIN.top : POWER_MARGIN.top)
+      .attr(
+        "y2",
+        HEIGHT - (mode === "temperature" ? TEMPERATURE_MARGIN.bottom : POWER_MARGIN.bottom)
+      );
     cursorPoints
       .selectAll("circle")
-      .data(state.model.series, (series) => series.id)
+      .data(series, (candidate) => candidate.id)
       .join("circle")
       .attr("r", 3.5)
       .attr("cx", cursorX)
-      .attr("cy", (series) => yScale(series.values[state.stepIndex].powerkW))
-      .attr("fill", (series) => colourFor(series.id));
+      .attr("cy", (candidate) => yScale(
+        mode === "temperature"
+          ? candidate.values[state.stepIndex + 1].temperatureC
+          : candidate.values[state.stepIndex].powerkW
+      ))
+      .attr("fill", (candidate) => colourFor(candidate.id));
   }
 
   function updateLegend() {
-    for (const series of state.model.series) {
+    for (const series of visibleSeries(state.model)) {
       const value = mode === "power"
         ? series.values[state.stepIndex].powerkW
-        : series.integratedEnergykWh;
-      const unit = mode === "power" ? "kW" : "kWh";
+        : mode === "energy"
+          ? series.integratedEnergykWh
+          : series.values[state.stepIndex + 1].temperatureC;
+      const unit = mode === "power" ? "kW" : mode === "energy" ? "kWh" : "°C";
       legendBySeriesId.get(series.id).value.textContent = formatEngineeringValue(value, unit);
     }
   }
@@ -417,28 +602,39 @@ export function createResultsChart({
       return;
     }
 
-    const elapsedSeconds = state.model.elapsedSeconds[state.stepIndex];
+    const elapsedSeconds = mode === "temperature"
+      ? state.model.temperatureSeries[0].values[state.stepIndex + 1].elapsedSeconds
+      : state.model.elapsedSeconds[state.stepIndex];
     svg
       .attr("role", "slider")
       .attr("tabindex", 0)
-      .attr("aria-label", "Energy flow results timeline")
+      .attr(
+        "aria-label",
+        mode === "temperature"
+          ? "Hot-water store temperature results timeline"
+          : "Energy flow results timeline"
+      )
       .attr("aria-valuemin", 1)
       .attr("aria-valuemax", state.model.stepCount)
       .attr("aria-valuenow", state.stepIndex + 1)
       .attr(
         "aria-valuetext",
-        `${formatChartTime(elapsedSeconds)}, step ${state.stepIndex + 1} of ${state.model.stepCount}`
+        `${formatChartTime(elapsedSeconds)}, ${
+          mode === "temperature" ? "state after " : ""
+        }step ${state.stepIndex + 1} of ${state.model.stepCount}`
       );
   }
 
   function renderChart() {
-    if (state.model !== renderedModel) {
+    if (state.model !== renderedModel || mode !== renderedMode) {
       rebuildLegend(state.model);
     }
     if (mode === "power") {
       renderPower(state.model);
-    } else {
+    } else if (mode === "energy") {
       renderEnergy(state.model);
+    } else {
+      renderTemperature(state.model);
     }
     renderedModel = state.model;
     renderedMode = mode;
@@ -451,7 +647,12 @@ export function createResultsChart({
       }
       powerButton.setAttribute("aria-pressed", String(mode === "power"));
       energyButton.setAttribute("aria-pressed", String(mode === "energy"));
-      headingTarget.textContent = mode === "power" ? "Flow over time" : "Integrated energy";
+      temperatureButton.setAttribute("aria-pressed", String(mode === "temperature"));
+      headingTarget.textContent = mode === "power"
+        ? "Flow over time"
+        : mode === "energy"
+          ? "Integrated energy"
+          : "Temperature over time";
       updateEmphasis();
       updateCursor();
       updateLegend();
@@ -473,16 +674,29 @@ export function createResultsChart({
       );
     }
     state = nextState;
+    temperatureButton.hidden = nextState.model.temperatureSeries.length === 0;
+    if (mode === "temperature" && temperatureButton.hidden) {
+      mode = "power";
+    }
     frameRenderer.request();
   }
 
   function setMode(nextMode) {
-    if (nextMode !== "power" && nextMode !== "energy") {
+    if (
+      nextMode !== "power" &&
+      nextMode !== "energy" &&
+      nextMode !== "temperature"
+    ) {
       throw new TypeError(`Unknown results chart mode: ${nextMode}`);
+    }
+    if (nextMode === "temperature" && state?.model.temperatureSeries.length === 0) {
+      return;
     }
     if (nextMode === mode) {
       return;
     }
+    highlightedSeriesId = null;
+    onHighlightConnection(null);
     mode = nextMode;
     if (state) {
       frameRenderer.request();
@@ -491,8 +705,9 @@ export function createResultsChart({
 
   const showPower = () => setMode("power");
   const showEnergy = () => setMode("energy");
+  const showTemperature = () => setMode("temperature");
   const handleKeyDown = (event) => {
-    if (mode !== "power" || !state) {
+    if (mode === "energy" || !state) {
       return;
     }
     const nextStepIndex = nextChartStepIndex({
@@ -511,6 +726,7 @@ export function createResultsChart({
   };
   powerButton.addEventListener("click", showPower);
   energyButton.addEventListener("click", showEnergy);
+  temperatureButton.addEventListener("click", showTemperature);
   svg.on("keydown", handleKeyDown);
 
   return Object.freeze({
@@ -520,6 +736,7 @@ export function createResultsChart({
       frameRenderer.dispose();
       powerButton.removeEventListener("click", showPower);
       energyButton.removeEventListener("click", showEnergy);
+      temperatureButton.removeEventListener("click", showTemperature);
       svg.on("keydown", null);
       legendTarget.replaceChildren();
       svg.remove();

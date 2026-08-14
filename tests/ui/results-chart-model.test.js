@@ -16,6 +16,7 @@ import {
   createResultsChartModel,
   integratePowerSerieskWh
 } from "../../src/ui/results-chart-model.js";
+import { createElectricalRunKpis } from "../../src/ui/run-kpi-model.js";
 
 const exampleDirectory = new URL("../../examples/blog-electrical/", import.meta.url);
 
@@ -76,6 +77,7 @@ test("chart model derives directional power series from canonical connection res
   assert.ok(chart.series.every((series) =>
     series.values.every((point) => point.powerkW >= 0)
   ));
+  assert.deepEqual(chart.temperatureSeries, []);
 });
 
 test("chart integration reproduces the reviewed daily-energy regression values", () => {
@@ -92,6 +94,25 @@ test("chart integration reproduces the reviewed daily-energy regression values",
   assert.ok(Math.abs(energyBySeriesId["bus-to-load:forward"] - expected.load) < 1e-12);
   assert.ok(Math.abs(energyBySeriesId["battery-to-bus:reverse"] - expected["to battery"]) < 1e-12);
   assert.ok(Math.abs(energyBySeriesId["grid-to-bus:reverse"] - expected["grid export"]) < 1e-12);
+});
+
+test("electrical KPIs reproduce the reviewed run totals", () => {
+  const kpis = Object.fromEntries(createElectricalRunKpis(run.results).map(
+    (kpi) => [kpi.id, kpi]
+  ));
+  const expected = expectedResults.cases.baseline.integratedEnergykWh;
+
+  for (const [kpiId, expectedValue] of [
+    ["load-energy", expected.load],
+    ["solar-energy", expected["solar supply"]],
+    ["grid-import-energy", expected["grid supply"]],
+    ["grid-export-energy", expected["grid export"]],
+    ["battery-charge-energy", expected["to battery"]],
+    ["battery-discharge-energy", expected["from battery"]]
+  ]) {
+    assert.ok(Math.abs(kpis[kpiId].value - expectedValue) < 1e-12);
+  }
+  assert.equal(kpis["grid-import-energy"].displayValue, "7.349 kWh");
 });
 
 test("trapezoidal integration validates its engineering inputs", () => {

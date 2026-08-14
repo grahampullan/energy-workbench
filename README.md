@@ -11,6 +11,7 @@ Visual Energy Modeller followed by a simple electrical–thermal extension.
 - [Architecture](ARCHITECTURE.md)
 - [Code shape profile](CODE_SHAPE_PROFILE.md)
 - [Architecture decisions](docs/adr/README.md)
+- [Project gates and Push 2 status](docs/project-gates.md)
 - [Component development](docs/component-development.md)
 - [Legacy electrical regression](docs/regression/blog-electrical.md)
 - [Coupled thermal reference](docs/regression/coupled-thermal.md)

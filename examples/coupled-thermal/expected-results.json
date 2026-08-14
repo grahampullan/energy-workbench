@@ -26,8 +26,7 @@
     "initialStoreTemperatureC": 80,
     "finalStoreTemperatureC": 73.7092529027568,
     "storeThermalCapacitykWhPerK": 10,
-    "storeInternalEnergyChangekWh": -62.90747097243198,
-    "maximumPowerBalanceErrorkW": 0
+    "storeInternalEnergyChangekWh": -62.90747097243198
   },
   "series": {
     "heaterRequestedPowerkW": [

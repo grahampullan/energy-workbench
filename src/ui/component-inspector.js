@@ -58,6 +58,7 @@ export function createComponentInspector({
   let resetButton;
   let applyButton;
   let saveVariantButton;
+  let diagnosticsHeading;
   let diagnosticsView;
 
   function disposeBindings() {
@@ -192,9 +193,12 @@ export function createComponentInspector({
     saveVariantButton.textContent = "Save variant";
     saveVariantButton.addEventListener("click", onSaveVariant);
     buttons.append(resetButton, applyButton, saveVariantButton);
+    diagnosticsHeading = document.createElement("p");
+    diagnosticsHeading.className = "preview-diagnostics-heading";
+    diagnosticsHeading.textContent = "Selected timestep";
     diagnosticsView = document.createElement("ul");
     diagnosticsView.className = "preview-diagnostics";
-    actions.append(previewStatus, buttons, diagnosticsView);
+    actions.append(previewStatus, buttons, diagnosticsHeading, diagnosticsView);
     target.append(actions);
 
     resultSections = document.createElement("div");
@@ -237,9 +241,17 @@ export function createComponentInspector({
     for (const diagnostic of diagnostics) {
       const item = document.createElement("li");
       item.dataset.severity = diagnostic.severity;
-      item.textContent = diagnostic.message;
+      const title = document.createElement("strong");
+      title.textContent = diagnostic.title;
+      const message = document.createElement("span");
+      message.textContent = diagnostic.message;
+      item.append(title, message);
       diagnosticsView.append(item);
     }
+    diagnosticsHeading.hidden = diagnostics.length === 0;
+    diagnosticsHeading.textContent = diagnostics.some(
+      (diagnostic) => diagnostic.severity === "error"
+    ) ? "Messages" : "Selected timestep";
     diagnosticsView.hidden = diagnostics.length === 0;
   }
 

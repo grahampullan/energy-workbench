@@ -30,7 +30,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -69,6 +70,29 @@ input {
 
 .project-actions {
   gap: 6px;
+}
+
+.example-picker {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.example-picker select {
+  min-height: 36px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: rgb(255 255 255 / 78%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .project-actions button {
@@ -314,6 +338,15 @@ h2 {
   stroke-width: 4;
 }
 
+.connection-line--thermal {
+  stroke: var(--amber);
+  stroke-dasharray: 7 4;
+}
+
+.connection-line--thermal.connection-line--highlighted {
+  stroke: var(--green);
+}
+
 #flow-arrow path {
   fill: #45655b;
 }
@@ -472,7 +505,7 @@ h2 {
   font-size: 11px;
 }
 
-.flow-legend span:first-child {
+.flow-legend span {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -483,6 +516,14 @@ h2 {
   width: 24px;
   height: 2px;
   background: #6e817b;
+}
+
+.legend-line--thermal {
+  background: repeating-linear-gradient(
+    to right,
+    var(--amber) 0 7px,
+    transparent 7px 11px
+  );
 }
 
 .inspector-panel {
@@ -666,25 +707,48 @@ h2 {
   background: var(--green);
 }
 
+.preview-diagnostics-heading {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .preview-diagnostics {
   display: grid;
-  gap: 5px;
-  margin: 12px 0 0;
+  gap: 7px;
+  margin: 7px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .preview-diagnostics li {
-  padding-left: 10px;
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
   border-left: 2px solid #d09b52;
+  border-radius: 0 7px 7px 0;
   color: #755225;
+  background: #fff8ed;
   font-size: 11px;
   line-height: 1.4;
+}
+
+.preview-diagnostics strong {
+  color: #68461d;
+  font-size: 12px;
 }
 
 .preview-diagnostics li[data-severity="error"] {
   border-color: #c9554f;
   color: #8d3e39;
+  background: #fff3f1;
+}
+
+.preview-diagnostics li[data-severity="error"] strong {
+  color: #7d302b;
 }
 
 .inspector-results > .inspector-section:first-child {
@@ -991,6 +1055,15 @@ h2 {
 
   .project-actions button {
     flex: 1;
+  }
+
+  .project-actions {
+    flex-wrap: wrap;
+  }
+
+  .example-picker,
+  .example-picker select {
+    width: 100%;
   }
 
   .document-status {

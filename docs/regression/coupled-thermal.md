@@ -12,16 +12,16 @@ process modes, schedule optimisation, CSV import, or industrial calibration.
 
 ## Example model
 
-The model in `examples/coupled-thermal` has six components:
+The model in `examples/coupled-thermal` has five components:
 
 ```text
-Grid -> Electrical bus -> Electric heater -> Hot-water store -> Heat demand
-                                             |
-                                             +----------------> Ambient
+Grid -> Electric heater -> Hot-water store -> Heat demand
+                           |
+                           +----------------> Ambient
 ```
 
-The first two connections carry `electricity.active-power`. The remaining
-three carry `thermal.heat-flow`, including source and delivery temperatures.
+The first connection carries `electricity.active-power`. The remaining three
+carry `thermal.heat-flow`, including source and delivery temperatures.
 The store-to-ambient connection represents standing heat loss, so its direction
 is from the store to the ambient boundary.
 
@@ -31,12 +31,17 @@ has an exact 10 kWh/K thermal capacity, a 70 °C useful-delivery threshold, an
 and supplies heat at 90 °C. Ambient temperature and heat demand are inline
 scenario series.
 
+Select **Coupled thermal** in the browser workbench to inspect the same run.
+The topology distinguishes thermal connections, the chart includes both flow
+types, and the component inspector exposes store temperature and served and
+unmet heat at the selected timestep.
+
 ## Operating policy
 
 The demand-following policy asks the heater for enough electrical input to
 match the current thermal demand after conversion efficiency. The store,
-heater, bus, and balancing grid then resolve their own feasible and actual
-operation in topology order.
+heater, and balancing grid then resolve their own feasible and actual operation
+in topology order.
 
 The policy is deliberately simple. It does not preheat the store or optimise
 across future timesteps. This keeps policy intent separate from physical
@@ -73,6 +78,5 @@ heater heat output = heater electrical input × efficiency
 store energy change = charge - discharge - standing loss
 ```
 
-It also checks that total demand equals served plus unmet heat and that the
-electrical bus residual remains below tolerance. These values are locked by
-`tests/regression/coupled-thermal.test.js`.
+It also checks that total demand equals served plus unmet heat. These values are
+locked by `tests/regression/coupled-thermal.test.js`.

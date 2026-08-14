@@ -7,6 +7,7 @@ import {
 } from "board-box";
 import { select } from "d3";
 
+import { THERMAL_HEAT_FLOW_TYPE } from "../core/flow-types.js";
 import { createFrameRenderer } from "./animation-frame.js";
 
 const BOX_WIDTH = 164;
@@ -202,6 +203,10 @@ function renderConnections(
     .attr("y1", (connection) => connection.y1)
     .attr("x2", (connection) => connection.x2)
     .attr("y2", (connection) => connection.y2)
+    .classed(
+      "connection-line--thermal",
+      (connection) => connection.flowType === THERMAL_HEAT_FLOW_TYPE
+    )
     .classed(
       "connection-line--highlighted",
       (connection) => connection.id === view.highlightedConnectionId

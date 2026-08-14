@@ -15,14 +15,6 @@
       "initialState": {}
     },
     {
-      "id": "bus",
-      "type": "electrical.bus",
-      "definitionVersion": "0.2.0",
-      "name": "Electrical bus",
-      "parameters": {},
-      "initialState": {}
-    },
-    {
       "id": "heater",
       "type": "thermal.electric-heater",
       "definitionVersion": "0.2.0",
@@ -78,23 +70,11 @@
   ],
   "connections": [
     {
-      "id": "grid-to-bus",
-      "name": "Grid to electrical bus",
+      "id": "grid-to-heater",
+      "name": "Grid to electric heater",
       "from": {
         "componentId": "grid",
         "portId": "electricity"
-      },
-      "to": {
-        "componentId": "bus",
-        "portId": "terminal-1"
-      }
-    },
-    {
-      "id": "bus-to-heater",
-      "name": "Electrical bus to heater",
-      "from": {
-        "componentId": "bus",
-        "portId": "terminal-2"
       },
       "to": {
         "componentId": "heater",

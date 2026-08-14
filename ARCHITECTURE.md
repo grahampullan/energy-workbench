@@ -218,28 +218,28 @@ repeat or partially reimplement the store equation.
 The Push 1B reference model uses one deliberately fixed thermal topology:
 
 ```text
-electrical bus -> electric heater -> hot-water store -> heat demand
-                                      |
-                                      +-> ambient boundary
+grid -> electric heater -> hot-water store -> heat demand
+                           |
+                           +-> ambient boundary
 ```
 
-The heater, store, demand, ambient boundary, and electrical bus own their
-respective equations. The policy chooses operational targets and explicitly
-identifies any balancing component. The runtime orders the component
-calculations and transfers their typed port flows; it must not use a
-whole-model coupled resolver. Thermal branching requires a visible junction
-component with an explicit component-owned allocation or mixing contract; it
-is not inferred from component order.
+The grid, heater, store, demand, and ambient boundary own their respective
+equations. The policy chooses operational targets and explicitly identifies
+the grid as the balancing component. The runtime orders the component
+calculations and transfers their typed port flows; it must not use a whole-model
+coupled resolver. Thermal branching requires a visible junction component with
+an explicit component-owned allocation or mixing contract; it is not inferred
+from component order.
 
 A fixed component reports equal minimum and maximum operating power and needs
 no policy target. A component with variable limits requires an explicit policy
 target unless the policy nominates it as the balancing component. A balancing
-component must be visible, connected to the relevant bus, and physically able
-to accept the residual operation. The electrical bus owns only its terminal
-power-conservation equation; it does not intrinsically select a grid or any
-other component to balance. A grid is one possible balancing component.
-Positive grid power imports energy into the model; negative grid power exports
-it.
+component must be visible, connected to the operation it balances, and
+physically able to accept the residual. Where a branching electrical bus is
+present, the bus owns only its terminal power-conservation equation; it does
+not intrinsically select a grid or any other component to balance. A grid is
+one possible balancing component. Positive grid power imports energy into the
+model; negative grid power exports it.
 
 ## Data and state rules
 

@@ -9,13 +9,8 @@
       "y": 20
     },
     {
-      "componentId": "bus",
-      "x": 260,
-      "y": 20
-    },
-    {
       "componentId": "heater",
-      "x": 500,
+      "x": 260,
       "y": 20
     },
     {

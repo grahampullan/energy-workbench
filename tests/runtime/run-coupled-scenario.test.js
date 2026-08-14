@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { electricalBusDefinition } from "../../src/components/electrical/bus.js";
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
 import { ambientBoundaryDefinition } from "../../src/components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from "../../src/components/thermal/electric-heater.js";
@@ -46,14 +45,6 @@ function createFixture({
             maximumImportPowerkW: maximumGridImportPowerkW,
             maximumExportPowerkW: 200
           },
-          initialState: {}
-        },
-        {
-          id: "bus",
-          type: electricalBusDefinition.type,
-          definitionVersion: electricalBusDefinition.version,
-          name: "Electrical bus",
-          parameters: {},
           initialState: {}
         },
         {
@@ -108,15 +99,9 @@ function createFixture({
       ],
       connections: [
         {
-          id: "grid-to-bus",
-          name: "Grid to bus",
+          id: "grid-to-heater",
+          name: "Grid to heater",
           from: { componentId: "grid", portId: "electricity" },
-          to: { componentId: "bus", portId: "terminal-1" }
-        },
-        {
-          id: "bus-to-heater",
-          name: "Bus to heater",
-          from: { componentId: "bus", portId: "terminal-2" },
           to: { componentId: "heater", portId: "electricity-in" }
         },
         {
@@ -161,7 +146,6 @@ function createFixture({
     },
     policy,
     registry: createComponentRegistry([
-      electricalBusDefinition,
       electricalGridDefinition,
       ambientBoundaryDefinition,
       electricHeaterDefinition,
@@ -186,7 +170,7 @@ test("coupled runtime follows demand and balances electrical and thermal connect
   assert.deepEqual(fixture.model, originalModel);
   assert.deepEqual(fixture.scenario, originalScenario);
   const step = result.results.steps[0];
-  const [grid, bus, heater, store, demand, ambient] = step.components;
+  const [grid, heater, store, demand, ambient] = step.components;
 
   assert.deepEqual(heater.requestedCommand, { powerkW: -10 });
   assert.deepEqual(heater.feasibleCommand, {
@@ -203,7 +187,6 @@ test("coupled runtime follows demand and balances electrical and thermal connect
     supplyTemperatureC: 100
   });
   assert.deepEqual(grid.actualCommand, { powerkW: 10 });
-  assert.equal(bus.outputs.powerBalanceErrorkW, 0);
 
   assert.equal(store.requestedCommand, null);
   assert.equal(store.feasibleCommand, null);
@@ -229,12 +212,7 @@ test("coupled runtime follows demand and balances electrical and thermal connect
 
   assert.deepEqual(step.connections, [
     {
-      connectionId: "grid-to-bus",
-      flowType: "electricity.active-power",
-      flow: { powerkW: 10 }
-    },
-    {
-      connectionId: "bus-to-heater",
+      connectionId: "grid-to-heater",
       flowType: "electricity.active-power",
       flow: { powerkW: 10 }
     },
@@ -281,13 +259,13 @@ test("coupled runtime reports unmet heat until the store reaches useful temperat
     "thermal.heat-demand.unmet-heat"
   ]);
   const [first, second] = result.results.steps;
-  assert.equal(first.components[3].state.temperatureC, 75);
-  assert.equal(first.components[4].outputs.servedHeatFlowkW, 0);
-  assert.equal(first.components[4].outputs.unmetHeatFlowkW, 10);
-  assert.equal(second.components[3].actualCommand.dischargeHeatFlowkW, 5);
-  assert.equal(second.components[3].state.temperatureC, 80);
-  assert.equal(second.components[4].outputs.servedHeatFlowkW, 5);
-  assert.equal(second.components[4].outputs.unmetHeatFlowkW, 5);
+  assert.equal(first.components[2].state.temperatureC, 75);
+  assert.equal(first.components[3].outputs.servedHeatFlowkW, 0);
+  assert.equal(first.components[3].outputs.unmetHeatFlowkW, 10);
+  assert.equal(second.components[2].actualCommand.dischargeHeatFlowkW, 5);
+  assert.equal(second.components[2].state.temperatureC, 80);
+  assert.equal(second.components[3].outputs.servedHeatFlowkW, 5);
+  assert.equal(second.components[3].outputs.unmetHeatFlowkW, 5);
 });
 
 test("coupled runtime allocates standing loss and conserves store energy", () => {
@@ -298,14 +276,14 @@ test("coupled runtime allocates standing loss and conserves store energy", () =>
 
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
-  const store = step.components[3];
+  const store = step.components[2];
   assert.equal(store.actualCommand.chargeHeatFlowkW, 4);
   assert.equal(store.actualCommand.dischargeHeatFlowkW, 4);
   assert.equal(store.outputs.heatLosskW, 6);
   assert.equal(store.outputs.netHeatFlowkW, -6);
   assert.equal(store.state.temperatureC, 74);
-  assert.equal(step.components[5].outputs.receivedHeatFlowkW, 6);
-  assert.equal(step.connections[4].flow.heatFlowkW, 6);
+  assert.equal(step.components[4].outputs.receivedHeatFlowkW, 6);
+  assert.equal(step.connections[3].flow.heatFlowkW, 6);
 });
 
 test("heat-demand-following policy converts requested heat through heater efficiency", () => {
@@ -316,8 +294,8 @@ test("heat-demand-following policy converts requested heat through heater effici
 
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
-  assert.deepEqual(step.components[2].requestedCommand, { powerkW: -10 });
-  assert.deepEqual(step.components[2].actualCommand, {
+  assert.deepEqual(step.components[1].requestedCommand, { powerkW: -10 });
+  assert.deepEqual(step.components[1].actualCommand, {
     powerkW: -10,
     heatOutputkW: 8
   });
@@ -339,14 +317,14 @@ test("the store clamps heater operation at its supply-temperature boundary", () 
 
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
-  assert.deepEqual(step.components[2].requestedCommand, { powerkW: -100 });
-  assert.deepEqual(step.components[2].feasibleCommand, {
+  assert.deepEqual(step.components[1].requestedCommand, { powerkW: -100 });
+  assert.deepEqual(step.components[1].feasibleCommand, {
     powerkW: -6.25,
     heatOutputkW: 5
   });
   assert.deepEqual(step.components[0].actualCommand, { powerkW: 6.25 });
-  assert.equal(step.components[3].state.temperatureC, 85);
-  assert.equal(step.connections[2].flow.heatFlowkW, 5);
+  assert.equal(step.components[2].state.temperatureC, 85);
+  assert.equal(step.connections[1].flow.heatFlowkW, 5);
 });
 
 test("coupled runtime preserves electrical grid infeasibility", () => {

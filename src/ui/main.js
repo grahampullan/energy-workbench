@@ -4,8 +4,13 @@ import { electricalGridDefinition } from "../components/electrical/grid.js";
 import { electricalLoadDefinition } from "../components/electrical/load.js";
 import { electricalPvDefinition } from "../components/electrical/pv.js";
 import { electricalSourceDefinition } from "../components/electrical/source.js";
+import { ambientBoundaryDefinition } from "../components/thermal/ambient-boundary.js";
+import { electricHeaterDefinition } from "../components/thermal/electric-heater.js";
+import { heatDemandDefinition } from "../components/thermal/heat-demand.js";
+import { hotWaterStoreDefinition } from "../components/thermal/hot-water-store.js";
 import { createComponentRegistry } from "../core/component-registry.js";
 import { validateVariant } from "../core/validation/validate-documents.js";
+import { createHeatDemandFollowingPolicy } from "../policies/heat-demand-following.js";
 import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-self-consumption.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
@@ -23,9 +28,53 @@ import {
   downloadJsonDocument,
   parseWorkbenchModel
 } from "./study-document-files.js";
-import { createWorkbenchView } from "./workbench-view-model.js";
+import {
+  createInspectorDiagnosticViews,
+  createWorkbenchView
+} from "./workbench-view-model.js";
 
-const EXAMPLE_ROOT = "/examples/blog-electrical";
+const DEFAULT_EXAMPLE_ID = "blog-electrical";
+const EXAMPLES = Object.freeze({
+  "blog-electrical": Object.freeze({
+    label: "PV and battery",
+    root: "/examples/blog-electrical",
+    topologyTitle: "Electrical system",
+    initialComponentType: "electrical.battery",
+    createPolicy(model) {
+      return createPvBatterySelfConsumptionPolicy({
+        batteryComponentId: componentIdForType(model, "electrical.battery"),
+        balancingComponentId: componentIdForType(model, "electrical.grid")
+      });
+    }
+  }),
+  "coupled-thermal": Object.freeze({
+    label: "Coupled thermal",
+    root: "/examples/coupled-thermal",
+    topologyTitle: "Electrical and thermal system",
+    initialComponentType: "thermal.hot-water-store",
+    createPolicy(model) {
+      return createHeatDemandFollowingPolicy({
+        heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
+        demandComponentId: componentIdForType(model, "thermal.heat-demand"),
+        balancingComponentId: componentIdForType(model, "electrical.grid")
+      });
+    }
+  })
+});
+
+function componentIdForType(model, type) {
+  const matches = model.components.filter((component) => component.type === type);
+  if (matches.length !== 1) {
+    throw new Error(`Example requires exactly one ${type}; received ${matches.length}`);
+  }
+  return matches[0].id;
+}
+
+function selectedExample() {
+  const requestedId = new URLSearchParams(window.location.search).get("example");
+  const id = Object.hasOwn(EXAMPLES, requestedId) ? requestedId : DEFAULT_EXAMPLE_ID;
+  return { id, ...EXAMPLES[id] };
+}
 
 async function loadJson(path) {
   const response = await fetch(path);
@@ -50,7 +99,11 @@ function definitionRegistry() {
     electricalGridDefinition,
     electricalLoadDefinition,
     electricalPvDefinition,
-    electricalSourceDefinition
+    electricalSourceDefinition,
+    ambientBoundaryDefinition,
+    electricHeaterDefinition,
+    heatDemandDefinition,
+    hotWaterStoreDefinition
   ]);
 }
 
@@ -99,29 +152,22 @@ function showFatalError(error) {
 }
 
 async function startWorkbench() {
+  const example = selectedExample();
   const [loadedModel, scenario, layout] = await Promise.all([
-    loadJson(`${EXAMPLE_ROOT}/model.json`),
-    loadJson(`${EXAMPLE_ROOT}/scenario.json`),
-    loadJson(`${EXAMPLE_ROOT}/layout.json`)
+    loadJson(`${example.root}/model.json`),
+    loadJson(`${example.root}/scenario.json`),
+    loadJson(`${example.root}/layout.json`)
   ]);
   if (layout.modelId !== loadedModel.id) {
     throw new Error(`Layout ${layout.id} belongs to ${layout.modelId}, not ${loadedModel.id}`);
   }
 
   const registry = definitionRegistry();
-  const battery = loadedModel.components.find(
-    (component) => component.type === "electrical.battery"
+  const policy = example.createPolicy(loadedModel);
+  const initialComponentId = componentIdForType(
+    loadedModel,
+    example.initialComponentType
   );
-  const grid = loadedModel.components.find(
-    (component) => component.type === "electrical.grid"
-  );
-  if (!battery || !grid) {
-    throw new Error("The example requires one battery and one balancing grid");
-  }
-  const policy = createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: battery.id,
-    balancingComponentId: grid.id
-  });
 
   function execute(model) {
     const run = runScenario({ model, scenario, registry, policy });
@@ -136,7 +182,7 @@ async function startWorkbench() {
   let activeModel = workingModel;
   let activeRun = baselineRun;
   let pendingModel = null;
-  let selectedComponentId = battery.id;
+  let selectedComponentId = initialComponentId;
   let highlightedConnectionId = null;
   let stepIndex = Math.floor(activeRun.results.steps.length / 2);
   let previewDiagnostics = [];
@@ -232,9 +278,22 @@ async function startWorkbench() {
       previewKeys: new Set(previewOverrides.keys()),
       previewCount,
       busy,
-      diagnostics: previewDiagnostics,
+      diagnostics: createInspectorDiagnosticViews({
+        diagnostics: previewDiagnostics,
+        stepIndex,
+        component: selectedComponent()
+      }),
       canApply: previewReady && !busy
     };
+  }
+
+  function warningSuffix() {
+    const count = previewDiagnostics.filter(
+      (diagnostic) => diagnostic.severity === "warning"
+    ).length;
+    return count === 0
+      ? ""
+      : ` · ${count.toLocaleString("en-GB")} ${count === 1 ? "warning" : "warnings"}`;
   }
 
   function setRunStatus() {
@@ -247,7 +306,7 @@ async function startWorkbench() {
     let message;
     let statusClass;
     if (previewOverrides.size === 0) {
-      message = `${activeRun.results.steps.length.toLocaleString("en-GB")} timesteps ready`;
+      message = `${activeRun.results.steps.length.toLocaleString("en-GB")} timesteps ready${warningSuffix()}`;
       statusClass = "run-status--complete";
     } else if (previewDiagnostics.some((diagnostic) => diagnostic.severity === "error")) {
       message = "Preview needs attention";
@@ -256,7 +315,7 @@ async function startWorkbench() {
       message = "Updating preview…";
       statusClass = "run-status--preview";
     } else if (previewReady) {
-      message = `Preview · ${activeRun.results.steps.length.toLocaleString("en-GB")} timesteps`;
+      message = `Preview · ${activeRun.results.steps.length.toLocaleString("en-GB")} timesteps${warningSuffix()}`;
       statusClass = "run-status--preview";
     } else {
       message = "Preview unavailable";
@@ -559,6 +618,13 @@ async function startWorkbench() {
   });
 
   const modelFileInput = element("open-model-file");
+  const exampleSelect = element("example-select");
+  exampleSelect.value = example.id;
+  exampleSelect.addEventListener("change", () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("example", exampleSelect.value);
+    window.location.assign(url);
+  });
   element("open-model").addEventListener("click", () => modelFileInput.click());
   modelFileInput.addEventListener("change", async () => {
     const [file] = modelFileInput.files;
@@ -571,10 +637,11 @@ async function startWorkbench() {
 
   element("model-name").textContent = workingModel.name;
   element("scenario-name").textContent = scenario.name;
+  element("topology-title").textContent = example.topologyTitle;
   element("summary-topology").textContent = `${workingModel.components.length} components · ${workingModel.connections.length} connections`;
   previewDiagnostics = baselineRun.diagnostics;
   updateResultViews({ rebuildParameters: true });
-  setDocumentStatus("Example model loaded; layout changes remain temporary");
+  setDocumentStatus(`${example.label} example loaded; layout changes remain temporary`);
 }
 
 startWorkbench().catch(showFatalError);

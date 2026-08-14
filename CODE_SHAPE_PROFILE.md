@@ -24,7 +24,7 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
    relationship, and state transition in its owning component definition. Do
    not duplicate component physics in policies or runtime modules.
 5. Keep policies limited to operating targets, priorities, schedules, and
-   explicit roles such as the visible component that balances a junction.
+   explicit roles such as the visible component that accepts residual flow.
 6. Keep runtime code generic: prepare inputs, order component work, transfer
    typed connection flows, check consistency, commit states, and collect
    results. Do not select whole-model solvers or branch on component type to

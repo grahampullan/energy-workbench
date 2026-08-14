@@ -61,6 +61,7 @@ export const heatDemandDefinition = {
   },
 
   editor: {
+    summaryOutput: "unmetHeatFlowkW",
     groups: [{
       id: "demand",
       label: "Demand",

@@ -167,6 +167,21 @@ function primaryMetric(definition, componentResult) {
     };
   }
 
+  const summaryOutputId = definition.editor.summaryOutput;
+  if (
+    typeof summaryOutputId === "string" &&
+    typeof componentResult.outputs[summaryOutputId] === "number"
+  ) {
+    const value = componentResult.outputs[summaryOutputId];
+    const unit = definition.outputs[summaryOutputId]?.unit ?? "";
+    return {
+      label: formatFieldLabel(summaryOutputId),
+      value,
+      unit,
+      displayValue: formatEngineeringValue(value, unit)
+    };
+  }
+
   const firstNumericOutput = Object.entries(componentResult.outputs).find(
     ([, value]) => typeof value === "number"
   );
@@ -209,6 +224,69 @@ function componentView(component, definition, componentResult, parameterOverride
     outputFields: fieldViews(definition.outputs, componentResult.outputs),
     stateFields: fieldViews(definition.initialState, componentResult.state)
   };
+}
+
+function diagnosticLocation(path) {
+  const match = /^\/steps\/(\d+)\/components\/([^/]+)(?:\/|$)/u.exec(path);
+  return match
+    ? { stepIndex: Number(match[1]), componentId: match[2] }
+    : null;
+}
+
+function outputValue(component, outputId) {
+  return component.outputFields.find((field) => field.id === outputId)?.value;
+}
+
+function diagnosticContent(diagnostic, component) {
+  if (
+    diagnostic.code === "thermal.heat-demand.unmet-heat" &&
+    component.type === "thermal.heat-demand"
+  ) {
+    const demand = outputValue(component, "demandHeatFlowkW");
+    const served = outputValue(component, "servedHeatFlowkW");
+    const unmet = outputValue(component, "unmetHeatFlowkW");
+    if ([demand, served, unmet].every(Number.isFinite)) {
+      return {
+        title: "Unmet heat demand",
+        message: `${formatEngineeringValue(unmet, "kW")} unmet · ` +
+          `${formatEngineeringValue(served, "kW")} served of ` +
+          `${formatEngineeringValue(demand, "kW")} requested`
+      };
+    }
+  }
+  return {
+    title: diagnostic.severity === "error" ? "Run error" : "Warning",
+    message: diagnostic.message
+  };
+}
+
+export function createInspectorDiagnosticViews({
+  diagnostics,
+  stepIndex,
+  component
+}) {
+  if (!Array.isArray(diagnostics) || !Number.isInteger(stepIndex) || !component) {
+    throw new TypeError("Diagnostics, stepIndex, and component are required");
+  }
+
+  return diagnostics.flatMap((diagnostic) => {
+    const location = diagnosticLocation(diagnostic.path);
+    if (
+      diagnostic.severity !== "error" &&
+      location !== null &&
+      (
+        location.stepIndex !== stepIndex ||
+        location.componentId !== component.id
+      )
+    ) {
+      return [];
+    }
+    return [{
+      severity: diagnostic.severity,
+      code: diagnostic.code,
+      ...diagnosticContent(diagnostic, component)
+    }];
+  });
 }
 
 export function createWorkbenchView({

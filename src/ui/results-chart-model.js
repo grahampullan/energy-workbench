@@ -1,4 +1,7 @@
-import { ACTIVE_POWER_FLOW_TYPE } from "../core/flow-types.js";
+import {
+  ACTIVE_POWER_FLOW_TYPE,
+  THERMAL_HEAT_FLOW_TYPE
+} from "../core/flow-types.js";
 
 function definitionFor(registry, component) {
   const definition = registry.get(component.type, component.definitionVersion);
@@ -44,6 +47,7 @@ function flowSeries({
   fromComponent,
   toComponent,
   direction,
+  flowType,
   values,
   elapsedSeconds,
   timeStepSeconds
@@ -56,6 +60,7 @@ function flowSeries({
     connectionId: connection.id,
     componentIds: [fromComponent.id, toComponent.id],
     direction,
+    flowType,
     label: `${source.name} → ${destination.name}`,
     values: values.map((powerkW, stepIndex) => ({
       stepIndex,
@@ -100,8 +105,15 @@ export function createResultsChartModel({ model, registry, results }) {
     const toDefinition = definitionFor(registry, toComponent);
     const fromPort = portFor(fromDefinition, fromComponent.id, connection.from.portId);
     const toPort = portFor(toDefinition, toComponent.id, connection.to.portId);
-    if (fromPort.flowType !== ACTIVE_POWER_FLOW_TYPE) {
-      return [];
+    const flowType = fromPort.flowType;
+    if (toPort.flowType !== flowType) {
+      throw new TypeError(`Connection ${connection.id} joins incompatible flow types`);
+    }
+    if (
+      flowType !== ACTIVE_POWER_FLOW_TYPE &&
+      flowType !== THERMAL_HEAT_FLOW_TYPE
+    ) {
+      throw new TypeError(`Connection ${connection.id} has unsupported flow type ${flowType}`);
     }
     const values = connectionResultsByStep.map((resultsByConnection, stepIndex) => {
       const result = resultsByConnection.get(connection.id);
@@ -110,19 +122,23 @@ export function createResultsChartModel({ model, registry, results }) {
           `Run results do not contain connection ${connection.id} at step ${stepIndex}`
         );
       }
-      if (result.flowType !== ACTIVE_POWER_FLOW_TYPE) {
+      if (result.flowType !== flowType) {
         throw new TypeError(
-          `Connection ${connection.id} must have ${ACTIVE_POWER_FLOW_TYPE} results`
+          `Connection ${connection.id} must have ${flowType} results`
         );
       }
-      if (!Number.isFinite(result.flow?.powerkW)) {
+      const powerkW = flowType === ACTIVE_POWER_FLOW_TYPE
+        ? result.flow?.powerkW
+        : result.flow?.heatFlowkW;
+      if (!Number.isFinite(powerkW)) {
         throw new TypeError(
-          `Connection ${connection.id} power must be finite at step ${stepIndex}`
+          `Connection ${connection.id} flow must be finite at step ${stepIndex}`
         );
       }
-      return result.flow.powerkW;
+      return powerkW;
     });
-    const directions = fromPort.direction === "bidirectional" &&
+    const directions = flowType === ACTIVE_POWER_FLOW_TYPE &&
+      fromPort.direction === "bidirectional" &&
       toPort.direction === "bidirectional"
       ? ["forward", "reverse"]
       : ["forward"];
@@ -132,6 +148,7 @@ export function createResultsChartModel({ model, registry, results }) {
       fromComponent,
       toComponent,
       direction,
+      flowType,
       values,
       elapsedSeconds,
       timeStepSeconds

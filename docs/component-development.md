@@ -234,9 +234,9 @@ standing loss alone cannot cool the store through the ambient boundary.
 The Push 1B reference model is:
 
 ```text
-electrical bus -> electric heater -> hot-water store -> heat demand
-                                      |
-                                      +-> ambient boundary
+grid -> electric heater -> hot-water store -> heat demand
+                           |
+                           +-> ambient boundary
 ```
 
 `createHeatDemandFollowingPolicy({ heaterComponentId, demandComponentId,
@@ -247,8 +247,7 @@ declared conversion. Component resolution then follows the visible topology:
 1. the store jointly settles charge, useful discharge, temperature limits, and
    standing loss;
 2. the heater applies its conversion equation to the accepted heat flow;
-3. the electrical bus calculates its balancing-terminal residual; and
-4. the policy-selected balancing component checks and accepts that residual.
+3. the policy-selected grid checks and accepts the heater's electrical flow.
 
 The heater's requested command is `{ powerkW }`. Its feasible and actual
 commands also contain `heatOutputkW`, making the cross-domain allocation

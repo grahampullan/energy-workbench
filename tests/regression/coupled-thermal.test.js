@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { electricalBusDefinition } from
-  "../../src/components/electrical/bus.js";
 import { electricalGridDefinition } from
   "../../src/components/electrical/grid.js";
 import { ambientBoundaryDefinition } from
@@ -38,7 +36,6 @@ const [model, scenario, layout, expectedResults] = await Promise.all([
 ]);
 
 const registry = createComponentRegistry([
-  electricalBusDefinition,
   electricalGridDefinition,
   ambientBoundaryDefinition,
   electricHeaterDefinition,
@@ -137,12 +134,7 @@ function summarise(series) {
     storeThermalCapacitykWhPerK,
     storeInternalEnergyChangekWh:
       storeThermalCapacitykWhPerK *
-      (finalTemperatureC - initialTemperatureC),
-    maximumPowerBalanceErrorkW: Math.max(
-      ...runResult.results.steps.map((step) => Math.abs(
-        componentAtStep(step, "bus").outputs.powerBalanceErrorkW
-      ))
-    )
+      (finalTemperatureC - initialTemperatureC)
   };
 }
 
@@ -152,7 +144,7 @@ test("coupled thermal example documents are valid and use stable references", ()
   assert.equal(validateLayout(layout, { model }).valid, true);
   assert.deepEqual(
     model.components.map((component) => component.id),
-    ["grid", "bus", "heater", "store", "heat-demand", "ambient"]
+    ["grid", "heater", "store", "heat-demand", "ambient"]
   );
   assert.equal(layout.components.length, model.components.length);
 });
@@ -208,7 +200,6 @@ test("coupled thermal example conserves electrical and thermal energy", () => {
       summary.totalStoreDischargeEnergykWh -
       summary.totalStandingHeatLossEnergykWh
   );
-  assert.ok(summary.maximumPowerBalanceErrorkW < 1e-12);
 });
 
 test("coupled thermal example exposes equipment and stored-energy limits", () => {

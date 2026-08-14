@@ -253,8 +253,8 @@ export function createResultsChart({
     gridLayer
       .attr("transform", `translate(${margin.left} 0)`)
       .call(axisLeft(yScale).ticks(6).tickSize(-plotWidth).tickFormat(""));
-    yLabel.text("Power (kW)");
-    title.text("Directional electrical power over time");
+    yLabel.text("Flow rate (kW)");
+    title.text("Energy flow rate over time");
 
     barLayer.selectAll("rect.results-energy-bar").remove();
     lineLayer
@@ -324,7 +324,7 @@ export function createResultsChart({
       .attr("transform", `translate(${margin.left} 0)`)
       .call(axisLeft(y).ticks(6).tickSize(-plotWidth).tickFormat(""));
     yLabel.text("Energy (kWh)");
-    title.text("Integrated directional electrical energy");
+    title.text("Integrated transferred energy");
 
     lineLayer.selectAll("path.results-power-line").remove();
     interactionLayer.selectAll("path.results-power-hit").remove();
@@ -409,7 +409,7 @@ export function createResultsChart({
       svg
         .attr("role", "img")
         .attr("tabindex", null)
-        .attr("aria-label", "Integrated directional electrical energy")
+        .attr("aria-label", "Integrated transferred energy")
         .attr("aria-valuemin", null)
         .attr("aria-valuemax", null)
         .attr("aria-valuenow", null)
@@ -421,7 +421,7 @@ export function createResultsChart({
     svg
       .attr("role", "slider")
       .attr("tabindex", 0)
-      .attr("aria-label", "Power results timeline")
+      .attr("aria-label", "Energy flow results timeline")
       .attr("aria-valuemin", 1)
       .attr("aria-valuemax", state.model.stepCount)
       .attr("aria-valuenow", state.stepIndex + 1)
@@ -451,7 +451,7 @@ export function createResultsChart({
       }
       powerButton.setAttribute("aria-pressed", String(mode === "power"));
       energyButton.setAttribute("aria-pressed", String(mode === "energy"));
-      headingTarget.textContent = mode === "power" ? "Power over time" : "Integrated energy";
+      headingTarget.textContent = mode === "power" ? "Flow over time" : "Integrated energy";
       updateEmphasis();
       updateCursor();
       updateLegend();

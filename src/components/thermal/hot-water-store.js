@@ -308,6 +308,7 @@ export const hotWaterStoreDefinition = {
   },
 
   editor: {
+    summaryOutput: "temperatureC",
     groups: [
       {
         id: "storage",

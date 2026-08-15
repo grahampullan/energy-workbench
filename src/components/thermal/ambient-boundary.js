@@ -3,7 +3,10 @@ import {
   createThermalFlow
 } from "../../core/thermal-flow.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
-import { singleConnection } from "../model-resolution.js";
+import {
+  singleConnection,
+  singlePortFlowConsumerResolution
+} from "../model-resolution.js";
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -66,6 +69,8 @@ export const ambientBoundaryDefinition = {
     }
     return [];
   },
+
+  resolution: singlePortFlowConsumerResolution("heat-in"),
 
   model: {
     prepare(modelComponent, context) {

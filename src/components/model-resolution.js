@@ -4,6 +4,17 @@ export function resolutionError(code, message) {
   return error;
 }
 
+export function resolutionDescription({
+  targets = [],
+  connectionFlows = [],
+  determines = []
+} = {}) {
+  return {
+    requires: { targets, connectionFlows },
+    determines
+  };
+}
+
 export function singleConnection(component, context, portId) {
   const matches = context.connections.filter((connection) =>
     (connection.from.component === component && connection.from.port.id === portId) ||
@@ -16,4 +27,14 @@ export function singleConnection(component, context, portId) {
     );
   }
   return matches[0];
+}
+
+export function singlePortFlowConsumerResolution(portId) {
+  return {
+    describe(component, context) {
+      return resolutionDescription({
+        connectionFlows: [singleConnection(component, context, portId).id]
+      });
+    }
+  };
 }

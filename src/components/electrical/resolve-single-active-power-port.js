@@ -1,4 +1,8 @@
-import { resolutionError, singleConnection } from "../model-resolution.js";
+import {
+  resolutionDescription,
+  resolutionError,
+  singleConnection
+} from "../model-resolution.js";
 
 export function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -15,6 +19,22 @@ export function componentPowerFromConnection(component, connection, flow) {
     ? flow.powerkW
     : -flow.powerkW;
   return powerkW === 0 ? 0 : powerkW;
+}
+
+export function singlePortActivePowerResolution(portId) {
+  return {
+    describe(component, context) {
+      const connection = singleConnection(component, context, portId);
+      if (context.balancingComponentId === component.id) {
+        return resolutionDescription({ connectionFlows: [connection.id] });
+      }
+      const { minimumPowerkW, maximumPowerkW } = context.operatingLimits;
+      return resolutionDescription({
+        targets: minimumPowerkW === maximumPowerkW ? [] : [component.id],
+        determines: [connection.id]
+      });
+    }
+  };
 }
 
 export function resolveSinglePortActivePower(component, context, portId) {

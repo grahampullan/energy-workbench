@@ -36,6 +36,13 @@ test("component registry rejects incomplete engineering definitions", () => {
     () => createComponentRegistry([missingMethod]),
     /model\.resolve must be a function/u
   );
+
+  const missingResolutionMethod = createTestComponentDefinition();
+  delete missingResolutionMethod.resolution.describe;
+  assert.throws(
+    () => createComponentRegistry([missingResolutionMethod]),
+    /resolution\.describe must be a function/u
+  );
 });
 
 test("component registry requires declared initial-state units and defaults", () => {

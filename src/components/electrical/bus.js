@@ -3,11 +3,14 @@ import {
   componentPowerFromConnection,
   connectionFlowForComponentPower
 } from "./resolve-single-active-power-port.js";
-import { resolutionError } from "../model-resolution.js";
+import {
+  resolutionDescription,
+  resolutionError
+} from "../model-resolution.js";
 
 const terminalIds = ["terminal-1", "terminal-2", "terminal-3", "terminal-4"];
 
-function resolveBus(runtimeComponent, context) {
+function busConnections(runtimeComponent, context) {
   for (const port of runtimeComponent.ports) {
     const connectionCount = context.connections.filter((connection) =>
       (connection.from.component === runtimeComponent && connection.from.port === port) ||
@@ -34,12 +37,33 @@ function resolveBus(runtimeComponent, context) {
     );
   }
 
-  const [balancingConnection] = balancingConnections;
+  return {
+    balancingConnection: balancingConnections[0],
+    nonBalancingConnections: context.connections.filter(
+      (connection) => connection !== balancingConnections[0]
+    )
+  };
+}
+
+function describeBusResolution(runtimeComponent, context) {
+  const { balancingConnection, nonBalancingConnections } = busConnections(
+    runtimeComponent,
+    context
+  );
+  return resolutionDescription({
+    connectionFlows: nonBalancingConnections.map((connection) => connection.id),
+    determines: [balancingConnection.id]
+  });
+}
+
+function resolveBus(runtimeComponent, context) {
+  const { balancingConnection, nonBalancingConnections } = busConnections(
+    runtimeComponent,
+    context
+  );
+
   const settledFlows = new Map();
-  for (const connection of context.connections) {
-    if (connection === balancingConnection) {
-      continue;
-    }
+  for (const connection of nonBalancingConnections) {
     const flow = context.getConnectionFlow(connection.id);
     if (flow === undefined) {
       return null;
@@ -105,6 +129,12 @@ export const electricalBusDefinition = {
 
   validate() {
     return [];
+  },
+
+  resolution: {
+    describe(runtimeComponent, context) {
+      return describeBusResolution(runtimeComponent, context);
+    }
   },
 
   model: {

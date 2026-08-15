@@ -49,6 +49,19 @@ export const exampleComponentDefinition = {
 
   validate(modelComponent, context) {},
 
+  resolution: {
+    describe(runtimeComponent, context) {
+      const [connection] = context.connections;
+      return {
+        requires: {
+          targets: [runtimeComponent.id],
+          connectionFlows: []
+        },
+        determines: [connection.id]
+      };
+    }
+  },
+
   model: {
     prepare(modelComponent, context) {
       return { conversionFactor: 1 };
@@ -118,6 +131,10 @@ the first runtime slice.
 - `initialise` creates state for one run; it does not modify the persisted
   component.
 - `getOperatingLimits` reports what is feasible from current state.
+- `getOperatingLimits` publishes capabilities. `resolution.describe` declares
+  the targets and already-settled connection flows needed for current
+  resolution, plus the connection flows this component determines. It contains
+  no governing calculation.
 - `resolve` owns the component's physical reconciliation. It returns
   `{ feasibleCommand, actualCommand, connectionFlows }`, or `null` when it is
   waiting for a connected component to settle a flow.
@@ -166,6 +183,9 @@ accuracy.
 - `policyContext.operatingLimitsByComponentId` is a read-only plain-object
   snapshot. Policies may use it to coordinate components without repeating
   component equations.
+- The runtime checks each component's resolution declaration after the policy
+  request, rejects missing or conflicting flow ownership and same-step cycles,
+  and executes the resulting stages in dependency order.
 - Positive command power exports from a component; negative power imports into
   it.
 - For an active-power component, `getOperatingLimits` includes finite
@@ -187,6 +207,11 @@ Each connection result has the shape
 `{ powerkW }`; its value is signed from the persisted `from` endpoint towards
 `to`. Endpoint mismatch is a `runtime.connection-balance` diagnostic, not a
 result field.
+
+Each timestep result also contains `resolutionPlan`. Its `stages` are arrays
+of component IDs that can resolve at the same dependency depth. The full plan
+returned by `prepareResolutionPlan` also exposes each component's prerequisites
+and determined connections for diagnostics.
 
 The current `electrical.bus` has four bidirectional terminals. It waits for its
 non-balancing terminal flows, applies its own conservation equation, and

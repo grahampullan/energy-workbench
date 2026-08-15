@@ -23,4 +23,5 @@ rather than rewriting its history.
 | [0012](0012-restricted-thermal-flow.md) | Restricted thermal flow and storage | Accepted |
 | [0013](0013-restricted-coupled-resolver.md) | Restricted coupled resolver | Superseded by 0015 |
 | [0014](0014-flow-type-and-connection-result-contract.md) | Flow type and connection-result contract | Partly superseded by 0015 |
-| [0015](0015-component-owned-resolution.md) | Component-owned resolution | Accepted |
+| [0015](0015-component-owned-resolution.md) | Component-owned resolution | Partly superseded by 0016 |
+| [0016](0016-resolution-dependency-plan.md) | Resolution-dependency plan | Accepted |

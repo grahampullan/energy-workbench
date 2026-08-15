@@ -1,5 +1,8 @@
 import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
-import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+import {
+  resolveSinglePortActivePower,
+  singlePortActivePowerResolution
+} from "./resolve-single-active-power-port.js";
 
 function parameterValue(component, definition, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -73,6 +76,8 @@ export const electricalLoadDefinition = {
     }
     return [];
   },
+
+  resolution: singlePortActivePowerResolution("electricity-in"),
 
   model: {
     prepare(modelComponent, context) {

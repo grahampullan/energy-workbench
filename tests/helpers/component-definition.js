@@ -8,6 +8,15 @@ export function createTestComponentDefinition({
   outputs = {},
   editor = {},
   validate = () => [],
+  resolution = {
+    describe: () => ({
+      requires: {
+        targets: [],
+        connectionFlows: []
+      },
+      determines: []
+    })
+  },
   model = {}
 } = {}) {
   return {
@@ -20,6 +29,7 @@ export function createTestComponentDefinition({
     outputs,
     editor,
     validate,
+    resolution,
     model: {
       prepare: model.prepare ?? (() => ({})),
       initialise: model.initialise ?? (() => ({})),

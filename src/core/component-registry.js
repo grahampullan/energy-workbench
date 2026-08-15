@@ -146,6 +146,11 @@ function assertOutputs(outputs, definitionType) {
   }
 }
 
+function assertResolution(resolution, definitionType) {
+  assertRecord(resolution, `${definitionType}.resolution`);
+  assertFunction(resolution.describe, `${definitionType}.resolution.describe`);
+}
+
 function assertComponentDefinition(definition) {
   assertRecord(definition, "Component definition");
   assertStableId(definition.type, "Component definition type");
@@ -165,6 +170,7 @@ function assertComponentDefinition(definition) {
   assertOutputs(definition.outputs, definition.type);
   assertRecord(definition.editor, `${definition.type}.editor`);
   assertFunction(definition.validate, `${definition.type}.validate`);
+  assertResolution(definition.resolution, definition.type);
   assertRecord(definition.model, `${definition.type}.model`);
   assertFunction(definition.model.prepare, `${definition.type}.model.prepare`);
   assertFunction(definition.model.initialise, `${definition.type}.model.initialise`);

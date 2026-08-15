@@ -10,6 +10,7 @@ import {
   connectionFlowForComponentPower
 } from "../electrical/resolve-single-active-power-port.js";
 import {
+  resolutionDescription,
   resolutionError,
   singleConnection
 } from "../model-resolution.js";
@@ -91,6 +92,32 @@ export const electricHeaterDefinition = {
       }];
     }
     return [];
+  },
+
+  resolution: {
+    describe(runtimeComponent, context) {
+      if (context.balancingComponentId === runtimeComponent.id) {
+        throw resolutionError(
+          "runtime.unsupported-balancing-component",
+          "The coupled electric heater cannot be the electrical balancing component"
+        );
+      }
+      const heatConnection = singleConnection(
+        runtimeComponent,
+        context,
+        "heat-out"
+      );
+      const electricityConnection = singleConnection(
+        runtimeComponent,
+        context,
+        "electricity-in"
+      );
+      return resolutionDescription({
+        targets: [runtimeComponent.id],
+        connectionFlows: [heatConnection.id],
+        determines: [electricityConnection.id]
+      });
+    }
   },
 
   model: {

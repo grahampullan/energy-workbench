@@ -5,6 +5,7 @@ import {
 } from "../../core/thermal-flow.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
 import {
+  resolutionDescription,
   resolutionError,
   singleConnection
 } from "../model-resolution.js";
@@ -25,6 +26,35 @@ function otherComponent(component, connection) {
   return connection.from.component === component
     ? connection.to.component
     : connection.from.component;
+}
+
+function batchTopology(runtimeComponent, context) {
+  const heatInputConnection = singleConnection(
+    runtimeComponent,
+    context,
+    "heat-in"
+  );
+  const heatLossConnection = singleConnection(
+    runtimeComponent,
+    context,
+    "heat-loss"
+  );
+  if (
+    heatInputConnection.to.component !== runtimeComponent ||
+    heatLossConnection.from.component !== runtimeComponent
+  ) {
+    throw resolutionError(
+      "runtime.unsupported-thermal-topology",
+      `Thermal connections around ${runtimeComponent.id} have the wrong direction`
+    );
+  }
+
+  return {
+    heatInputConnection,
+    heatLossConnection,
+    heater: otherComponent(runtimeComponent, heatInputConnection),
+    ambient: otherComponent(runtimeComponent, heatLossConnection)
+  };
 }
 
 function finiteCapability(limits, field, { positive = false } = {}) {
@@ -75,28 +105,12 @@ function requireCommand(command) {
 }
 
 function resolveBatch(runtimeComponent, context, stepContext) {
-  const heatInputConnection = singleConnection(
-    runtimeComponent,
-    context,
-    "heat-in"
-  );
-  const heatLossConnection = singleConnection(
-    runtimeComponent,
-    context,
-    "heat-loss"
-  );
-  if (
-    heatInputConnection.to.component !== runtimeComponent ||
-    heatLossConnection.from.component !== runtimeComponent
-  ) {
-    throw resolutionError(
-      "runtime.unsupported-thermal-topology",
-      `Thermal connections around ${runtimeComponent.id} have the wrong direction`
-    );
-  }
-
-  const heater = otherComponent(runtimeComponent, heatInputConnection);
-  const ambient = otherComponent(runtimeComponent, heatLossConnection);
+  const {
+    heatInputConnection,
+    heatLossConnection,
+    heater,
+    ambient
+  } = batchTopology(runtimeComponent, context);
   const heaterTarget = context.getTarget(heater.id);
   if (!heaterTarget || !Number.isFinite(heaterTarget.powerkW)) {
     throw resolutionError(
@@ -359,6 +373,20 @@ export const batchThermalMassDefinition = {
       });
     }
     return diagnostics;
+  },
+
+  resolution: {
+    describe(runtimeComponent, context) {
+      const {
+        heatInputConnection,
+        heatLossConnection,
+        heater
+      } = batchTopology(runtimeComponent, context);
+      return resolutionDescription({
+        targets: [heater.id],
+        determines: [heatInputConnection.id, heatLossConnection.id]
+      });
+    }
   },
 
   model: {

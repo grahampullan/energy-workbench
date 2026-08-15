@@ -153,6 +153,11 @@ test("coupled thermal example documents are valid and use stable references", ()
     ["grid", "heater", "store", "heat-demand", "ambient"]
   );
   assert.equal(layout.components.length, model.components.length);
+  assert.deepEqual(runResult.results.steps[0].resolutionPlan.stages, [
+    ["store"],
+    ["heater", "heat-demand", "ambient"],
+    ["grid"]
+  ]);
 });
 
 test("coupled thermal example matches the reviewed headless result fixture", () => {

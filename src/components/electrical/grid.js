@@ -1,5 +1,8 @@
 import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
-import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+import {
+  resolveSinglePortActivePower,
+  singlePortActivePowerResolution
+} from "./resolve-single-active-power-port.js";
 
 export const electricalGridDefinition = {
   type: "electrical.grid",
@@ -50,6 +53,8 @@ export const electricalGridDefinition = {
   validate() {
     return [];
   },
+
+  resolution: singlePortActivePowerResolution("electricity"),
 
   model: {
     prepare() {

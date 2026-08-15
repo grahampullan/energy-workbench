@@ -1,6 +1,6 @@
 # ADR 0015: Component-owned resolution
 
-**Status:** Accepted
+**Status:** Partly superseded by ADR 0016
 
 **Date:** 2026-08-13
 

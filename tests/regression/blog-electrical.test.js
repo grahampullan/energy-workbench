@@ -173,6 +173,11 @@ test("ported blog example documents are valid and use stable references", () => 
     ["grid", "bus", "pv", "load", "battery"]
   );
   assert.equal(layout.components.length, model.components.length);
+  assert.deepEqual(runsByCase.baseline.results.steps[0].resolutionPlan.stages, [
+    ["pv", "load", "battery"],
+    ["bus"],
+    ["grid"]
+  ]);
 });
 
 test("ported scenario preserves every legacy profile sample in kilowatts", () => {

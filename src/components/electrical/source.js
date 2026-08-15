@@ -1,5 +1,8 @@
 import { ACTIVE_POWER_FLOW_TYPE } from "../../core/flow-types.js";
-import { resolveSinglePortActivePower } from "./resolve-single-active-power-port.js";
+import {
+  resolveSinglePortActivePower,
+  singlePortActivePowerResolution
+} from "./resolve-single-active-power-port.js";
 
 export const electricalSourceDefinition = {
   type: "electrical.source",
@@ -38,6 +41,8 @@ export const electricalSourceDefinition = {
   validate() {
     return [];
   },
+
+  resolution: singlePortActivePowerResolution("electricity-out"),
 
   model: {
     prepare() {

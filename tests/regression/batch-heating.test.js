@@ -146,6 +146,11 @@ test("batch-heating example documents are valid and use stable references", () =
     ["grid", "heater", "batch", "ambient"]
   );
   assert.equal(layout.components.length, model.components.length);
+  assert.deepEqual(runResult.results.steps[0].resolutionPlan.stages, [
+    ["batch"],
+    ["heater", "ambient"],
+    ["grid"]
+  ]);
 });
 
 test("batch-heating example matches the reviewed headless result fixture", () => {

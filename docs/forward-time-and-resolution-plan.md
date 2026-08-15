@@ -1,6 +1,7 @@
 # Forward-time integration and topology-resolution plan
 
-**Status:** Agreed design direction; implementation incomplete
+**Status:** Implemented for the current electrical and thermal components;
+future flow types must extend the same small contract
 
 **Date:** 15 August 2026
 
@@ -52,13 +53,19 @@ Use the existing terms precisely:
   and parameters.
 - **Actual:** the resolved operation and connection flow.
 
-For dependency analysis, a component definition may additionally declare:
+For dependency analysis, component definitions use two small contracts:
 
-- **Publishes:** capabilities available from current state.
+- **Publishes:** `getOperatingLimits` returns capabilities available from
+  current state.
 - **Requires:** prescribed values, targets, capabilities, or actual flows that
   must be available before the component can resolve.
 - **Determines:** actual connection flows for which the component is the sole
   owner.
+
+Because every component publishes operating limits before policy and
+resolution, `resolution.describe` only needs to enumerate required policy
+targets, required settled connection flows, and determined connection flows.
+It does not repeat individual capability field names.
 
 `Settled` describes an actual connection flow after its determining component
 has produced it. These declarations belong to reusable component definitions,
@@ -71,8 +78,9 @@ Physical flow direction does not necessarily give calculation order. A store
 accepts heat in the physical direction of flow, but its current acceptance
 capability may need to be known before a heat pump determines its output.
 
-When the topology or selected policy changes, model preparation should derive
-a resolution-dependency graph from:
+Runtime-model preparation resolves the topology. At each timestep, once the
+current capabilities and selected policy roles are available, resolution-plan
+preparation derives a dependency graph from:
 
 ```text
 model topology
@@ -99,11 +107,11 @@ A remaining cycle must be rejected, broken explicitly by a previous-timestep
 state, or contained inside one component with a specific local solution. It
 must not cause the generic runtime to become an implicit whole-model solver.
 
-The existing retry loop is a dynamic form of dependency evaluation: a
-component returns `null` until its prerequisites exist. It remains adequate for
-the controlled reference models, but an interactive modeller needs the graph
-to validate a topology before a run and explain failures in component and port
-terms.
+The checked graph now supplies the component execution stages. A component
+returning `null` in its planned stage, or settling flows different from its
+declaration, is a component-contract failure. Plans are retained in timestep
+results so the interactive modeller can explain execution order in component
+and connection terms.
 
 ## Heat-recovery acceptance topology
 
@@ -174,7 +182,7 @@ repository.
    rectangular accounting, then test, build, and commit the current
    batch-heating UI slice.
 2. Add the minimal resolution declarations and derive a checked resolution
-   plan for all existing examples.
+   plan for all existing examples. **Complete.**
 3. Prove material mass and enthalpy conservation headlessly through fill,
    hold, and empty operation.
 4. Add separate refractory, molten-metal inventory, and thermal-contact

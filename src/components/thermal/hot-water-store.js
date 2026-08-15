@@ -5,6 +5,7 @@ import {
 } from "../../core/thermal-flow.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
 import {
+  resolutionDescription,
   resolutionError,
   singleConnection
 } from "../model-resolution.js";
@@ -28,18 +29,7 @@ function otherComponent(component, connection) {
     : connection.from.component;
 }
 
-function finiteCapability(limits, field, { positive = false } = {}) {
-  const value = limits?.[field];
-  if (!Number.isFinite(value) || (positive ? value <= 0 : value < 0)) {
-    throw resolutionError(
-      "runtime.thermal-capability-contract",
-      `Thermal capability ${field} is missing or invalid`
-    );
-  }
-  return value;
-}
-
-function resolveStore(runtimeComponent, context, stepContext) {
+function storeTopology(runtimeComponent, context) {
   const chargeConnection = singleConnection(runtimeComponent, context, "heat-in");
   const demandConnection = singleConnection(runtimeComponent, context, "heat-out");
   const lossConnection = singleConnection(runtimeComponent, context, "heat-loss");
@@ -54,9 +44,36 @@ function resolveStore(runtimeComponent, context, stepContext) {
     );
   }
 
-  const heater = otherComponent(runtimeComponent, chargeConnection);
-  const demand = otherComponent(runtimeComponent, demandConnection);
-  const ambient = otherComponent(runtimeComponent, lossConnection);
+  return {
+    chargeConnection,
+    demandConnection,
+    lossConnection,
+    heater: otherComponent(runtimeComponent, chargeConnection),
+    demand: otherComponent(runtimeComponent, demandConnection),
+    ambient: otherComponent(runtimeComponent, lossConnection)
+  };
+}
+
+function finiteCapability(limits, field, { positive = false } = {}) {
+  const value = limits?.[field];
+  if (!Number.isFinite(value) || (positive ? value <= 0 : value < 0)) {
+    throw resolutionError(
+      "runtime.thermal-capability-contract",
+      `Thermal capability ${field} is missing or invalid`
+    );
+  }
+  return value;
+}
+
+function resolveStore(runtimeComponent, context, stepContext) {
+  const {
+    chargeConnection,
+    demandConnection,
+    lossConnection,
+    heater,
+    demand,
+    ambient
+  } = storeTopology(runtimeComponent, context);
   const heaterTarget = context.getTarget(heater.id);
   if (!heaterTarget || !Number.isFinite(heaterTarget.powerkW)) {
     throw resolutionError(
@@ -420,6 +437,25 @@ export const hotWaterStoreDefinition = {
     }
 
     return diagnostics;
+  },
+
+  resolution: {
+    describe(runtimeComponent, context) {
+      const {
+        chargeConnection,
+        demandConnection,
+        lossConnection,
+        heater
+      } = storeTopology(runtimeComponent, context);
+      return resolutionDescription({
+        targets: [heater.id],
+        determines: [
+          chargeConnection.id,
+          demandConnection.id,
+          lossConnection.id
+        ]
+      });
+    }
   },
 
   model: {

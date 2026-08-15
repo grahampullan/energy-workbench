@@ -32,25 +32,29 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 7. Use `prescribed`, `target`, `capability`, and `actual` precisely. Do not
    represent a whole port with the old `constraint`, `target`, `variable`, and
    `max` state machine.
-8. Keep boundary compatibility small and flow-type-specific. Do not create an
+8. Publish capabilities through `getOperatingLimits`. Keep component resolution
+   declarations limited to required targets, required settled flows, and
+   determined connection flows. Governing equations remain in the component's
+   `model.resolve` function.
+9. Keep boundary compatibility small and flow-type-specific. Do not create an
    arbitrary feasible-region format, generic constraint language, or implicit
    iterative solver.
-9. Pass registries, scenarios, policies, clocks, and other dependencies
+10. Pass registries, scenarios, policies, clocks, and other dependencies
    explicitly. Compose them at the browser, CLI, or test boundary.
-10. Keep feature behaviour in its owning module. Avoid forwarding wrappers and
+11. Keep feature behaviour in its owning module. Avoid forwarding wrappers and
    broad barrel files; a small registry or composition module is fine.
-11. Make engineering units obvious in schemas, names, and tests. Prefer names
+12. Make engineering units obvious in schemas, names, and tests. Prefer names
    such as `powerkW`, `energykWh`, `durationHours`, and `temperatureC` over
    context-dependent `value` fields. Preserve SI symbol casing inside
    identifiers: use `kW` and `kWh`, never `Kw`, `KW`, or `Kwh`.
-12. Use JSON Schema once for structural validity and JavaScript once for
+13. Use JSON Schema once for structural validity and JavaScript once for
    engineering validity. Reject invalid input clearly; do not silently repair
    it.
-13. Keep `core`, `runtime`, and component calculations deterministic. Time,
+14. Keep `core`, `runtime`, and component calculations deterministic. Time,
    randomness, environment values, and I/O must not be hidden inputs.
-14. Keep runtime state local to a run. Component evaluation must not mutate the
+15. Keep runtime state local to a run. Component evaluation must not mutate the
    persisted model or depend on UI state.
-15. Keep domain results separate from presentation state. Graph labels, chart
+16. Keep domain results separate from presentation state. Graph labels, chart
     series, and inspector controls derive from canonical run results.
 
 ## UI defaults

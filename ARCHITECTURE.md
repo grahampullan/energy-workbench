@@ -83,6 +83,7 @@ A component step follows one direction:
 ```text
 component constraints and capabilities
 -> policy targets, priorities, and operating roles
+-> checked resolution-dependency plan
 -> component resolution of feasible and actual operation
 -> typed connection transfer and consistency checks
 -> component evaluation and state commit
@@ -95,6 +96,19 @@ duplicating component equations. Each component definition resolves its own
 physical feasibility and produces its actual port behaviour. The runtime
 coordinates these calls but does not clamp operation using knowledge of a
 component's physics.
+
+Every component publishes its current capabilities through
+`getOperatingLimits`. Its `resolution.describe` function identifies the policy
+targets and settled connection flows required before resolution, plus the
+connection flows it alone determines. This is dependency metadata, not a
+second implementation of the component equation.
+
+After current-step capabilities and policy roles are known, the runtime checks
+those declarations, derives an acyclic sequence of resolution stages, and
+executes components in that order. It rejects missing or conflicting flow
+determiners, absent prerequisites, and same-step cycles before resolving
+physics. The resulting plan is included with the timestep result so a UI or
+diagnostic report can explain the order.
 
 Every component that supplies, consumes, stores, converts, distributes, mixes,
 or balances energy is explicit and visible in the topology. A runtime helper

@@ -9,6 +9,7 @@ import {
 } from "./component-execution.js";
 import { checkConnectionBalances } from "./connection-execution.js";
 import { requestPolicyOperation } from "./policy-request.js";
+import { prepareResolutionPlan } from "./prepare-resolution-plan.js";
 import { prepareRuntimeModel } from "./prepare-runtime-model.js";
 
 const DEFAULT_BALANCE_TOLERANCE_KILOWATTS = 1e-9;
@@ -77,6 +78,7 @@ function stepResults({
   stepContext,
   operation,
   limitsByComponentId,
+  resolutionPlan,
   resolution,
   evaluationsByComponentId,
   connections
@@ -84,6 +86,9 @@ function stepResults({
   return {
     stepIndex: stepContext.stepIndex,
     elapsedSeconds: stepContext.elapsedSeconds,
+    resolutionPlan: {
+      stages: resolutionPlan.stages
+    },
     components: runtimeModel.components.map((component) => {
       const evaluation = evaluationsByComponentId.get(component.id);
       return {
@@ -162,8 +167,20 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       return failure(diagnostics);
     }
 
+    const planPreparation = prepareResolutionPlan({
+      runtimeModel,
+      operation,
+      limitsByComponentId,
+      stepIndex
+    });
+    diagnostics.push(...planPreparation.diagnostics);
+    if (!planPreparation.prepared || hasErrors(diagnostics)) {
+      return failure(diagnostics);
+    }
+
     const resolution = resolveRuntimeComponents(
       runtimeModel,
+      planPreparation.plan,
       operation,
       limitsByComponentId,
       stepContext,
@@ -201,6 +218,7 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       stepContext,
       operation,
       limitsByComponentId,
+      resolutionPlan: planPreparation.plan,
       resolution,
       evaluationsByComponentId,
       connections

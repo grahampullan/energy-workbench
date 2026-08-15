@@ -42,7 +42,9 @@ Push 2 keeps the repository boundary explicit:
 
 ## First Push 2 slice
 
-Start with one deterministic, headless heating cycle:
+**Status:** Implemented headlessly and in the browser workbench.
+
+The first slice is one deterministic heating cycle:
 
 ```text
 Grid -> Electric heater -> One-node batch thermal mass -> Ambient
@@ -54,13 +56,17 @@ the existing grid, electric heater, ambient boundary, runtime, and thermal-flow
 contract. Drive it with a small inline synthetic schedule and a fixed
 historical heating policy.
 
-The slice is complete when a reviewed fixture and tests show:
+The reviewed fixture and tests show:
 
 - electrical and thermal energy balance;
 - the full batch-temperature trajectory;
 - input energy for the cycle;
 - final delivery-temperature margin; and
 - an explicit warning when the required temperature is missed.
+
+The browser uses the same runtime result and adds editable component
+parameters, batch KPIs, selected-timestep diagnostics, and the required
+temperature line on the temperature chart.
 
 CSV input, multiple thermal nodes, calibration, uncertainty, burner fuel,
 emissions, policy comparison, and the private ladle model follow later. They

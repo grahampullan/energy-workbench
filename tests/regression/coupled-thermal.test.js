@@ -13,6 +13,8 @@ import { heatDemandDefinition } from
 import { hotWaterStoreDefinition } from
   "../../src/components/thermal/hot-water-store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { integrateStepPowerkWh } from
+  "../../src/core/energy-integration.js";
 import {
   validateLayout,
   validateModel,
@@ -61,12 +63,6 @@ function componentAtStep(step, componentId) {
   return step.components.find((component) => component.componentId === componentId);
 }
 
-function integrateFixedStep(values) {
-  const durationHours = runResult.results.time.timeStepSeconds / 3600;
-  return values.reduce((energykWh, value) =>
-    energykWh + value * durationHours, 0);
-}
-
 function assertClose(actual, expected, tolerance = 1e-9) {
   assert.ok(
     Math.abs(actual - expected) <= tolerance,
@@ -108,27 +104,37 @@ function resultSeries() {
 function summarise(series) {
   const finalTemperatureC = series.storeTemperatureC.at(-1);
   const initialTemperatureC = storeModelComponent.initialState.temperatureC;
+  const integrate = (values) => integrateStepPowerkWh(
+    values,
+    runResult.results.time.timeStepSeconds
+  );
   return {
-    totalGridImportEnergykWh: integrateFixedStep(
+    totalGridImportEnergykWh: integrate(
       runResult.results.steps.map((step) =>
         componentAtStep(step, "grid").outputs.importPowerkW)
     ),
-    totalHeaterElectricalInputEnergykWh: integrateFixedStep(
+    totalHeaterElectricalInputEnergykWh: integrate(
       series.heaterElectricalInputPowerkW
     ),
-    totalHeaterHeatOutputEnergykWh: integrateFixedStep(
+    totalHeaterHeatOutputEnergykWh: integrate(
       series.heaterHeatOutputkW
     ),
-    totalDemandEnergykWh: integrateFixedStep(series.demandHeatFlowkW),
-    totalServedHeatEnergykWh: integrateFixedStep(series.servedHeatFlowkW),
-    totalUnmetHeatEnergykWh: integrateFixedStep(series.unmetHeatFlowkW),
-    totalStoreChargeEnergykWh: integrateFixedStep(
+    totalDemandEnergykWh: integrate(series.demandHeatFlowkW),
+    totalServedHeatEnergykWh: integrate(series.servedHeatFlowkW),
+    totalUnmetHeatEnergykWh: integrate(series.unmetHeatFlowkW),
+    totalStoreChargeEnergykWh: integrate(
       series.storeChargeHeatFlowkW
     ),
-    totalStoreDischargeEnergykWh: integrateFixedStep(
+    totalStoreDischargeEnergykWh: integrate(
       series.storeDischargeHeatFlowkW
     ),
-    totalStandingHeatLossEnergykWh: integrateFixedStep(series.storeHeatLosskW),
+    totalStandingHeatLossEnergykWh: integrate(series.storeHeatLosskW),
+    totalStoreNetHeatEnergykWh: integrate(
+      series.storeChargeHeatFlowkW.map((value, index) =>
+        value -
+        series.storeDischargeHeatFlowkW[index] -
+        series.storeHeatLosskW[index])
+    ),
     initialStoreTemperatureC: initialTemperatureC,
     finalStoreTemperatureC: finalTemperatureC,
     storeThermalCapacitykWhPerK,
@@ -177,7 +183,8 @@ test("coupled thermal example matches the reviewed headless result fixture", () 
 });
 
 test("coupled thermal example conserves electrical and thermal energy", () => {
-  const summary = summarise(resultSeries());
+  const series = resultSeries();
+  const summary = summarise(series);
   const heaterEfficiency = model.components.find(
     (component) => component.id === "heater"
   ).parameters.efficiency;
@@ -195,10 +202,14 @@ test("coupled thermal example conserves electrical and thermal energy", () => {
     summary.totalServedHeatEnergykWh + summary.totalUnmetHeatEnergykWh
   );
   assertClose(
-    summary.storeInternalEnergyChangekWh,
+    summary.totalStoreNetHeatEnergykWh,
     summary.totalStoreChargeEnergykWh -
       summary.totalStoreDischargeEnergykWh -
       summary.totalStandingHeatLossEnergykWh
+  );
+  assertClose(
+    summary.storeInternalEnergyChangekWh,
+    summary.totalStoreNetHeatEnergykWh
   );
 });
 

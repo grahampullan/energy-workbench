@@ -1,0 +1,92 @@
+{
+  "numericContract": {
+    "timeStepCount": 16,
+    "timeStepSeconds": 900,
+    "energyIntegrationMethod": "explicit-forward rectangular"
+  },
+  "series": {
+    "heaterRequestedPowerkW": [
+      0, 0, 0, 0, -50, -50, -50, -50,
+      -50, -50, -50, -50, -50, -50, -50, 0
+    ],
+    "heaterElectricalInputPowerkW": [
+      0, 0, 0, 0, 50, 50, 50, 50,
+      50, 50, 50, 50, 50, 50, 50, 0
+    ],
+    "heaterHeatOutputkW": [
+      0, 0, 0, 0, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 0
+    ],
+    "batchHeatInputkW": [
+      0, 0, 0, 0, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 0
+    ],
+    "batchHeatLosskW": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      1.125,
+      2.2218750000000003,
+      3.2913281249999997,
+      4.334044921875,
+      5.350693798828125,
+      6.341926453857423,
+      7.308378292510987,
+      8.250668835198212,
+      9.169402114318258,
+      10.0651670614603,
+      10.938537884923793
+    ],
+    "batchTemperatureC": [
+      20,
+      20,
+      20,
+      20,
+      31.25,
+      42.21875,
+      52.91328125,
+      63.340449218749995,
+      73.50693798828125,
+      83.41926453857423,
+      93.08378292510987,
+      102.50668835198212,
+      111.69402114318257,
+      120.651670614603,
+      129.38537884923792,
+      126.65074437800698
+    ],
+    "requiredTemperatureMarginK": [
+      -100,
+      -100,
+      -100,
+      -100,
+      -88.75,
+      -77.78125,
+      -67.08671875,
+      -56.659550781250005,
+      -46.49306201171875,
+      -36.580735461425775,
+      -26.916217074890127,
+      -17.49331164801788,
+      -8.305978856817433,
+      0.651670614603006,
+      9.385378849237924,
+      6.650744378006976
+    ]
+  },
+  "summary": {
+    "totalGridImportEnergykWh": 137.5,
+    "totalHeaterElectricalInputEnergykWh": 137.5,
+    "totalHeaterHeatOutputEnergykWh": 123.75,
+    "totalBatchHeatInputEnergykWh": 123.75,
+    "totalBatchNetHeatEnergykWh": 106.65074437800698,
+    "totalHeatLossEnergykWh": 17.099255621993024,
+    "initialBatchTemperatureC": 20,
+    "finalBatchTemperatureC": 126.65074437800698,
+    "batchThermalCapacitykWhPerK": 1,
+    "batchInternalEnergyChangekWh": 106.65074437800698,
+    "finalRequiredTemperatureMarginK": 6.650744378006976
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "model.batch-heating-synthetic",
+  "name": "Synthetic batch-heating process",
+  "components": [
+    {
+      "id": "grid",
+      "type": "electrical.grid",
+      "definitionVersion": "0.2.0",
+      "name": "Grid",
+      "parameters": {
+        "maximumImportPowerkW": 60,
+        "maximumExportPowerkW": 0
+      },
+      "initialState": {}
+    },
+    {
+      "id": "heater",
+      "type": "thermal.electric-heater",
+      "definitionVersion": "0.2.0",
+      "name": "Electric heater",
+      "parameters": {
+        "maximumElectricalInputPowerkW": 50,
+        "efficiency": 0.9,
+        "supplyTemperatureC": 150
+      },
+      "initialState": {}
+    },
+    {
+      "id": "batch",
+      "type": "process.batch-thermal-mass",
+      "definitionVersion": "0.1.0",
+      "name": "Batch",
+      "parameters": {
+        "massKg": 1000,
+        "specificHeatCapacityKjPerKgK": 3.6,
+        "maximumTemperatureC": 145,
+        "heatLossCoefficientkWPerK": 0.1,
+        "maximumHeatInputkW": 50,
+        "requiredTemperatureC": 120
+      },
+      "initialState": {
+        "temperatureC": 20
+      }
+    },
+    {
+      "id": "ambient",
+      "type": "thermal.ambient-boundary",
+      "definitionVersion": "0.2.0",
+      "name": "Ambient",
+      "parameters": {
+        "temperatureSeriesId": "ambient-temperature"
+      },
+      "initialState": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "grid-to-heater",
+      "name": "Grid to electric heater",
+      "from": {
+        "componentId": "grid",
+        "portId": "electricity"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "electricity-in"
+      }
+    },
+    {
+      "id": "heater-to-batch",
+      "name": "Heater to batch",
+      "from": {
+        "componentId": "heater",
+        "portId": "heat-out"
+      },
+      "to": {
+        "componentId": "batch",
+        "portId": "heat-in"
+      }
+    },
+    {
+      "id": "batch-to-ambient",
+      "name": "Batch heat loss",
+      "from": {
+        "componentId": "batch",
+        "portId": "heat-loss"
+      },
+      "to": {
+        "componentId": "ambient",
+        "portId": "heat-in"
+      }
+    }
+  ]
+}

@@ -910,6 +910,11 @@ h2 {
   stroke-width: 4;
 }
 
+.results-power-line[data-kind="prescribed"],
+.results-temperature-line[data-kind="prescribed"] {
+  stroke-dasharray: 7 5;
+}
+
 .results-temperature-threshold {
   stroke: var(--amber);
   stroke-dasharray: 5 4;
@@ -996,6 +1001,14 @@ h2 {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+
+.results-legend-item[data-kind="prescribed"] .results-legend-swatch {
+  width: 12px;
+  height: 0;
+  border-top: 2px dashed currentcolor;
+  border-radius: 0;
+  background: transparent !important;
 }
 
 .results-legend-label {

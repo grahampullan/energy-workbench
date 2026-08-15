@@ -9,6 +9,8 @@ import { electricalGridDefinition } from "../../src/components/electrical/grid.j
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
 import { electricalPvDefinition } from "../../src/components/electrical/pv.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { integrateStepPowerkWh } from
+  "../../src/core/energy-integration.js";
 import {
   validateLayout,
   validateModel,
@@ -103,15 +105,6 @@ function powerSeries(runResult) {
   return series;
 }
 
-function integratePowerkWh(values, timeStepSeconds) {
-  const durationHours = timeStepSeconds / 3600;
-  let energykWh = 0;
-  for (let index = 1; index < values.length; index += 1) {
-    energykWh += (values[index - 1] + values[index]) / 2 * durationHours;
-  }
-  return energykWh;
-}
-
 function summariseRun(runResult) {
   const checkpointStepIndices = expectedResults.numericContract.checkpointStepIndices;
   const series = powerSeries(runResult);
@@ -119,7 +112,7 @@ function summariseRun(runResult) {
     Object.entries(series).map(([name, values]) => [name, {
       minimumkW: Math.min(...values),
       maximumkW: Math.max(...values),
-      integratedEnergykWh: integratePowerkWh(
+      integratedEnergykWh: integrateStepPowerkWh(
         values,
         runResult.results.time.timeStepSeconds
       ),

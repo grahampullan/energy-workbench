@@ -4,6 +4,7 @@ import { electricalGridDefinition } from "../components/electrical/grid.js";
 import { electricalLoadDefinition } from "../components/electrical/load.js";
 import { electricalPvDefinition } from "../components/electrical/pv.js";
 import { electricalSourceDefinition } from "../components/electrical/source.js";
+import { batchThermalMassDefinition } from "../components/process/batch-thermal-mass.js";
 import { ambientBoundaryDefinition } from "../components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from "../components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../components/thermal/heat-demand.js";
@@ -12,6 +13,7 @@ import { createComponentRegistry } from "../core/component-registry.js";
 import { validateVariant } from "../core/validation/validate-documents.js";
 import { createHeatDemandFollowingPolicy } from "../policies/heat-demand-following.js";
 import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-self-consumption.js";
+import { createScheduledHeatingPolicy } from "../policies/scheduled-heating.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
 import { createComponentInspector } from "./component-inspector.js";
@@ -24,6 +26,7 @@ import { createPreviewRunScheduler } from "./preview-run-scheduler.js";
 import { createResultsChartModel } from "./results-chart-model.js";
 import { createResultsChart } from "./results-chart.js";
 import {
+  createBatchHeatingRunKpis,
   createCoupledThermalRunKpis,
   createElectricalRunKpis
 } from "./run-kpi-model.js";
@@ -62,6 +65,20 @@ const EXAMPLES = Object.freeze({
       return createHeatDemandFollowingPolicy({
         heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
         demandComponentId: componentIdForType(model, "thermal.heat-demand"),
+        balancingComponentId: componentIdForType(model, "electrical.grid")
+      });
+    }
+  }),
+  "batch-heating-synthetic": Object.freeze({
+    label: "Batch heating",
+    root: "/examples/batch-heating-synthetic",
+    topologyTitle: "Batch-heating process",
+    initialComponentType: "process.batch-thermal-mass",
+    createKpis: createBatchHeatingRunKpis,
+    createPolicy(model) {
+      return createScheduledHeatingPolicy({
+        heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
+        powerSeriesId: "heater-input-power",
         balancingComponentId: componentIdForType(model, "electrical.grid")
       });
     }
@@ -106,6 +123,7 @@ function definitionRegistry() {
     electricalLoadDefinition,
     electricalPvDefinition,
     electricalSourceDefinition,
+    batchThermalMassDefinition,
     ambientBoundaryDefinition,
     electricHeaterDefinition,
     heatDemandDefinition,
@@ -243,7 +261,8 @@ async function startWorkbench() {
       chartModel = createResultsChartModel({
         model: activeModel,
         registry,
-        results: activeRun.results
+        results: activeRun.results,
+        scenario
       });
       chartModelSource = activeModel;
       chartResultsSource = activeRun.results;

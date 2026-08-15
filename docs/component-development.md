@@ -151,6 +151,13 @@ their explicit boundaries.
 `runScenario({ model, scenario, policy, registry, options })` prepares the model,
 initialises isolated state, and runs every scenario step synchronously.
 
+Each step uses only current state, current materialised scenario values,
+component parameters, and current policy targets to determine actual flows.
+Components then advance their state explicitly to the next time level. A
+current flow must not depend on a proposed next state. Integrated rate totals
+use the same current-step rectangular sum; timestep refinement controls
+accuracy.
+
 - The runtime evaluates every component's current operating limits once before
   requesting policy operation.
 - `policy.request(runtimeModel, stepContext, policyContext)` returns

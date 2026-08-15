@@ -250,6 +250,12 @@ model; negative grid power exports it.
   units, topology, limits, and physical plausibility.
 - Model parameters are plain values. Units and timestep conventions are
   explicit and tested.
+- State advances explicitly from current-time state and actual flow. No
+  current timestep may require a proposed next state to determine its actual
+  flow.
+- Integrated rate totals use the same current-step rectangular sum as state
+  transitions. Timestep refinement, chosen by the user, controls integration
+  accuracy.
 - A run does not mutate the persisted model.
 - Preview overrides are temporary. Apply changes the working model through a
   command. A saved variant is a separate reproducible state.

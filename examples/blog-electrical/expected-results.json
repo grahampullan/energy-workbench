@@ -6,7 +6,7 @@
     "timeStepSeconds": 60,
     "powerUnit": "kW",
     "integratedEnergyUnit": "kWh",
-    "integrationMethod": "trapezoidal",
+    "integrationMethod": "explicit-forward rectangular",
     "checkpointStepIndices": [
       0,
       180,
@@ -23,12 +23,12 @@
     "baseline": {
       "variantId": null,
       "integratedEnergykWh": {
-        "solar supply": 9.453087202915242,
-        "from battery": 5.0000000000000036,
-        "grid supply": 7.348949112911647,
-        "load": 16.718209794847006,
-        "to battery": 4.999999999999998,
-        "grid export": 0.08382652097984335
+        "solar supply": 9.453087202970284,
+        "from battery": 4.9999999999999964,
+        "grid supply": 7.3572824622822255,
+        "load": 16.726543144272668,
+        "to battery": 5,
+        "grid export": 0.08382652097984333
       },
       "finalBatteryStoredEnergykWh": 0,
       "maximumPowerBalanceErrorkW": 1.1102230246251565e-16
@@ -36,12 +36,12 @@
     "doublePv": {
       "variantId": "variant.blog-electrical-double-pv",
       "integratedEnergykWh": {
-        "solar supply": 18.906174405830484,
-        "from battery": 5,
-        "grid supply": 6.431680595099754,
-        "load": 16.718209794847006,
-        "to battery": 5.000000000000002,
-        "grid export": 8.619645206083181
+        "solar supply": 18.90617440594057,
+        "from battery": 5.0000000000000036,
+        "grid supply": 6.440013944415266,
+        "load": 16.726543144272668,
+        "to battery": 5,
+        "grid export": 8.61964520608318
       },
       "finalBatteryStoredEnergykWh": 0,
       "maximumPowerBalanceErrorkW": 2.220446049250313e-16
@@ -49,11 +49,11 @@
     "doubleBatteryCapacity": {
       "variantId": "variant.blog-electrical-double-battery-capacity",
       "integratedEnergykWh": {
-        "solar supply": 9.453087202915242,
-        "from battery": 5.083826520979847,
-        "grid supply": 7.265122591931803,
-        "load": 16.718209794847006,
-        "to battery": 5.083826520979839,
+        "solar supply": 9.453087202970284,
+        "from battery": 5.083826520979839,
+        "grid supply": 7.273455941302384,
+        "load": 16.726543144272668,
+        "to battery": 5.083826520979843,
         "grid export": 0
       },
       "finalBatteryStoredEnergykWh": 0,

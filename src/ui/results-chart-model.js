@@ -1,9 +1,8 @@
+import { integrateStepPowerkWh } from "../core/energy-integration.js";
 import {
   ACTIVE_POWER_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../core/flow-types.js";
-
-const HOT_WATER_STORE_TYPE = "thermal.hot-water-store";
 
 function definitionFor(registry, component) {
   const definition = registry.get(component.type, component.definitionVersion);
@@ -21,27 +20,6 @@ function portFor(definition, componentId, portId) {
     throw new Error(`Component ${componentId} does not define port: ${portId}`);
   }
   return port;
-}
-
-export function integratePowerSerieskWh(values, timeStepSeconds) {
-  if (!Array.isArray(values)) {
-    throw new TypeError("Power-series values must be an array");
-  }
-  if (!Number.isFinite(timeStepSeconds) || timeStepSeconds <= 0) {
-    throw new TypeError("timeStepSeconds must be a finite, positive number");
-  }
-  if (values.some((value) => !Number.isFinite(value))) {
-    throw new TypeError("Power-series values must be finite numbers");
-  }
-
-  const durationHours = timeStepSeconds / 3600;
-  let energykWh = 0;
-  for (let index = 1; index < values.length; index += 1) {
-    const previous = values[index - 1];
-    const current = values[index];
-    energykWh += (previous + current) / 2 * durationHours;
-  }
-  return energykWh;
 }
 
 function flowSeries({
@@ -63,17 +41,101 @@ function flowSeries({
     componentIds: [fromComponent.id, toComponent.id],
     direction,
     flowType,
+    kind: "calculated",
     label: `${source.name} → ${destination.name}`,
     values: values.map((powerkW, stepIndex) => ({
       stepIndex,
       elapsedSeconds: elapsedSeconds[stepIndex],
       powerkW: forward ? Math.max(0, powerkW) : Math.max(0, -powerkW)
     })),
-    integratedEnergykWh: integratePowerSerieskWh(
+    integratedEnergykWh: integrateStepPowerkWh(
       values.map((powerkW) => forward ? Math.max(0, powerkW) : Math.max(0, -powerkW)),
       timeStepSeconds
     )
   };
+}
+
+function validateScenarioTime(scenario, results) {
+  if (scenario === undefined) {
+    return;
+  }
+  if (
+    scenario.time?.timeStepSeconds !== results.time.timeStepSeconds ||
+    scenario.time?.stepCount !== results.steps.length
+  ) {
+    throw new TypeError(
+      "Scenario and run results must use the same timestep and step count"
+    );
+  }
+}
+
+function scenarioSeriesWithUnit(scenario, unit, stepCount) {
+  if (scenario === undefined) {
+    return [];
+  }
+  return scenario.series
+    .filter((series) => series.unit === unit)
+    .map((series) => {
+      if (
+        series.data?.kind !== "inline" ||
+        !Array.isArray(series.data.values) ||
+        series.data.values.length !== stepCount ||
+        series.data.values.some((value) => !Number.isFinite(value))
+      ) {
+        throw new TypeError(
+          `Scenario series ${series.id} must contain one finite inline value per timestep`
+        );
+      }
+      return series;
+    });
+}
+
+function createPrescribedPowerSeries({ scenario, stepCount, timeStepSeconds }) {
+  return scenarioSeriesWithUnit(scenario, "kW", stepCount).map((series) => {
+    if (series.data.values.some((value) => value < 0)) {
+      throw new RangeError(
+        `Prescribed power series ${series.id} must contain non-negative values`
+      );
+    }
+    return {
+      id: `scenario:${series.id}`,
+      connectionId: null,
+      componentIds: [],
+      direction: null,
+      flowType: null,
+      kind: "prescribed",
+      label: `${series.name} · prescribed`,
+      values: series.data.values.map((powerkW, stepIndex) => ({
+        stepIndex,
+        elapsedSeconds: stepIndex * timeStepSeconds,
+        powerkW
+      }))
+    };
+  });
+}
+
+function createPrescribedTemperatureSeries({
+  scenario,
+  stepCount,
+  timeStepSeconds
+}) {
+  return scenarioSeriesWithUnit(scenario, "°C", stepCount).map((series) => {
+    const values = series.data.values.map((temperatureC, stepIndex) => ({
+      stepIndex,
+      elapsedSeconds: stepIndex * timeStepSeconds,
+      temperatureC
+    }));
+    return {
+      id: `scenario:${series.id}`,
+      connectionId: null,
+      componentIds: [],
+      kind: "prescribed",
+      label: `${series.name} · prescribed`,
+      thresholdC: null,
+      thresholdLabel: null,
+      values
+    };
+  });
 }
 
 function componentParameter(component, definition, parameterId) {
@@ -98,14 +160,27 @@ function stateForComponent(entries, componentId, context) {
 
 function createTemperatureSeries({ model, registry, results, timeStepSeconds }) {
   return model.components
-    .filter((component) => component.type === HOT_WATER_STORE_TYPE)
-    .map((component) => {
+    .flatMap((component) => {
       const definition = definitionFor(registry, component);
+      const chart = definition.editor.temperatureChart;
+      if (chart === undefined) {
+        return [];
+      }
+      const { stateField, thresholdParameter, thresholdLabel } = chart;
+      if (
+        typeof stateField !== "string" ||
+        typeof thresholdParameter !== "string" ||
+        typeof thresholdLabel !== "string"
+      ) {
+        throw new TypeError(
+          `Component ${component.id} temperature-chart metadata is invalid`
+        );
+      }
       const initialTemperatureC = stateForComponent(
         results.initialStates,
         component.id,
         "Run results initial states"
-      ).temperatureC;
+      )[stateField];
       if (!Number.isFinite(initialTemperatureC)) {
         throw new TypeError(
           `Component ${component.id} initial temperature must be finite`
@@ -120,7 +195,7 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
           step.components,
           component.id,
           `Run results step ${stepIndex}`
-        ).temperatureC;
+        )[stateField];
         if (!Number.isFinite(temperatureC)) {
           throw new TypeError(
             `Component ${component.id} temperature must be finite at step ${stepIndex}`
@@ -137,18 +212,20 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
         id: `${component.id}:temperature`,
         connectionId: null,
         componentIds: [component.id],
+        kind: "calculated",
         label: `${component.name} temperature`,
         thresholdC: componentParameter(
           component,
           definition,
-          "minimumUsefulTemperatureC"
+          thresholdParameter
         ),
+        thresholdLabel,
         values
       };
     });
 }
 
-export function createResultsChartModel({ model, registry, results }) {
+export function createResultsChartModel({ model, registry, results, scenario }) {
   if (!model || !registry || !results) {
     throw new TypeError("Model, registry, and run results are required");
   }
@@ -159,6 +236,7 @@ export function createResultsChartModel({ model, registry, results }) {
   if (!Array.isArray(results.steps) || results.steps.length === 0) {
     throw new TypeError("Run results must contain at least one timestep");
   }
+  validateScenarioTime(scenario, results);
 
   const componentsById = new Map(model.components.map((component) => [
     component.id,
@@ -234,10 +312,20 @@ export function createResultsChartModel({ model, registry, results }) {
     stepCount: results.steps.length,
     elapsedSeconds,
     series,
+    prescribedPowerSeries: createPrescribedPowerSeries({
+      scenario,
+      stepCount: results.steps.length,
+      timeStepSeconds
+    }),
     temperatureSeries: createTemperatureSeries({
       model,
       registry,
       results,
+      timeStepSeconds
+    }),
+    prescribedTemperatureSeries: createPrescribedTemperatureSeries({
+      scenario,
+      stepCount: results.steps.length,
       timeStepSeconds
     })
   };

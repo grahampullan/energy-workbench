@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "scenario.batch-heating-synthetic",
+  "name": "Synthetic four-hour batch-heating cycle",
+  "time": {
+    "startTime": "2026-01-01T08:00:00Z",
+    "timeStepSeconds": 900,
+    "stepCount": 16
+  },
+  "series": [
+    {
+      "id": "heater-input-power",
+      "name": "Scheduled heater input",
+      "unit": "kW",
+      "data": {
+        "kind": "inline",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          50,
+          50,
+          50,
+          50,
+          50,
+          50,
+          50,
+          50,
+          50,
+          50,
+          50,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ambient-temperature",
+      "name": "Ambient temperature",
+      "unit": "°C",
+      "data": {
+        "kind": "inline",
+        "values": [
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20,
+          20
+        ]
+      }
+    }
+  ]
+}

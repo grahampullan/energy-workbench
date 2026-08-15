@@ -93,6 +93,7 @@ test("coupled chart includes electrical and thermal connection flows", () => {
   assert.equal(storeTemperature.id, "store:temperature");
   assert.equal(storeTemperature.label, "Hot-water store temperature");
   assert.equal(storeTemperature.thresholdC, 70);
+  assert.equal(storeTemperature.thresholdLabel, "Minimum useful");
   assert.equal(storeTemperature.values.length, 13);
   assert.deepEqual(
     storeTemperature.values[0],
@@ -180,7 +181,7 @@ test("inspector warnings are scoped and explain the selected timestep", () => {
   }), []);
 });
 
-test("coupled KPIs use the fixed-timestep engineering totals", () => {
+test("coupled KPIs use explicit-forward energy totals", () => {
   const kpis = Object.fromEntries(createCoupledThermalRunKpis(run.results).map(
     (kpi) => [kpi.id, kpi]
   ));

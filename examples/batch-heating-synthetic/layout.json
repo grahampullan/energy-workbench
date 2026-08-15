@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "layout.batch-heating-synthetic",
+  "modelId": "model.batch-heating-synthetic",
+  "components": [
+    {
+      "componentId": "grid",
+      "x": 20,
+      "y": 20
+    },
+    {
+      "componentId": "heater",
+      "x": 260,
+      "y": 20
+    },
+    {
+      "componentId": "batch",
+      "x": 500,
+      "y": 20
+    },
+    {
+      "componentId": "ambient",
+      "x": 500,
+      "y": 180
+    }
+  ]
+}

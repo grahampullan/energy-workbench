@@ -1,5 +1,5 @@
+import { integrateStepPowerkWh } from "../core/energy-integration.js";
 import { formatEngineeringValue } from "./workbench-view-model.js";
-import { integratePowerSerieskWh } from "./results-chart-model.js";
 
 function requireResults(results) {
   if (
@@ -47,11 +47,6 @@ function stateSeries(results, componentId, stateId) {
   });
 }
 
-function integrateFixedStep(values, timeStepSeconds) {
-  const durationHours = timeStepSeconds / 3600;
-  return values.reduce((total, value) => total + value * durationHours, 0);
-}
-
 function kpi(id, label, value, unit, tone = "neutral") {
   return {
     id,
@@ -65,7 +60,7 @@ function kpi(id, label, value, unit, tone = "neutral") {
 
 export function createElectricalRunKpis(results) {
   requireResults(results);
-  const integrate = (values) => integratePowerSerieskWh(
+  const integrate = (values) => integrateStepPowerkWh(
     values,
     results.time.timeStepSeconds
   );
@@ -94,7 +89,7 @@ export function createElectricalRunKpis(results) {
 
 export function createCoupledThermalRunKpis(results) {
   requireResults(results);
-  const integrate = (values) => integrateFixedStep(
+  const integrate = (values) => integrateStepPowerkWh(
     values,
     results.time.timeStepSeconds
   );
@@ -124,5 +119,46 @@ export function createCoupledThermalRunKpis(results) {
       ...temperaturesC
     ), "°C"),
     kpi("final-store-temperature", "Final store temp", temperaturesC.at(-1), "°C")
+  ];
+}
+
+export function createBatchHeatingRunKpis(results) {
+  requireResults(results);
+  const integrate = (values) => integrateStepPowerkWh(
+    values,
+    results.time.timeStepSeconds
+  );
+  const finalTemperatureC = stateSeries(
+    results,
+    "batch",
+    "temperatureC"
+  ).at(-1);
+  const finalRequiredTemperatureMarginK = outputSeries(
+    results,
+    "batch",
+    "requiredTemperatureMarginK"
+  ).at(-1);
+
+  return [
+    kpi("grid-import-energy", "Grid import", integrate(
+      outputSeries(results, "grid", "importPowerkW")
+    ), "kWh"),
+    kpi("heat-supplied-energy", "Heat supplied", integrate(
+      outputSeries(results, "batch", "heatInputkW")
+    ), "kWh"),
+    kpi("heat-absorbed-energy", "Heat absorbed", integrate(
+      outputSeries(results, "batch", "netHeatFlowkW")
+    ), "kWh"),
+    kpi("heat-loss-energy", "Heat loss", integrate(
+      outputSeries(results, "batch", "heatLosskW")
+    ), "kWh"),
+    kpi("final-batch-temperature", "Final batch temp", finalTemperatureC, "°C"),
+    kpi(
+      "required-temperature-margin",
+      "Final temperature margin",
+      finalRequiredTemperatureMarginK,
+      "K",
+      finalRequiredTemperatureMarginK < -1e-9 ? "warning" : "neutral"
+    )
   ];
 }

@@ -67,8 +67,9 @@ not make the run fail.
 ## Reviewed result fixture
 
 `expected-results.json` records the complete 12-step series and integrated
-energy summary produced by the headless runtime. Energy is integrated as a
-fixed-timestep rectangular sum, matching the runtime state update.
+energy summary produced by the headless runtime. Each current-step flow is
+multiplied by the step duration, consistently with the component state update.
+Timestep refinement controls integration accuracy.
 
 The regression checks three independent balances:
 

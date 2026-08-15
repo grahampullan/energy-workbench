@@ -12,10 +12,7 @@ import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { createPvBatterySelfConsumptionPolicy } from
   "../../src/policies/pv-battery-self-consumption.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
-import {
-  createResultsChartModel,
-  integratePowerSerieskWh
-} from "../../src/ui/results-chart-model.js";
+import { createResultsChartModel } from "../../src/ui/results-chart-model.js";
 import { createElectricalRunKpis } from "../../src/ui/run-kpi-model.js";
 
 const exampleDirectory = new URL("../../examples/blog-electrical/", import.meta.url);
@@ -48,7 +45,12 @@ const run = runScenario({
 
 test("chart model derives directional power series from canonical connection results", () => {
   assert.equal(run.completed, true, JSON.stringify(run.diagnostics));
-  const chart = createResultsChartModel({ model, registry, results: run.results });
+  const chart = createResultsChartModel({
+    model,
+    registry,
+    results: run.results,
+    scenario
+  });
 
   assert.equal(chart.stepCount, 1440);
   assert.equal(chart.timeStepSeconds, 60);
@@ -77,10 +79,18 @@ test("chart model derives directional power series from canonical connection res
   assert.ok(chart.series.every((series) =>
     series.values.every((point) => point.powerkW >= 0)
   ));
+  assert.deepEqual(
+    chart.prescribedPowerSeries.map((series) => series.id),
+    ["scenario:electrical-demand", "scenario:solar-generation"]
+  );
+  assert.ok(chart.prescribedPowerSeries.every(
+    (series) => series.kind === "prescribed"
+  ));
   assert.deepEqual(chart.temperatureSeries, []);
+  assert.deepEqual(chart.prescribedTemperatureSeries, []);
 });
 
-test("chart integration reproduces the reviewed daily-energy regression values", () => {
+test("chart integration reproduces explicit-forward daily-energy results", () => {
   const chart = createResultsChartModel({ model, registry, results: run.results });
   const energyBySeriesId = Object.fromEntries(chart.series.map((series) => [
     series.id,
@@ -112,13 +122,7 @@ test("electrical KPIs reproduce the reviewed run totals", () => {
   ]) {
     assert.ok(Math.abs(kpis[kpiId].value - expectedValue) < 1e-12);
   }
-  assert.equal(kpis["grid-import-energy"].displayValue, "7.349 kWh");
-});
-
-test("trapezoidal integration validates its engineering inputs", () => {
-  assert.equal(integratePowerSerieskWh([0, 2, 2], 3600), 3);
-  assert.throws(() => integratePowerSerieskWh([0, Number.NaN], 60), /finite/u);
-  assert.throws(() => integratePowerSerieskWh([0, 1], 0), /positive/u);
+  assert.equal(kpis["grid-import-energy"].displayValue, "7.357 kWh");
 });
 
 test("chart model rejects an incomplete connection result series", () => {

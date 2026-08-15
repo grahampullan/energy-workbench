@@ -38,6 +38,32 @@ export function formatFieldLabel(field) {
     .join(" ");
 }
 
+function unitIdentifierSuffix(unit) {
+  if (unit === "1" || unit === "scenario-series-id") {
+    return "";
+  }
+  const parts = unit
+    .replaceAll("°", "")
+    .replaceAll("³", "3")
+    .replaceAll("²", "2")
+    .split(/\s*\/\s*/u)
+    .map((part) => part.replaceAll(/[^A-Za-z0-9]/gu, ""))
+    .filter(Boolean);
+  return parts.map((part, index) => index === 0
+    ? part
+    : `Per${part.charAt(0).toUpperCase()}${part.slice(1)}`
+  ).join("");
+}
+
+function fieldLabel(id, specification) {
+  const unitSuffix = unitIdentifierSuffix(specification.unit);
+  const fieldWithoutUnit = unitSuffix &&
+    id.toLowerCase().endsWith(unitSuffix.toLowerCase())
+    ? id.slice(0, -unitSuffix.length)
+    : id;
+  return formatFieldLabel(fieldWithoutUnit);
+}
+
 function connectionFlowView(connectionResult) {
   if (connectionResult.flowType === ACTIVE_POWER_FLOW_TYPE) {
     const value = connectionResult.flow?.powerkW;
@@ -103,11 +129,9 @@ function definitionFor(registry, component) {
 function fieldViews(specifications, values) {
   return Object.entries(specifications).map(([id, specification]) => {
     const value = Object.hasOwn(values, id) ? values[id] : specification.default;
-    const label = formatFieldLabel(id);
-    const unitSuffix = ` ${specification.unit}`;
     return {
       id,
-      label: label.endsWith(unitSuffix) ? label.slice(0, -unitSuffix.length) : label,
+      label: fieldLabel(id, specification),
       unit: specification.unit,
       value,
       editor: specification.editor ?? null,
@@ -251,6 +275,20 @@ function diagnosticContent(diagnostic, component) {
         message: `${formatEngineeringValue(unmet, "kW")} unmet · ` +
           `${formatEngineeringValue(served, "kW")} served of ` +
           `${formatEngineeringValue(demand, "kW")} requested`
+      };
+    }
+  }
+  if (
+    diagnostic.code === "process.batch-thermal-mass.required-temperature-missed" &&
+    component.type === "process.batch-thermal-mass"
+  ) {
+    const temperatureC = outputValue(component, "temperatureC");
+    const marginK = outputValue(component, "requiredTemperatureMarginK");
+    if ([temperatureC, marginK].every(Number.isFinite)) {
+      return {
+        title: "Required temperature missed",
+        message: `${formatEngineeringValue(temperatureC, "°C")} final · ` +
+          `${formatEngineeringValue(-marginK, "K")} below requirement`
       };
     }
   }

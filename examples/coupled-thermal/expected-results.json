@@ -7,7 +7,7 @@
     "powerUnit": "kW",
     "energyUnit": "kWh",
     "temperatureUnit": "°C",
-    "energyIntegrationMethod": "rectangular fixed-timestep sum"
+    "energyIntegrationMethod": "explicit-forward rectangular"
   },
   "expectedDiagnostics": {
     "code": "thermal.heat-demand.unmet-heat",
@@ -23,6 +23,7 @@
     "totalStoreChargeEnergykWh": 320,
     "totalStoreDischargeEnergykWh": 364.91043344919,
     "totalStandingHeatLossEnergykWh": 17.99703752324189,
+    "totalStoreNetHeatEnergykWh": -62.90747097243195,
     "initialStoreTemperatureC": 80,
     "finalStoreTemperatureC": 73.7092529027568,
     "storeThermalCapacitykWhPerK": 10,

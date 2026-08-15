@@ -3,8 +3,8 @@
 An interactive engineering environment for approximate, time-resolved energy
 models.
 
-The project is currently building Push 1: a behavioural port of the original
-Visual Energy Modeller followed by a simple electrical–thermal extension.
+The project has passed its Push 1 gate and is building Push 2 batch-heating
+models on the validated electrical–thermal foundation.
 
 ## Project contracts
 
@@ -12,9 +12,11 @@ Visual Energy Modeller followed by a simple electrical–thermal extension.
 - [Code shape profile](CODE_SHAPE_PROFILE.md)
 - [Architecture decisions](docs/adr/README.md)
 - [Project gates and Push 2 status](docs/project-gates.md)
+- [Forward-time and topology-resolution plan](docs/forward-time-and-resolution-plan.md)
 - [Component development](docs/component-development.md)
 - [Legacy electrical regression](docs/regression/blog-electrical.md)
 - [Coupled thermal reference](docs/regression/coupled-thermal.md)
+- [Batch-heating reference](docs/regression/batch-heating.md)
 
 JSON Schemas for the initial study documents live in `src/core/schemas`.
 
@@ -23,14 +25,15 @@ four-terminal electrical bus with fixed load and PV profiles, branching,
 policy-controlled battery storage and generation, and a residual grid boundary
 with import and export limits. It also supports the Push 1B coupled topology:
 an electric heater, hot-water store, heat demand, and ambient heat-loss
-boundary. The complete 1,440-step legacy electrical example and the short
-synthetic coupled-thermal example both run headlessly on the same contracts,
-with their reviewed results recorded by regression tests.
+boundary. Push 2 adds a scheduled electric heater and one-node batch thermal
+mass with a required final temperature. All three public examples run
+headlessly on the same contracts, with reviewed results recorded by regression
+tests.
 
-The browser workbench can load either committed example through the same
+The browser workbench can load any committed example through the same
 runtime. It presents the saved topology, live electrical and thermal flows, a
 definition-driven component inspector, run KPIs, linked flow-rate and
-integrated-energy charts, a hot-water store temperature chart, and timestep
+integrated-energy charts, component temperature charts, and timestep
 scrubbing. Numeric parameter controls create temporary preview runs which can
 be reset or applied to the in-memory working model.
 Components can also be moved and resized as temporary layout changes;

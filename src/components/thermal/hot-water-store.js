@@ -235,7 +235,7 @@ export const hotWaterStoreDefinition = {
       editor: { minimum: 950, maximum: 1000, step: 1 }
     },
     specificHeatCapacityKjPerKgK: {
-      unit: "kJ/(kg·K)",
+      unit: "kJ / kgK",
       default: 4.186,
       hardBounds: { minimum: 0 },
       editor: { minimum: 3.5, maximum: 4.5, step: 0.001 }
@@ -309,6 +309,11 @@ export const hotWaterStoreDefinition = {
 
   editor: {
     summaryOutput: "temperatureC",
+    temperatureChart: {
+      stateField: "temperatureC",
+      thresholdParameter: "minimumUsefulTemperatureC",
+      thresholdLabel: "Minimum useful"
+    },
     groups: [
       {
         id: "storage",

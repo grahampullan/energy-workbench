@@ -125,25 +125,31 @@ All three cases complete through the shared runtime. Every preserved minimum,
 maximum, and nine-point power checkpoint matches the legacy result after unit
 conversion. Maximum bus residual is `2.23e-16 kW` or lower.
 
-The remaining daily-energy differences are intentional corrections at battery
-boundaries:
+The legacy chart integrated adjacent samples trapezoidally. Energy Workbench
+instead multiplies every current-step flow by the step duration, matching its
+explicit-forward state updates. The daily-energy differences therefore combine
+that deliberate integration change with corrected battery boundaries:
 
 | Case | Quantity | Legacy kWh | New kWh |
 | --- | --- | ---: | ---: |
+| Baseline | Load | 16.718210 | 16.726543 |
 | Baseline | Battery discharge | 5.007289 | 5.000000 |
-| Baseline | Grid import | 7.341660 | 7.348949 |
+| Baseline | Grid import | 7.341660 | 7.357282 |
 | Baseline | Battery charge | 5.005396 | 5.000000 |
 | Baseline | Grid export | 0.078430 | 0.083827 |
+| Double PV | Load | 16.718210 | 16.726543 |
 | Double PV | Battery discharge | 5.005415 | 5.000000 |
-| Double PV | Grid import | 6.426265 | 6.431681 |
+| Double PV | Grid import | 6.426265 | 6.440014 |
 | Double PV | Battery charge | 5.042798 | 5.000000 |
 | Double PV | Grid export | 8.576847 | 8.619645 |
+| Double capacity | Load | 16.718210 | 16.726543 |
 | Double capacity | Battery discharge | 5.085524 | 5.083827 |
-| Double capacity | Grid import | 7.263425 | 7.265123 |
+| Double capacity | Grid import | 7.263425 | 7.273456 |
 
-PV and load energy are unchanged. The new battery finishes at exactly
-`0 kWh` in every case rather than overshooting below zero. The corrected
-expected values are locked by `tests/regression/blog-electrical.test.js`.
+PV energy is unchanged at the table precision because its first and final
+samples are both negligible. The new battery finishes at exactly `0 kWh` in
+every case rather than overshooting below zero. The corrected expected values
+are locked by `tests/regression/blog-electrical.test.js`.
 
 ## Push 1A acceptance checklist
 

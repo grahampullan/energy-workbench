@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  calculateStandingHeatLoss,
   createThermalFlow,
   thermalFlowValidationMessage
 } from "../../src/core/thermal-flow.js";
@@ -117,32 +116,4 @@ test("component execution reports malformed thermal port flows", () => {
     ["runtime.component-port-flow-contract"]
   );
   assert.match(diagnostics[0].message, /heatFlowkW/u);
-});
-
-test("standing heat loss is bounded by energy available above ambient", () => {
-  assert.deepEqual(calculateStandingHeatLoss({
-    thermalCapacitykWhPerK: 1,
-    heatLossCoefficientkWPerK: 10,
-    temperatureC: 21,
-    ambientTemperatureC: 20,
-    chargeHeatFlowkW: 0,
-    dischargeHeatFlowkW: 0,
-    durationHours: 1
-  }), {
-    unconstrainedHeatLosskW: 10,
-    heatLosskW: 1
-  });
-
-  assert.throws(
-    () => calculateStandingHeatLoss({
-      thermalCapacitykWhPerK: 0,
-      heatLossCoefficientkWPerK: 1,
-      temperatureC: 21,
-      ambientTemperatureC: 20,
-      chargeHeatFlowkW: 0,
-      dischargeHeatFlowkW: 0,
-      durationHours: 1
-    }),
-    /capacity and duration/u
-  );
 });

@@ -4,12 +4,14 @@ import test from "node:test";
 
 import { electricalGridDefinition } from
   "../../src/components/electrical/grid.js";
-import { ambientBoundaryDefinition } from
-  "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from
   "../../src/components/thermal/heat-demand.js";
+import { heatTransferDefinition } from
+  "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
@@ -39,9 +41,10 @@ const [model, scenario, layout, expectedResults] = await Promise.all([
 
 const registry = createComponentRegistry([
   electricalGridDefinition,
-  ambientBoundaryDefinition,
+  constantTemperatureDefinition,
   electricHeaterDefinition,
   heatDemandDefinition,
+  heatTransferDefinition,
   thermalStoreDefinition
 ]);
 const policy = createHeatDemandFollowingPolicy({
@@ -82,6 +85,7 @@ function resultSeries() {
   for (const step of runResult.results.steps) {
     const heater = componentAtStep(step, "heater");
     const store = componentAtStep(step, "store");
+    const heatLoss = componentAtStep(step, "store-loss");
     const demand = componentAtStep(step, "heat-demand");
     series.heaterRequestedPowerkW.push(heater.requestedCommand.powerkW);
     series.heaterElectricalInputPowerkW.push(
@@ -90,7 +94,7 @@ function resultSeries() {
     series.heaterHeatOutputkW.push(heater.outputs.heatOutputkW);
     series.storeChargeHeatFlowkW.push(store.outputs.heatInputkW);
     series.storeDischargeHeatFlowkW.push(store.outputs.heatOutputkW);
-    series.storeHeatLosskW.push(store.outputs.heatLosskW);
+    series.storeHeatLosskW.push(heatLoss.outputs.heatFlowkW);
     series.storeTemperatureC.push(store.outputs.temperatureC);
     series.demandHeatFlowkW.push(demand.outputs.demandHeatFlowkW);
     series.servedHeatFlowkW.push(demand.outputs.servedHeatFlowkW);
@@ -152,12 +156,13 @@ test("coupled thermal example documents are valid and use stable references", ()
   assert.equal(validateLayout(layout, { model }).valid, true);
   assert.deepEqual(
     model.components.map((component) => component.id),
-    ["grid", "heater", "store", "heat-demand", "ambient"]
+    ["grid", "heater", "store", "store-loss", "heat-demand", "ambient"]
   );
   assert.equal(layout.components.length, model.components.length);
   assert.deepEqual(runResult.results.steps[0].resolutionPlan.stages, [
-    ["store"],
-    ["heater", "heat-demand", "ambient"],
+    ["store-loss"],
+    ["store", "ambient"],
+    ["heater", "heat-demand"],
     ["grid"]
   ]);
 });
@@ -241,5 +246,5 @@ test("coupled thermal example exposes equipment and stored-energy limits", () =>
     energyLimitedStore.operatingLimits.maximumHeatOutputkW
   );
   assertClose(componentAtStep(idleStep, "heater").outputs.heatOutputkW, 0);
-  assert.ok(componentAtStep(idleStep, "store").outputs.heatLosskW > 0);
+  assert.ok(componentAtStep(idleStep, "store-loss").outputs.heatFlowkW > 0);
 });

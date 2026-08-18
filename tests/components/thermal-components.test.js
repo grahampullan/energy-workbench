@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ambientBoundaryDefinition } from "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../../src/components/thermal/heat-demand.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
@@ -202,8 +203,8 @@ test("heat demand preparation rejects a scenario series with the wrong unit", ()
   );
 });
 
-test("ambient boundary provides the timestep temperature for rejected heat", () => {
-  const component = preparedComponent(ambientBoundaryDefinition, {
+test("constant-temperature boundary provides its imposed timestep temperature", () => {
+  const component = preparedComponent(constantTemperatureDefinition, {
     parameters: { temperatureSeriesId: "ambient-temperature" },
     scenarioSeries: [series("ambient-temperature", "°C", [15])]
   });
@@ -227,7 +228,10 @@ test("ambient boundary provides the timestep temperature for rejected heat", () 
 
   assert.deepEqual(
     component.definition.model.getOperatingLimits(component, context),
-    { ambientTemperatureC: 15 }
+    {
+      temperatureC: 15,
+      fixedTemperatureBoundary: true
+    }
   );
   assert.deepEqual(evaluation.portFlows["heat-in"]["first-loss"], {
     heatFlowkW: 10,
@@ -240,7 +244,7 @@ test("ambient boundary provides the timestep temperature for rejected heat", () 
     deliveryTemperatureC: 15
   });
   assert.deepEqual(evaluation.outputs, {
-    ambientTemperatureC: 15,
+    temperatureC: 15,
     receivedHeatFlowkW: 15
   });
 });

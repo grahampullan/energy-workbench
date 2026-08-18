@@ -3,12 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
-import { ambientBoundaryDefinition } from
-  "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from
   "../../src/components/thermal/heat-demand.js";
+import { heatTransferDefinition } from
+  "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
@@ -39,9 +41,10 @@ const [model, scenario, expectedResults] = await Promise.all([
 ]);
 const registry = createComponentRegistry([
   electricalGridDefinition,
-  ambientBoundaryDefinition,
+  constantTemperatureDefinition,
   electricHeaterDefinition,
   heatDemandDefinition,
+  heatTransferDefinition,
   thermalStoreDefinition
 ]);
 const run = runScenario({
@@ -122,9 +125,16 @@ test("coupled topology and inspector expose the important thermal results", () =
   });
   const runtimeStep = run.results.steps[stepIndex];
   const store = view.components.find((component) => component.id === "store");
+  const heatLoss = view.components.find(
+    (component) => component.id === "store-loss"
+  );
+  const ambient = view.components.find((component) => component.id === "ambient");
   const demand = view.components.find((component) => component.id === "heat-demand");
   const runtimeStore = runtimeStep.components.find(
     (component) => component.componentId === "store"
+  );
+  const runtimeHeatLoss = runtimeStep.components.find(
+    (component) => component.componentId === "store-loss"
   );
   const runtimeDemand = runtimeStep.components.find(
     (component) => component.componentId === "heat-demand"
@@ -132,6 +142,12 @@ test("coupled topology and inspector expose the important thermal results", () =
 
   assert.equal(store.metric.value, runtimeStore.outputs.temperatureC);
   assert.equal(store.metric.unit, "°C");
+  assert.equal(heatLoss.metric.value, runtimeHeatLoss.outputs.heatFlowkW);
+  assert.equal(heatLoss.metric.unit, "kW");
+  assert.equal(ambient.definitionName, "Constant temperature");
+  assert.equal(ambient.name, "Ambient");
+  assert.equal(ambient.metric.label, "Temperature");
+  assert.equal(ambient.metric.unit, "°C");
   assert.equal(demand.metric.value, runtimeDemand.outputs.unmetHeatFlowkW);
   assert.equal(
     demand.outputFields.find((field) => field.id === "servedHeatFlowkW").value,

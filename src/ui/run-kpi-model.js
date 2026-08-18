@@ -138,7 +138,7 @@ export function createBatchHeatingRunKpis(results) {
       outputSeries(results, "batch", "netEnergyFlowkW")
     ), "kWh"),
     kpi("heat-loss-energy", "Heat loss", integrate(
-      outputSeries(results, "batch", "heatLosskW")
+      outputSeries(results, "batch-loss", "heatFlowkW")
     ), "kWh"),
     kpi("final-batch-temperature", "Final batch temp", finalTemperatureC, "°C"),
     kpi(

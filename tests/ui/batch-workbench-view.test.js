@@ -6,10 +6,12 @@ import { electricalGridDefinition } from
   "../../src/components/electrical/grid.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { ambientBoundaryDefinition } from
-  "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
+import { heatTransferDefinition } from
+  "../../src/components/thermal/heat-transfer.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { createScheduledHeatingPolicy } from
   "../../src/policies/scheduled-heating.js";
@@ -38,8 +40,9 @@ const [model, scenario, expectedResults] = await Promise.all([
 const registry = createComponentRegistry([
   electricalGridDefinition,
   thermalStoreDefinition,
-  ambientBoundaryDefinition,
-  electricHeaterDefinition
+  constantTemperatureDefinition,
+  electricHeaterDefinition,
+  heatTransferDefinition
 ]);
 const policy = createScheduledHeatingPolicy({
   heaterComponentId: "heater",
@@ -133,8 +136,7 @@ test("batch workbench inspector exposes editable model inputs and live results",
     "maximumTemperatureC",
     "minimumUsefulTemperatureC",
     "maximumHeatInputkW",
-    "maximumHeatOutputkW",
-    "heatLossCoefficientkWPerK"
+    "maximumHeatOutputkW"
   ]);
   assert.ok(Object.values(parameters).every((field) => field.editor !== null));
   assert.equal(

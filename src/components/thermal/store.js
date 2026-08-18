@@ -7,10 +7,7 @@ import {
   createMaterialFlow,
   materialEnthalpyFlowkW
 } from "../../core/material-flow.js";
-import {
-  calculateStandingHeatLoss,
-  createThermalFlow
-} from "../../core/thermal-flow.js";
+import { createThermalFlow } from "../../core/thermal-flow.js";
 import {
   resolutionDescription,
   resolutionError
@@ -22,7 +19,8 @@ const COMMAND_FIELDS = new Set([
   "materialOutFlow",
   "heatInFlows",
   "heatOutFlow",
-  "heatLossFlow"
+  "passiveHeatInFlows",
+  "passiveHeatOutFlows"
 ]);
 
 function isRecord(value) {
@@ -100,14 +98,28 @@ function storeTopology(runtimeComponent, context) {
   );
   const heatIn = connectionsForPort(runtimeComponent, context, "heat-in");
   const heatOut = optionalConnection(runtimeComponent, context, "heat-out");
-  const heatLoss = optionalConnection(runtimeComponent, context, "heat-loss");
+  const passiveHeatIn = connectionsForPort(
+    runtimeComponent,
+    context,
+    "passive-heat-in"
+  );
+  const passiveHeatOut = connectionsForPort(
+    runtimeComponent,
+    context,
+    "passive-heat-out"
+  );
 
   if (
     (materialIn && materialIn.to.component !== runtimeComponent) ||
     (materialOut && materialOut.from.component !== runtimeComponent) ||
     heatIn.some((connection) => connection.to.component !== runtimeComponent) ||
     (heatOut && heatOut.from.component !== runtimeComponent) ||
-    (heatLoss && heatLoss.from.component !== runtimeComponent)
+    passiveHeatIn.some(
+      (connection) => connection.to.component !== runtimeComponent
+    ) ||
+    passiveHeatOut.some(
+      (connection) => connection.from.component !== runtimeComponent
+    )
   ) {
     throw resolutionError(
       "runtime.unsupported-thermal-store-topology",
@@ -115,17 +127,14 @@ function storeTopology(runtimeComponent, context) {
     );
   }
 
-  if (
-    runtimeComponent.parameters.heatLossCoefficientkWPerK > 0 &&
-    heatLoss === null
-  ) {
-    throw resolutionError(
-      "runtime.thermal-store-missing-heat-loss-connection",
-      `${runtimeComponent.id}.heat-loss must be connected when its heat-loss coefficient is positive`
-    );
-  }
-
-  return { materialIn, materialOut, heatIn, heatOut, heatLoss };
+  return {
+    materialIn,
+    materialOut,
+    heatIn,
+    heatOut,
+    passiveHeatIn,
+    passiveHeatOut
+  };
 }
 
 function finiteCapability(limits, field, { positive = false } = {}) {
@@ -237,23 +246,38 @@ function resolveHeatOutput(runtimeComponent, context, connection) {
   });
 }
 
-function ambientTemperature(runtimeComponent, context, connection) {
-  if (!connection) {
-    return context.operatingLimits.temperatureC;
+function settledThermalFlows(context, connections) {
+  const flows = {};
+  for (const connection of connections) {
+    const flow = context.getConnectionFlow(connection.id);
+    if (flow === undefined) {
+      return null;
+    }
+    flows[connection.id] = createThermalFlow(flow);
   }
-  const ambient = otherComponent(runtimeComponent, connection);
-  const temperatureC = context.getOperatingLimits(ambient.id)?.ambientTemperatureC;
-  if (!Number.isFinite(temperatureC)) {
-    throw resolutionError(
-      "runtime.thermal-capability-contract",
-      "Thermal capability ambientTemperatureC is missing or invalid"
-    );
-  }
-  return temperatureC;
+  return flows;
+}
+
+function sumHeatFlowkW(flows) {
+  return Object.values(flows).reduce(
+    (total, flow) => total + flow.heatFlowkW,
+    0
+  );
 }
 
 function resolveStore(runtimeComponent, context, stepContext) {
   const topology = storeTopology(runtimeComponent, context);
+  const passiveHeatInFlows = settledThermalFlows(
+    context,
+    topology.passiveHeatIn
+  );
+  const passiveHeatOutFlows = settledThermalFlows(
+    context,
+    topology.passiveHeatOut
+  );
+  if (passiveHeatInFlows === null || passiveHeatOutFlows === null) {
+    return null;
+  }
   const currentSpecificEnthalpy = context.operatingLimits.specificEnthalpyKjPerKg;
   const materialInFlow = topology.materialIn
     ? context.getConnectionFlow(topology.materialIn.id)
@@ -275,11 +299,6 @@ function resolveStore(runtimeComponent, context, stepContext) {
     context,
     topology.heatOut
   );
-  const ambientTemperatureC = ambientTemperature(
-    runtimeComponent,
-    context,
-    topology.heatLoss
-  );
   const requestedInputs = requestedHeatInputs(
     runtimeComponent,
     context,
@@ -289,12 +308,8 @@ function resolveStore(runtimeComponent, context, stepContext) {
     (total, input) => total + input.requestedHeatFlowkW,
     0
   );
-  const capacity = context.operatingLimits.thermalCapacitykWhPerK;
-  const temperatureC = context.operatingLimits.temperatureC;
-  const unconstrainedHeatLosskW = capacity > 0 && topology.heatLoss
-    ? runtimeComponent.parameters.heatLossCoefficientkWPerK *
-      Math.max(0, temperatureC - ambientTemperatureC)
-    : 0;
+  const passiveHeatInputkW = sumHeatFlowkW(passiveHeatInFlows);
+  const passiveHeatOutputkW = sumHeatFlowkW(passiveHeatOutFlows);
   const nextMassKg = context.operatingLimits.containedMassKg +
     (checkedMaterialInFlow.massFlowKgPerSecond - massOutflowKgPerSecond) *
       stepContext.timeStepSeconds;
@@ -305,8 +320,9 @@ function resolveStore(runtimeComponent, context, stepContext) {
     (
       enthalpyInflowkW -
       enthalpyOutflowkW -
-      heatOutFlow.heatFlowkW -
-      unconstrainedHeatLosskW
+      heatOutFlow.heatFlowkW +
+      passiveHeatInputkW -
+      passiveHeatOutputkW
     ) * stepContext.durationHours;
   const maximumHeatInputForTemperature = (temperatureLimitC) => Math.max(
     0,
@@ -347,29 +363,13 @@ function resolveStore(runtimeComponent, context, stepContext) {
     allocatedHeatInputkW += heatFlowkW;
     remainingHeatInputkW -= heatFlowkW;
   }
-  const heatLosskW = capacity > 0 && topology.heatLoss
-    ? calculateStandingHeatLoss({
-        thermalCapacitykWhPerK: capacity,
-        heatLossCoefficientkWPerK:
-          runtimeComponent.parameters.heatLossCoefficientkWPerK,
-        temperatureC,
-        ambientTemperatureC,
-        chargeHeatFlowkW: allocatedHeatInputkW,
-        dischargeHeatFlowkW: heatOutFlow.heatFlowkW,
-        durationHours: stepContext.durationHours
-      }).heatLosskW
-    : 0;
-  const heatLossFlow = createThermalFlow({
-    heatFlowkW: heatLosskW,
-    sourceTemperatureC: temperatureC,
-    deliveryTemperatureC: ambientTemperatureC
-  });
   const command = {
     materialInFlow: checkedMaterialInFlow,
     materialOutFlow,
     heatInFlows,
     heatOutFlow,
-    heatLossFlow
+    passiveHeatInFlows,
+    passiveHeatOutFlows
   };
   const connectionFlows = Object.fromEntries([
     ...(topology.materialOut
@@ -379,8 +379,7 @@ function resolveStore(runtimeComponent, context, stepContext) {
       connection.id,
       heatInFlows[connection.id]
     ]),
-    ...(topology.heatOut ? [[topology.heatOut.id, heatOutFlow]] : []),
-    ...(topology.heatLoss ? [[topology.heatLoss.id, heatLossFlow]] : [])
+    ...(topology.heatOut ? [[topology.heatOut.id, heatOutFlow]] : [])
   ]);
   return {
     feasibleCommand: topology.materialOut
@@ -399,7 +398,9 @@ function requireCommand(command) {
   if (
     fields.length !== COMMAND_FIELDS.size ||
     fields.some((field) => !COMMAND_FIELDS.has(field)) ||
-    !isRecord(command.heatInFlows)
+    !isRecord(command.heatInFlows) ||
+    !isRecord(command.passiveHeatInFlows) ||
+    !isRecord(command.passiveHeatOutFlows)
   ) {
     throw new TypeError(
       "Thermal-store command must contain exactly its material and heat flows"
@@ -409,7 +410,7 @@ function requireCommand(command) {
 
 export const thermalStoreDefinition = {
   type: "thermal.store",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Thermal store",
 
   parameters: {
@@ -442,12 +443,6 @@ export const thermalStoreDefinition = {
       default: 0,
       hardBounds: { minimum: ABSOLUTE_ZERO_C },
       editor: { minimum: -50, maximum: 1800, step: 1 }
-    },
-    heatLossCoefficientkWPerK: {
-      unit: "kW/K",
-      default: 0,
-      hardBounds: { minimum: 0 },
-      editor: { minimum: 0, maximum: 10, step: 0.01 }
     },
     maximumHeatInputkW: {
       unit: "kW",
@@ -491,9 +486,16 @@ export const thermalStoreDefinition = {
       direction: "out"
     },
     {
-      id: "heat-loss",
+      id: "passive-heat-in",
       flowType: THERMAL_HEAT_FLOW_TYPE,
-      direction: "out"
+      direction: "in",
+      cardinality: "many"
+    },
+    {
+      id: "passive-heat-out",
+      flowType: THERMAL_HEAT_FLOW_TYPE,
+      direction: "out",
+      cardinality: "many"
     }
   ],
 
@@ -504,7 +506,8 @@ export const thermalStoreDefinition = {
     enthalpyOutflowkW: { unit: "kW" },
     heatInputkW: { unit: "kW" },
     heatOutputkW: { unit: "kW" },
-    heatLosskW: { unit: "kW" },
+    passiveHeatInputkW: { unit: "kW" },
+    passiveHeatOutputkW: { unit: "kW" },
     netEnergyFlowkW: { unit: "kW" },
     containedMassKg: { unit: "kg" },
     containedEnthalpykWh: { unit: "kWh" },
@@ -538,8 +541,7 @@ export const thermalStoreDefinition = {
         label: "Heat transfer",
         parameters: [
           "maximumHeatInputkW",
-          "maximumHeatOutputkW",
-          "heatLossCoefficientkWPerK"
+          "maximumHeatOutputkW"
         ]
       }
     ]
@@ -613,11 +615,6 @@ export const thermalStoreDefinition = {
     }
     for (const [field, code, label] of [
       [
-        "heatLossCoefficientkWPerK",
-        "thermal.store.heat-loss-coefficient",
-        "Heat-loss coefficient"
-      ],
-      [
         "maximumHeatInputkW",
         "thermal.store.maximum-heat-input",
         "Maximum heat input"
@@ -689,12 +686,15 @@ export const thermalStoreDefinition = {
       }
       return resolutionDescription({
         targets: [...targets],
-        connectionFlows: topology.materialIn ? [topology.materialIn.id] : [],
+        connectionFlows: [
+          ...(topology.materialIn ? [topology.materialIn.id] : []),
+          ...topology.passiveHeatIn.map((connection) => connection.id),
+          ...topology.passiveHeatOut.map((connection) => connection.id)
+        ],
         determines: [
           ...(topology.materialOut ? [topology.materialOut.id] : []),
           ...topology.heatIn.map((connection) => connection.id),
-          ...(topology.heatOut ? [topology.heatOut.id] : []),
-          ...(topology.heatLoss ? [topology.heatLoss.id] : [])
+          ...(topology.heatOut ? [topology.heatOut.id] : [])
         ]
       });
     }
@@ -730,10 +730,7 @@ export const thermalStoreDefinition = {
         containedEnthalpykWh: stepContext.state.containedEnthalpykWh,
         specificEnthalpyKjPerKg: specificEnthalpyKjPerKg(stepContext.state),
         temperatureC,
-        sourceTemperatureC: temperatureC,
         thermalCapacitykWhPerK: capacity,
-        heatLossCoefficientkWPerK:
-          runtimeComponent.parameters.heatLossCoefficientkWPerK,
         minimumUsefulTemperatureC:
           runtimeComponent.parameters.minimumUsefulTemperatureC,
         maximumTemperatureC: runtimeComponent.parameters.maximumTemperatureC
@@ -755,13 +752,25 @@ export const thermalStoreDefinition = {
         createThermalFlow(flow)
       ]));
       const heatOutFlow = createThermalFlow(actualCommand.heatOutFlow);
-      const heatLossFlow = createThermalFlow(actualCommand.heatLossFlow);
+      const passiveHeatInFlows = Object.fromEntries(Object.entries(
+        actualCommand.passiveHeatInFlows
+      ).map(([connectionId, flow]) => [
+        connectionId,
+        createThermalFlow(flow)
+      ]));
+      const passiveHeatOutFlows = Object.fromEntries(Object.entries(
+        actualCommand.passiveHeatOutFlows
+      ).map(([connectionId, flow]) => [
+        connectionId,
+        createThermalFlow(flow)
+      ]));
       const heatInputkW = Object.values(heatInFlows).reduce(
         (total, flow) => total + flow.heatFlowkW,
         0
       );
       const heatOutputkW = heatOutFlow.heatFlowkW;
-      const heatLosskW = heatLossFlow.heatFlowkW;
+      const passiveHeatInputkW = sumHeatFlowkW(passiveHeatInFlows);
+      const passiveHeatOutputkW = sumHeatFlowkW(passiveHeatOutFlows);
       const currentTemperatureC = storeTemperatureC(
         runtimeComponent,
         stepContext.state
@@ -795,11 +804,24 @@ export const thermalStoreDefinition = {
       }
       for (const [label, flow] of [
         ["heat output", heatOutFlow],
-        ["heat loss", heatLossFlow]
+        ...Object.values(passiveHeatOutFlows).map((flow) => [
+          "passive heat output",
+          flow
+        ])
       ]) {
         if (Math.abs(flow.sourceTemperatureC - currentTemperatureC) > TOLERANCE) {
           throw new RangeError(
             `Thermal-store ${label} must use the store source temperature`
+          );
+        }
+      }
+      for (const flow of Object.values(passiveHeatInFlows)) {
+        if (
+          Math.abs(flow.deliveryTemperatureC - currentTemperatureC) >
+            TOLERANCE
+        ) {
+          throw new RangeError(
+            "Thermal-store passive heat input must use the store delivery temperature"
           );
         }
       }
@@ -812,24 +834,6 @@ export const thermalStoreDefinition = {
             "Positive store heating requires delivery temperature at least as high as the store temperature"
           );
         }
-      }
-      const expectedHeatLosskW = operatingLimits.thermalCapacitykWhPerK > 0
-        ? calculateStandingHeatLoss({
-            thermalCapacitykWhPerK:
-              operatingLimits.thermalCapacitykWhPerK,
-            heatLossCoefficientkWPerK:
-              runtimeComponent.parameters.heatLossCoefficientkWPerK,
-            temperatureC: currentTemperatureC,
-            ambientTemperatureC: heatLossFlow.deliveryTemperatureC,
-            chargeHeatFlowkW: heatInputkW,
-            dischargeHeatFlowkW: heatOutputkW,
-            durationHours: stepContext.durationHours
-          }).heatLosskW
-        : 0;
-      if (Math.abs(heatLosskW - expectedHeatLosskW) > TOLERANCE) {
-        throw new RangeError(
-          "Thermal-store heat loss does not match its governing heat-loss equation"
-        );
       }
       const enthalpyInflowkW = materialEnthalpyFlowkW(materialInFlow);
       const enthalpyOutflowkW = materialEnthalpyFlowkW(materialOutFlow);
@@ -844,7 +848,8 @@ export const thermalStoreDefinition = {
         heatInputkW -
         enthalpyOutflowkW -
         heatOutputkW -
-        heatLosskW;
+        passiveHeatOutputkW +
+        passiveHeatInputkW;
       const nextEnthalpykWh = normaliseZero(
         stepContext.state.containedEnthalpykWh +
           netEnergyFlowkW * stepContext.durationHours
@@ -903,7 +908,8 @@ export const thermalStoreDefinition = {
           "material-out": materialOutFlow,
           "heat-in": heatInFlows,
           "heat-out": heatOutFlow,
-          "heat-loss": heatLossFlow
+          "passive-heat-in": passiveHeatInFlows,
+          "passive-heat-out": passiveHeatOutFlows
         },
         outputs: {
           massInflowKgPerSecond: materialInFlow.massFlowKgPerSecond,
@@ -912,7 +918,8 @@ export const thermalStoreDefinition = {
           enthalpyOutflowkW,
           heatInputkW,
           heatOutputkW,
-          heatLosskW,
+          passiveHeatInputkW,
+          passiveHeatOutputkW,
           netEnergyFlowkW,
           containedMassKg: nextMassKg,
           containedEnthalpykWh: nextEnthalpykWh,

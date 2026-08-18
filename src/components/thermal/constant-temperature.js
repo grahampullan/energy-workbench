@@ -12,23 +12,23 @@ function isRecord(value) {
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
     ? component.parameters[parameter]
-    : ambientBoundaryDefinition.parameters[parameter].default;
+    : constantTemperatureDefinition.parameters[parameter].default;
 }
 
-function ambientTemperatureC(runtimeComponent, stepContext) {
-  const temperature = stepContext.seriesValues[
+function boundaryTemperatureC(runtimeComponent, stepContext) {
+  const temperatureC = stepContext.seriesValues[
     runtimeComponent.modelData.temperatureSeriesId
   ];
-  if (!Number.isFinite(temperature) || temperature < ABSOLUTE_ZERO_C) {
+  if (!Number.isFinite(temperatureC) || temperatureC < ABSOLUTE_ZERO_C) {
     throw new RangeError(
-      "Ambient temperature must be finite and no lower than absolute zero"
+      "Constant temperature must be finite and no lower than absolute zero"
     );
   }
-  return temperature;
+  return temperatureC;
 }
 
-function ambientConnectionFlows(context) {
-  const ambientTemperatureC = context.operatingLimits.ambientTemperatureC;
+function resolvedConnectionFlows(context) {
+  const temperatureC = context.operatingLimits.temperatureC;
   const connectionFlows = {};
   for (const connection of context.connections) {
     const flow = context.getConnectionFlow(connection.id);
@@ -38,7 +38,7 @@ function ambientConnectionFlows(context) {
     connectionFlows[connection.id] = createThermalFlow({
       heatFlowkW: flow.heatFlowkW,
       sourceTemperatureC: flow.sourceTemperatureC,
-      deliveryTemperatureC: ambientTemperatureC
+      deliveryTemperatureC: temperatureC
     });
   }
   return connectionFlows;
@@ -51,7 +51,7 @@ function evaluatedConnectionFlows(actualCommand, temperatureC) {
     !isRecord(actualCommand.connectionFlows)
   ) {
     throw new TypeError(
-      "Ambient-boundary command must contain exactly its connection flows"
+      "Constant-temperature command must contain exactly its connection flows"
     );
   }
   return Object.fromEntries(Object.entries(actualCommand.connectionFlows).map(
@@ -63,10 +63,10 @@ function evaluatedConnectionFlows(actualCommand, temperatureC) {
   ));
 }
 
-export const ambientBoundaryDefinition = {
-  type: "thermal.ambient-boundary",
-  version: "0.3.0",
-  name: "Ambient boundary",
+export const constantTemperatureDefinition = {
+  type: "thermal.constant-temperature",
+  version: "0.1.0",
+  name: "Constant temperature",
 
   parameters: {
     temperatureSeriesId: {
@@ -85,11 +85,12 @@ export const ambientBoundaryDefinition = {
   }],
 
   outputs: {
-    ambientTemperatureC: { unit: "°C" },
+    temperatureC: { unit: "°C" },
     receivedHeatFlowkW: { unit: "kW" }
   },
 
   editor: {
+    summaryOutput: "temperatureC",
     groups: [{
       id: "boundary",
       label: "Boundary",
@@ -98,10 +99,16 @@ export const ambientBoundaryDefinition = {
   },
 
   validate(modelComponent) {
-    const temperatureSeriesId = parameterValue(modelComponent, "temperatureSeriesId");
-    if (typeof temperatureSeriesId !== "string" || temperatureSeriesId.length === 0) {
+    const temperatureSeriesId = parameterValue(
+      modelComponent,
+      "temperatureSeriesId"
+    );
+    if (
+      typeof temperatureSeriesId !== "string" ||
+      temperatureSeriesId.length === 0
+    ) {
       return [{
-        code: "thermal.ambient-boundary.temperature-series-id",
+        code: "thermal.constant-temperature.temperature-series-id",
         message: "temperatureSeriesId must be a non-empty scenario series ID"
       }];
     }
@@ -138,11 +145,14 @@ export const ambientBoundaryDefinition = {
     },
 
     getOperatingLimits(runtimeComponent, stepContext) {
-      return { ambientTemperatureC: ambientTemperatureC(runtimeComponent, stepContext) };
+      return {
+        temperatureC: boundaryTemperatureC(runtimeComponent, stepContext),
+        fixedTemperatureBoundary: true
+      };
     },
 
     resolve(runtimeComponent, context) {
-      const connectionFlows = ambientConnectionFlows(context);
+      const connectionFlows = resolvedConnectionFlows(context);
       if (connectionFlows === null) {
         return null;
       }
@@ -154,12 +164,15 @@ export const ambientBoundaryDefinition = {
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
-      const temperatureC = ambientTemperatureC(runtimeComponent, stepContext);
-      const connectionFlows = evaluatedConnectionFlows(actualCommand, temperatureC);
+      const temperatureC = boundaryTemperatureC(runtimeComponent, stepContext);
+      const connectionFlows = evaluatedConnectionFlows(
+        actualCommand,
+        temperatureC
+      );
       return {
         portFlows: { "heat-in": connectionFlows },
         outputs: {
-          ambientTemperatureC: temperatureC,
+          temperatureC,
           receivedHeatFlowkW: Object.values(connectionFlows).reduce(
             (total, flow) => total + flow.heatFlowkW,
             0

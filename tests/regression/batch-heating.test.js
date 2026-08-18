@@ -6,10 +6,12 @@ import { electricalGridDefinition } from
   "../../src/components/electrical/grid.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { ambientBoundaryDefinition } from
-  "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
+import { heatTransferDefinition } from
+  "../../src/components/thermal/heat-transfer.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
@@ -41,8 +43,9 @@ const [model, scenario, layout, expectedResults] = await Promise.all([
 const registry = createComponentRegistry([
   electricalGridDefinition,
   thermalStoreDefinition,
-  ambientBoundaryDefinition,
-  electricHeaterDefinition
+  constantTemperatureDefinition,
+  electricHeaterDefinition,
+  heatTransferDefinition
 ]);
 const policy = createScheduledHeatingPolicy({
   heaterComponentId: "heater",
@@ -81,13 +84,14 @@ function resultSeries() {
   for (const step of runResult.results.steps) {
     const heater = componentAtStep(step, "heater");
     const batch = componentAtStep(step, "batch");
+    const heatLoss = componentAtStep(step, "batch-loss");
     series.heaterRequestedPowerkW.push(heater.requestedCommand.powerkW);
     series.heaterElectricalInputPowerkW.push(
       heater.outputs.electricalInputPowerkW
     );
     series.heaterHeatOutputkW.push(heater.outputs.heatOutputkW);
     series.batchHeatInputkW.push(batch.outputs.heatInputkW);
-    series.batchHeatLosskW.push(batch.outputs.heatLosskW);
+    series.batchHeatLosskW.push(heatLoss.outputs.heatFlowkW);
     series.batchTemperatureC.push(batch.outputs.temperatureC);
     series.requiredTemperatureMarginK.push(
       batch.outputs.temperatureMarginK
@@ -146,12 +150,13 @@ test("batch-heating example documents are valid and use stable references", () =
   assert.equal(validateLayout(layout, { model }).valid, true);
   assert.deepEqual(
     model.components.map((component) => component.id),
-    ["grid", "heater", "batch", "ambient"]
+    ["grid", "heater", "batch", "batch-loss", "ambient"]
   );
   assert.equal(layout.components.length, model.components.length);
   assert.deepEqual(runResult.results.steps[0].resolutionPlan.stages, [
-    ["batch"],
-    ["heater", "ambient"],
+    ["batch-loss"],
+    ["batch", "ambient"],
+    ["heater"],
     ["grid"]
   ]);
 });

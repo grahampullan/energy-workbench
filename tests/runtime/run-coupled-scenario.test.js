@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
-import { ambientBoundaryDefinition } from "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../../src/components/thermal/heat-demand.js";
+import { heatTransferDefinition } from
+  "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from "../../src/components/thermal/store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { createHeatDemandFollowingPolicy } from
@@ -22,7 +25,7 @@ function createFixture({
   storeInitialTemperatureC = 80,
   storeMaximumTemperatureC = 100,
   storeMinimumUsefulTemperatureC = 70,
-  storeHeatLossCoefficientkWPerK = 0,
+  heatTransferConductancekWPerK = 0,
   demandDefinition = heatDemandDefinition,
   policy = createHeatDemandFollowingPolicy({
     heaterComponentId: "heater",
@@ -70,7 +73,6 @@ function createFixture({
             enthalpyReferenceTemperatureC: 0,
             maximumTemperatureC: storeMaximumTemperatureC,
             minimumUsefulTemperatureC: storeMinimumUsefulTemperatureC,
-            heatLossCoefficientkWPerK: storeHeatLossCoefficientkWPerK,
             maximumHeatInputkW: 100,
             maximumHeatOutputkW: 100
           },
@@ -93,10 +95,20 @@ function createFixture({
         },
         {
           id: "ambient",
-          type: ambientBoundaryDefinition.type,
-          definitionVersion: ambientBoundaryDefinition.version,
+          type: constantTemperatureDefinition.type,
+          definitionVersion: constantTemperatureDefinition.version,
           name: "Ambient",
           parameters: { temperatureSeriesId: "ambient-temperature" },
+          initialState: {}
+        },
+        {
+          id: "store-loss",
+          type: heatTransferDefinition.type,
+          definitionVersion: heatTransferDefinition.version,
+          name: "Store heat loss",
+          parameters: {
+            conductancekWPerK: heatTransferConductancekWPerK
+          },
           initialState: {}
         }
       ],
@@ -120,9 +132,15 @@ function createFixture({
           to: { componentId: "heat-demand", portId: "heat-in" }
         },
         {
+          id: "store-to-loss",
+          name: "Store to heat transfer",
+          from: { componentId: "store", portId: "passive-heat-out" },
+          to: { componentId: "store-loss", portId: "source" }
+        },
+        {
           id: "store-to-ambient",
-          name: "Store to ambient",
-          from: { componentId: "store", portId: "heat-loss" },
+          name: "Heat transfer to ambient",
+          from: { componentId: "store-loss", portId: "sink" },
           to: { componentId: "ambient", portId: "heat-in" }
         }
       ]
@@ -150,9 +168,10 @@ function createFixture({
     policy,
     registry: createComponentRegistry([
       electricalGridDefinition,
-      ambientBoundaryDefinition,
+      constantTemperatureDefinition,
       electricHeaterDefinition,
       demandDefinition,
+      heatTransferDefinition,
       thermalStoreDefinition
     ])
   };
@@ -177,7 +196,7 @@ test("coupled runtime follows demand and balances electrical and thermal connect
   assert.deepEqual(fixture.model, originalModel);
   assert.deepEqual(fixture.scenario, originalScenario);
   const step = result.results.steps[0];
-  const [grid, heater, store, demand, ambient] = step.components;
+  const [grid, heater, store, demand, ambient, heatTransfer] = step.components;
 
   assert.deepEqual(heater.requestedCommand, { powerkW: -10 });
   assert.deepEqual(heater.feasibleCommand, {
@@ -218,7 +237,22 @@ test("coupled runtime follows demand and balances electrical and thermal connect
       sourceTemperatureC: 80,
       deliveryTemperatureC: 80
     },
-    heatLossFlow: {
+    passiveHeatInFlows: {},
+    passiveHeatOutFlows: {
+      "store-to-loss": {
+        heatFlowkW: 0,
+        sourceTemperatureC: 80,
+        deliveryTemperatureC: 80
+      }
+    }
+  });
+  assert.deepEqual(heatTransfer.actualCommand, {
+    sourceFlow: {
+      heatFlowkW: 0,
+      sourceTemperatureC: 80,
+      deliveryTemperatureC: 80
+    },
+    sinkFlow: {
       heatFlowkW: 0,
       sourceTemperatureC: 80,
       deliveryTemperatureC: 20
@@ -231,7 +265,8 @@ test("coupled runtime follows demand and balances electrical and thermal connect
     enthalpyOutflowkW: 0,
     heatInputkW: 10,
     heatOutputkW: 10,
-    heatLosskW: 0,
+    passiveHeatInputkW: 0,
+    passiveHeatOutputkW: 0,
     netEnergyFlowkW: 0,
     containedMassKg: 1000,
     containedEnthalpykWh: 80,
@@ -264,6 +299,15 @@ test("coupled runtime follows demand and balances electrical and thermal connect
       flowType: "thermal.heat-flow",
       flow: {
         heatFlowkW: 10,
+        sourceTemperatureC: 80,
+        deliveryTemperatureC: 80
+      }
+    },
+    {
+      connectionId: "store-to-loss",
+      flowType: "thermal.heat-flow",
+      flow: {
+        heatFlowkW: 0,
         sourceTemperatureC: 80,
         deliveryTemperatureC: 80
       }
@@ -302,10 +346,10 @@ test("coupled runtime reports unmet heat until the store reaches useful temperat
   assert.equal(second.components[3].outputs.unmetHeatFlowkW, 5);
 });
 
-test("coupled runtime allocates standing loss and conserves store energy", () => {
+test("heat transfer determines standing loss and the store conserves energy", () => {
   const result = runScenario(createFixture({
     demandValues: [4],
-    storeHeatLossCoefficientkWPerK: 0.1
+    heatTransferConductancekWPerK: 0.1
   }));
 
   assert.equal(result.completed, true);
@@ -313,11 +357,13 @@ test("coupled runtime allocates standing loss and conserves store energy", () =>
   const store = step.components[2];
   assert.equal(store.actualCommand.heatInFlows["heater-to-store"].heatFlowkW, 4);
   assert.equal(store.actualCommand.heatOutFlow.heatFlowkW, 4);
-  assert.equal(store.outputs.heatLosskW, 6);
+  assert.equal(store.outputs.passiveHeatOutputkW, 6);
   assert.equal(store.outputs.netEnergyFlowkW, -6);
   assertClose(store.outputs.temperatureC, 74);
   assert.equal(step.components[4].outputs.receivedHeatFlowkW, 6);
+  assert.equal(step.components[5].outputs.heatFlowkW, 6);
   assert.equal(step.connections[3].flow.heatFlowkW, 6);
+  assert.equal(step.connections[4].flow.heatFlowkW, 6);
 });
 
 test("heat-demand-following policy converts requested heat through heater efficiency", () => {
@@ -385,29 +431,34 @@ test("coupled runtime preserves electrical grid infeasibility", () => {
   assert.ok(diagnosticCodes(result).includes("runtime.electrical-balance-infeasible"));
 });
 
-test("thermal-store material and loss ports are optional", () => {
+test("thermal-store material and passive heat ports are optional", () => {
   const fixture = createFixture();
   fixture.model.connections = fixture.model.connections.filter(
-    (connection) => connection.id !== "store-to-ambient"
+    (connection) => !["store-to-loss", "store-to-ambient"].includes(
+      connection.id
+    )
+  );
+  fixture.model.components = fixture.model.components.filter(
+    (component) => component.id !== "store-loss"
   );
   const result = runScenario(fixture);
 
   assert.equal(result.completed, true);
   assert.ok(result.results.steps.every((step) =>
-    step.components[2].outputs.heatLosskW === 0
+    step.components[2].outputs.passiveHeatOutputkW === 0
   ));
 });
 
-test("a positive store heat-loss coefficient requires a heat-loss connection", () => {
-  const fixture = createFixture({ storeHeatLossCoefficientkWPerK: 0.1 });
+test("heat transfer requires both of its visible boundary connections", () => {
+  const fixture = createFixture({ heatTransferConductancekWPerK: 0.1 });
   fixture.model.connections = fixture.model.connections.filter(
-    (connection) => connection.id !== "store-to-ambient"
+    (connection) => connection.id !== "store-to-loss"
   );
   const result = runScenario(fixture);
 
   assert.equal(result.completed, false);
   assert.ok(diagnosticCodes(result).includes(
-    "runtime.thermal-store-missing-heat-loss-connection"
+    "runtime.component-connection-count"
   ));
 });
 

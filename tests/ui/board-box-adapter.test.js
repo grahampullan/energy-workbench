@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { connectionGeometry } from "../../src/ui/topology-geometry.js";
 
-test("heat-loss connections enter a wide lower ambient boundary vertically", () => {
+test("heat-loss connections enter a wide lower temperature boundary vertically", () => {
   const boxes = new Map([
     ["burner", { x: 40, y: 20, width: 100, height: 80 }],
     ["metal", { x: 240, y: 20, width: 100, height: 80 }],

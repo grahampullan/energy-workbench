@@ -246,7 +246,7 @@ export function createTopologyBoard({
 
   const boxesByComponentId = new Map();
   const verticalBoundaryComponentIds = new Set(model.components
-    .filter(({ type }) => type === "thermal.ambient-boundary")
+    .filter(({ type }) => type === "thermal.constant-temperature")
     .map(({ id }) => id));
   const connectionRenderer = createFrameRenderer({
     render() {

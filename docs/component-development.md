@@ -261,11 +261,13 @@ to heat it, and the demand reports heat below its minimum delivery temperature
 as unmet. Thermal connections do not infer mass flow, pressure, mixing, or pipe
 delay.
 
-The ambient boundary exposes one repeatable incoming `heat-in` port. Every
-physical loss connection references that port but retains its own settled
-thermal flow and endpoint balance check; the ambient component reports their
-sum as `receivedHeatFlowkW`. Do not add an aggregation component solely to
-combine heat losses before the ambient boundary.
+The constant-temperature component exposes one repeatable incoming `heat-in`
+port. Every physical loss connection references that port but retains its own
+settled thermal flow and endpoint balance check; the boundary reports their sum
+as `receivedHeatFlowkW`. Its prescribed temperature may vary between timesteps,
+but received heat does not change it. Use an instance named “Ambient” for the
+environment. Do not add an aggregation component solely to combine heat losses
+before this boundary.
 
 ### Material mass and enthalpy flow
 
@@ -285,11 +287,11 @@ transported enthalpy rate is
 temperature on this connection or infer composition, pressure, phase, or
 mixing in generic connection execution.
 
-`thermal.store` has optional `material-in` and `material-out` ports, a
-repeatable `heat-in` port, and optional `heat-out` and `heat-loss` ports. The
-ports always exist; their connections determine whether an instance is a
-closed fixed-mass thermal body or a flowing material inventory. Do not add an
-equipment-specific mode flag.
+`thermal.store` has optional `material-in` and `material-out` ports, repeatable
+`heat-in`, `passive-heat-in`, and `passive-heat-out` ports, and an optional
+`heat-out` port. The ports always exist; their connections determine whether an
+instance is a closed fixed-mass thermal body or a flowing material inventory.
+Do not add an equipment-specific mode flag.
 
 The store keeps only mass and contained enthalpy as state. It derives
 temperature using constant specific heat capacity and an enthalpy-reference
@@ -300,14 +302,27 @@ temperature. Its explicit update is:
 ```text
 massNext = mass + (massIn - massOut) * dtSeconds
 enthalpyNext = enthalpy
-             + (enthalpyIn + heatIn
-                - enthalpyOut - heatOut - heatLoss) * durationHours
-Qloss = UA * max(0, T - Tambient)
+             + (enthalpyIn + activeHeatIn + passiveHeatIn
+                - enthalpyOut - activeHeatOut - passiveHeatOut)
+               * durationHours
 ```
 
-Over a coarse timestep, loss is capped at the energy available above ambient so
-standing loss alone cannot cool the store through the ambient boundary. A
-positive heat-loss coefficient requires a visible heat-loss connection.
+`thermal.heat-transfer` owns passive temperature-driven transfer between two
+visible boundaries:
+
+```text
+Q = K * max(0, Tsource - Tsink)
+```
+
+It requires one source connection and one sink connection. A finite source or
+sink publishes current temperature and thermal capacity; a fixed-temperature
+boundary publishes that role explicitly. Over a coarse timestep, transfer is
+capped at finite-body equilibrium and at the sink maximum temperature. Connect
+a store's `passive-heat-out` to the transfer's `source`, then connect the
+transfer's `sink` to another store's `passive-heat-in` or to a
+constant-temperature boundary. The store
+accounts for settled passive heat but does not calculate `K * ΔT`.
+
 The current definition represents one well-mixed material with constant
 specific heat capacity and no phase change or stratification. An equipment
 name such as “hot-water tank”, “refractory”, or “molten-metal inventory” belongs
@@ -320,7 +335,7 @@ The Push 1B reference model is:
 ```text
 grid -> electric heater -> thermal store (hot-water instance) -> heat demand
                            |
-                           +-> ambient boundary
+                           +-> heat transfer -> constant temperature (“Ambient”)
 ```
 
 `createHeatDemandFollowingPolicy({ heaterComponentId, demandComponentId,
@@ -328,14 +343,16 @@ balancingComponentId })`
 requests heater electrical input from the current heat demand and the heater's
 declared conversion. Component resolution then follows the visible topology:
 
-1. the store jointly settles charge, useful discharge, temperature limits, and
-   standing loss;
-2. the heater applies its conversion equation to the accepted heat flow;
-3. the policy-selected grid checks and accepts the heater's electrical flow.
+1. the heat-transfer component settles passive source and sink flows from the
+   current store and prescribed Ambient temperatures;
+2. the store settles charge, useful discharge, and temperature limits while
+   accounting for the settled passive flow;
+3. the heater applies its conversion equation to the accepted heat flow;
+4. the policy-selected grid checks and accepts the heater's electrical flow.
 
 The heater's requested command is `{ powerkW }`. Its feasible and actual
 commands also contain `heatOutputkW`, making the cross-domain allocation
-explicit. Store, demand, and ambient operation follows their component-owned
+explicit. Store, demand, and constant-temperature operation follows their component-owned
 equations. Every thermal
 connection is checked for matching heat rate, source temperature, and delivery
 temperature before state is committed.

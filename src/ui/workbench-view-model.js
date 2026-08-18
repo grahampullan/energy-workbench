@@ -209,7 +209,7 @@ function primaryMetric(definition, componentResult) {
     const value = componentResult.outputs[summaryOutputId];
     const unit = definition.outputs[summaryOutputId]?.unit ?? "";
     return {
-      label: formatFieldLabel(summaryOutputId),
+      label: fieldLabel(summaryOutputId, definition.outputs[summaryOutputId]),
       value,
       unit,
       displayValue: formatEngineeringValue(value, unit)
@@ -225,7 +225,7 @@ function primaryMetric(definition, componentResult) {
   const [outputId, value] = firstNumericOutput;
   const unit = definition.outputs[outputId]?.unit ?? "";
   return {
-    label: formatFieldLabel(outputId),
+    label: fieldLabel(outputId, definition.outputs[outputId]),
     value,
     unit,
     displayValue: formatEngineeringValue(value, unit)

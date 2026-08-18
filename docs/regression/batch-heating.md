@@ -8,12 +8,12 @@ process modes, CSV import, calibration, or optimisation are added.
 
 ## Example model
 
-The model in `examples/batch-heating-synthetic` has four visible components:
+The model in `examples/batch-heating-synthetic` has five visible components:
 
 ```text
 Grid -> Electric heater -> Thermal store named “Batch”
                               |
-                              +------------> Ambient
+                              +-> Heat transfer -> Ambient
 ```
 
 The cycle has 16 quarter-hour steps. It includes one idle hour, 2.75 hours at
@@ -28,10 +28,14 @@ The scheduled-heating policy publishes the requested electrical input for the
 heater. It does not calculate temperature or heat loss.
 
 The `thermal.store` instance named “Batch” is the source of truth for its
-governing physics. Its material ports are unconnected, so mass remains fixed.
-It decides how much offered heat it can accept, calculates heat loss, advances
-contained enthalpy, derives temperature, and reports the margin to the required
-final temperature. The heater applies its own conversion efficiency and the
+accumulation physics. Its material ports are unconnected, so mass remains
+fixed. It decides how much offered heat it can accept, accounts for the settled
+passive heat output, advances contained enthalpy, derives temperature, and
+reports the margin to the required final temperature.
+
+The stateless `thermal.heat-transfer` instance owns standing loss. It determines
+equal source and sink flows from the batch and ambient temperatures using its
+0.1 kW/K conductance. The heater applies its own conversion efficiency and the
 grid balances the resulting electrical flow.
 
 ## Engineering contract

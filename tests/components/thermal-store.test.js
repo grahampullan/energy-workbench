@@ -18,7 +18,6 @@ function modelComponent({ parameters = {}, initialState = {} } = {}) {
       enthalpyReferenceTemperatureC: 0,
       maximumTemperatureC: 100,
       minimumUsefulTemperatureC: 70,
-      heatLossCoefficientkWPerK: 0.1,
       maximumHeatInputkW: 50,
       maximumHeatOutputkW: 100,
       ...parameters
@@ -80,7 +79,8 @@ function command(overrides = {}) {
     materialOutFlow: materialFlow(),
     heatInFlows: {},
     heatOutFlow: heatFlow(),
-    heatLossFlow: heatFlow(0, 60, 20),
+    passiveHeatInFlows: {},
+    passiveHeatOutFlows: {},
     ...overrides
   };
 }
@@ -108,9 +108,7 @@ test("one thermal store represents a closed fixed-mass thermal body", () => {
       containedEnthalpykWh: 60,
       specificEnthalpyKjPerKg: 216,
       temperatureC: 60,
-      sourceTemperatureC: 60,
       thermalCapacitykWhPerK: 1,
-      heatLossCoefficientkWPerK: 0.1,
       minimumUsefulTemperatureC: 70,
       maximumTemperatureC: 100
     }
@@ -122,13 +120,15 @@ test("one thermal store represents a closed fixed-mass thermal body", () => {
       heatInFlows: {
         "heater-to-store": heatFlow(20, 100, 100)
       },
-      heatLossFlow: heatFlow(4, 60, 20)
+      passiveHeatOutFlows: {
+        "store-to-transfer": heatFlow(4, 60, 20)
+      }
     }),
     context
   );
 
   assert.equal(evaluation.outputs.heatInputkW, 20);
-  assert.equal(evaluation.outputs.heatLosskW, 4);
+  assert.equal(evaluation.outputs.passiveHeatOutputkW, 4);
   assert.equal(evaluation.outputs.netEnergyFlowkW, 16);
   assert.equal(evaluation.outputs.temperatureC, 76);
   assert.deepEqual(evaluation.nextState, {
@@ -144,7 +144,6 @@ test("the same thermal store conserves mass and enthalpy with material flow", ()
       specificHeatCapacityKjPerKgK: 1,
       maximumTemperatureC: 200,
       minimumUsefulTemperatureC: 0,
-      heatLossCoefficientkWPerK: 0,
       maximumHeatInputkW: 10
     },
     initialState: {
@@ -163,8 +162,7 @@ test("the same thermal store conserves mass and enthalpy with material flow", ()
       heatInFlows: {
         "heater-to-store": heatFlow(10, 150, 150)
       },
-      heatOutFlow: heatFlow(0, 100, 100),
-      heatLossFlow: heatFlow(0, 100, 100)
+      heatOutFlow: heatFlow(0, 100, 100)
     }),
     stepContext(component, { durationHours })
   );
@@ -186,7 +184,6 @@ test("an empty thermal store can accept material and heat in the same step", () 
       specificHeatCapacityKjPerKgK: 1,
       maximumTemperatureC: 200,
       minimumUsefulTemperatureC: 0,
-      heatLossCoefficientkWPerK: 0,
       maximumHeatInputkW: 10
     },
     initialState: {
@@ -205,8 +202,7 @@ test("an empty thermal store can accept material and heat in the same step", () 
       heatInFlows: {
         "heater-to-store": heatFlow(10, 150, 150)
       },
-      heatOutFlow: heatFlow(0, 0, 0),
-      heatLossFlow: heatFlow(0, 0, 0)
+      heatOutFlow: heatFlow(0, 0, 0)
     }),
     stepContext(component, { durationHours })
   );
@@ -224,8 +220,7 @@ test("thermal-store evaluation rejects commands that contradict its physics", ()
     () => component.definition.model.evaluate(
       component,
       command({
-        heatInFlows: { heater: heatFlow(51, 100, 100) },
-        heatLossFlow: heatFlow(4, 60, 20)
+        heatInFlows: { heater: heatFlow(51, 100, 100) }
       }),
       context
     ),
@@ -235,20 +230,19 @@ test("thermal-store evaluation rejects commands that contradict its physics", ()
     () => component.definition.model.evaluate(
       component,
       command({
-        heatInFlows: { heater: heatFlow(10, 55, 55) },
-        heatLossFlow: heatFlow(4, 60, 20)
+        heatInFlows: { heater: heatFlow(10, 55, 55) }
       }),
       context
     ),
     /delivery temperature at least as high/u
   );
   assert.throws(
-    () => component.definition.model.evaluate(
-      component,
-      command({ heatLossFlow: heatFlow(3, 60, 20) }),
-      context
-    ),
-    /governing heat-loss equation/u
+    () => component.definition.model.evaluate(component, command({
+      passiveHeatOutFlows: {
+        transfer: heatFlow(3, 59, 20)
+      }
+    }), context),
+    /source temperature/u
   );
   assert.throws(
     () => component.definition.model.evaluate(
@@ -258,57 +252,6 @@ test("thermal-store evaluation rejects commands that contradict its physics", ()
     ),
     /must contain exactly/u
   );
-});
-
-test("thermal-store heat loss is ambient-bounded and refines explicitly", () => {
-  const preparation = prepare(modelComponent({
-    parameters: { heatLossCoefficientkWPerK: 0.1 },
-    initialState: { massKg: 1000, containedEnthalpykWh: 80 }
-  }));
-  const component = preparation.runtimeModel.components[0];
-  const evaluateLoss = (state, durationHours, heatLosskW) =>
-    component.definition.model.evaluate(
-      component,
-      command({
-        materialInFlow: materialFlow(0, state.containedEnthalpykWh * 3.6),
-        materialOutFlow: materialFlow(0, state.containedEnthalpykWh * 3.6),
-        heatOutFlow: heatFlow(0, state.containedEnthalpykWh, state.containedEnthalpykWh),
-        heatLossFlow: heatFlow(
-          heatLosskW,
-          state.containedEnthalpykWh,
-          20
-        )
-      }),
-      stepContext(component, { state, durationHours })
-    );
-  const initialState = { massKg: 1000, containedEnthalpykWh: 80 };
-  const coarse = evaluateLoss(initialState, 1, 6);
-  const firstHalf = evaluateLoss(initialState, 0.5, 6);
-  const secondHalf = evaluateLoss(firstHalf.nextState, 0.5, 5.7);
-
-  assertClose(coarse.outputs.temperatureC, 74);
-  assertClose(secondHalf.outputs.temperatureC, 74.15);
-  assert.ok(secondHalf.outputs.temperatureC > coarse.outputs.temperatureC);
-
-  const highLossPreparation = prepare(modelComponent({
-    parameters: {
-      minimumUsefulTemperatureC: 0,
-      heatLossCoefficientkWPerK: 10
-    },
-    initialState: { massKg: 1000, containedEnthalpykWh: 21 }
-  }));
-  const highLossStore = highLossPreparation.runtimeModel.components[0];
-  const ambientBounded = highLossStore.definition.model.evaluate(
-    highLossStore,
-    command({
-      materialInFlow: materialFlow(0, 75.6),
-      materialOutFlow: materialFlow(0, 75.6),
-      heatOutFlow: heatFlow(0, 21, 21),
-      heatLossFlow: heatFlow(1, 21, 20)
-    }),
-    stepContext(highLossStore)
-  );
-  assert.equal(ambientBounded.outputs.temperatureC, 20);
 });
 
 test("thermal-store validation rejects impossible state and properties", () => {
@@ -337,7 +280,7 @@ test("thermal-store validation rejects impossible state and properties", () => {
   );
 });
 
-test("thermal-store ports make material transfer optional and heat input repeatable", () => {
+test("thermal-store ports make material and passive heat transfer repeatable", () => {
   assert.deepEqual(
     thermalStoreDefinition.ports.map(({ id, cardinality }) => [
       id,
@@ -348,7 +291,8 @@ test("thermal-store ports make material transfer optional and heat input repeata
       ["material-out", "one"],
       ["heat-in", "many"],
       ["heat-out", "one"],
-      ["heat-loss", "one"]
+      ["passive-heat-in", "many"],
+      ["passive-heat-out", "many"]
     ]
   );
 });

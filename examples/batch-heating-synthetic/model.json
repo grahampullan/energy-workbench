@@ -29,7 +29,7 @@
     {
       "id": "batch",
       "type": "thermal.store",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Batch",
       "parameters": {
         "maximumMassKg": 1000,
@@ -37,7 +37,6 @@
         "enthalpyReferenceTemperatureC": 0,
         "maximumTemperatureC": 145,
         "minimumUsefulTemperatureC": 120,
-        "heatLossCoefficientkWPerK": 0.1,
         "maximumHeatInputkW": 50,
         "maximumHeatOutputkW": 0
       },
@@ -47,9 +46,19 @@
       }
     },
     {
+      "id": "batch-loss",
+      "type": "thermal.heat-transfer",
+      "definitionVersion": "0.1.0",
+      "name": "Heat loss",
+      "parameters": {
+        "conductancekWPerK": 0.1
+      },
+      "initialState": {}
+    },
+    {
       "id": "ambient",
-      "type": "thermal.ambient-boundary",
-      "definitionVersion": "0.3.0",
+      "type": "thermal.constant-temperature",
+      "definitionVersion": "0.1.0",
       "name": "Ambient",
       "parameters": {
         "temperatureSeriesId": "ambient-temperature"
@@ -83,11 +92,23 @@
       }
     },
     {
-      "id": "batch-to-ambient",
-      "name": "Batch heat loss",
+      "id": "batch-to-loss",
+      "name": "Batch to heat loss",
       "from": {
         "componentId": "batch",
-        "portId": "heat-loss"
+        "portId": "passive-heat-out"
+      },
+      "to": {
+        "componentId": "batch-loss",
+        "portId": "source"
+      }
+    },
+    {
+      "id": "batch-to-ambient",
+      "name": "Batch heat loss to ambient",
+      "from": {
+        "componentId": "batch-loss",
+        "portId": "sink"
       },
       "to": {
         "componentId": "ambient",

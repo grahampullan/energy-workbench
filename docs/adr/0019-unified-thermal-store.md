@@ -1,6 +1,6 @@
 # ADR 0019: Unified thermal store
 
-**Status:** Accepted
+**Status:** Partly superseded by ADR 0020
 
 **Date:** 2026-08-18
 

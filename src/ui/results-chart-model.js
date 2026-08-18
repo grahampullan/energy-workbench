@@ -23,6 +23,18 @@ function portFor(definition, componentId, portId) {
   return port;
 }
 
+function isFlowChartPortVisible(definition, portId) {
+  const hiddenPorts = definition.editor?.hiddenFlowChartPorts ?? [];
+  if (!Array.isArray(hiddenPorts) || hiddenPorts.some(
+    (hiddenPortId) => typeof hiddenPortId !== "string"
+  )) {
+    throw new TypeError(
+      `Component definition ${definition.type} has invalid hidden flow-chart ports`
+    );
+  }
+  return !hiddenPorts.includes(portId);
+}
+
 function flowSeries({
   connection,
   fromComponent,
@@ -374,10 +386,24 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
       }
       return result.flow;
     });
-    return { connection, fromComponent, toComponent, fromPort, toPort, flowType, flows };
+    const visibleInFlowChart =
+      isFlowChartPortVisible(fromDefinition, fromPort.id) &&
+      isFlowChartPortVisible(toDefinition, toPort.id);
+    return {
+      connection,
+      fromComponent,
+      toComponent,
+      fromPort,
+      toPort,
+      flowType,
+      flows,
+      visibleInFlowChart
+    };
   });
 
-  const series = connectionEntries.flatMap((entry) => {
+  const series = connectionEntries
+    .filter(({ visibleInFlowChart }) => visibleInFlowChart)
+    .flatMap((entry) => {
     const { connection, fromComponent, toComponent, fromPort, toPort, flowType, flows } = entry;
     const values = flows.map((flow, stepIndex) => {
       const powerkW = flowType === ACTIVE_POWER_FLOW_TYPE
@@ -410,7 +436,9 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
     }));
   });
   const materialSeries = connectionEntries
-    .filter(({ flowType }) => flowType === MATERIAL_MASS_FLOW_TYPE)
+    .filter(({ flowType, visibleInFlowChart }) =>
+      visibleInFlowChart && flowType === MATERIAL_MASS_FLOW_TYPE
+    )
     .map((entry) => materialMassSeries({
       ...entry,
       elapsedSeconds,

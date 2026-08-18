@@ -6,9 +6,11 @@ import { electricalPvDefinition } from "../components/electrical/pv.js";
 import { electricalSourceDefinition } from "../components/electrical/source.js";
 import { materialSinkDefinition } from "../components/material/sink.js";
 import { materialSourceDefinition } from "../components/material/source.js";
-import { ambientBoundaryDefinition } from "../components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from "../components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../components/thermal/heat-demand.js";
+import { heatTransferDefinition } from "../components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from "../components/thermal/store.js";
 import { createComponentRegistry } from "../core/component-registry.js";
 import { validateVariant } from "../core/validation/validate-documents.js";
@@ -148,9 +150,10 @@ function definitionRegistry() {
     electricalSourceDefinition,
     materialSinkDefinition,
     materialSourceDefinition,
-    ambientBoundaryDefinition,
+    constantTemperatureDefinition,
     electricHeaterDefinition,
     heatDemandDefinition,
+    heatTransferDefinition,
     thermalStoreDefinition
   ]);
 }

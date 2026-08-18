@@ -47,14 +47,17 @@ Push 2 keeps the repository boundary explicit:
 The first slice is one deterministic heating cycle:
 
 ```text
-Grid -> Electric heater -> Thermal store (batch instance) -> Ambient
+Grid -> Electric heater -> Thermal store (batch instance)
+                           -> Heat transfer -> Ambient
 ```
 
-Reuse `thermal.store` as a fixed-mass lumped body with heat input, standing
-heat loss, derived temperature, and a required final-temperature margin. Its
-material ports remain unconnected. Reuse the existing grid, electric heater,
-ambient boundary, runtime, and thermal-flow contract. Drive it with a small
-inline synthetic schedule and a fixed historical heating policy.
+Reuse `thermal.store` as a fixed-mass lumped body with heat input, derived
+temperature, and a required final-temperature margin. Its material ports remain
+unconnected. An explicit `thermal.heat-transfer` owns standing loss to the
+constant-temperature component named “Ambient”. Reuse the existing grid,
+electric heater, constant-temperature component, runtime, and thermal-flow
+contract. Drive it with a small inline synthetic
+schedule and a fixed historical heating policy.
 
 The reviewed fixture and tests show:
 

@@ -12,18 +12,19 @@ process modes, schedule optimisation, CSV import, or industrial calibration.
 
 ## Example model
 
-The model in `examples/coupled-thermal` has five components:
+The model in `examples/coupled-thermal` has six components:
 
 ```text
 Grid -> Electric heater -> Thermal store named “Hot-water store” -> Heat demand
                            |
-                           +----------------> Ambient
+                           +-> Heat transfer -> Ambient
 ```
 
-The first connection carries `electricity.active-power`. The remaining three
-carry `thermal.heat-flow`, including source and delivery temperatures.
-The store-to-ambient connection represents standing heat loss, so its direction
-is from the store to the ambient boundary.
+The first connection carries `electricity.active-power`. The remaining four
+carry `thermal.heat-flow`, including source and delivery temperatures. Standing
+loss crosses two ideal connections because its governing `thermal.heat-transfer`
+component is explicit between the store and a constant-temperature component
+named “Ambient”.
 
 The synthetic duty cycle has 12 half-hour steps. The store starts at 80 °C and
 has an exact 10 kWh/K thermal capacity, a 70 °C useful-delivery threshold, an
@@ -53,9 +54,10 @@ The reference case exercises:
 
 - Electrical-to-thermal conversion, with heater heat equal to electrical input
   multiplied by efficiency.
-- Store mass and contained-enthalpy state, with temperature derived after heat
-  input, output, and standing loss.
-- Positive standing loss during idle timesteps.
+- Store mass and contained-enthalpy state, with temperature derived after
+  active input and output and the settled passive heat output.
+- Positive standing loss determined by the heat-transfer component during idle
+  timesteps.
 - The store heat-input limit when requested heat exceeds 80 kW.
 - The store heat-output limit at the first 150 kW peak.
 - The stored usable-energy limit as temperature approaches the 70 °C service

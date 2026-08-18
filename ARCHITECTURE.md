@@ -248,8 +248,9 @@ explicitly:
 ```text
 massNext = mass + (massIn - massOut) * dtSeconds
 enthalpyNext = enthalpy
-             + (enthalpyIn + heatIn
-                - enthalpyOut - heatOut - heatLoss) * dtSeconds / 3600
+             + (enthalpyIn + activeHeatIn + passiveHeatIn
+                - enthalpyOut - activeHeatOut - passiveHeatOut)
+               * dtSeconds / 3600
 ```
 
 Temperature is derived from contained mass, contained enthalpy, specific heat
@@ -260,9 +261,25 @@ Temperature is a derived output rather than an independent state. The current
 store assumes one well-mixed material, constant specific heat capacity, no
 phase change, and no stratification. Its instance name describes the equipment;
 the component type describes the governing equation. The store owns the joint
-feasibility of material transfer, heat input and output, ambient loss,
-temperature, and capacity constraints. The runtime must not repeat or
-partially reimplement that equation.
+feasibility of material transfer, active heat input and output, passive settled
+heat flows, temperature, and capacity constraints. It does not own the physical
+relationship that determines passive transfer to another body or boundary.
+
+`thermal.heat-transfer` is a stateless, directed two-boundary component. It
+determines equal source and sink heat flow from current boundary temperatures:
+
+```text
+Q = K * max(0, Tsource - Tsink)
+```
+
+Each connected finite body publishes `temperatureC`,
+`thermalCapacitykWhPerK`, and its maximum temperature. A fixed-temperature
+boundary instead publishes `fixedTemperatureBoundary: true`. The transfer is
+capped so one explicit step cannot cross finite-body thermal equilibrium or
+raise the sink above its maximum temperature. The source store accounts for
+the settled flow on `passive-heat-out`; a finite sink accounts for it on
+`passive-heat-in`; a constant-temperature boundary absorbs it without state. The runtime
+must not repeat or partially reimplement either component equation.
 
 Most ports accept one connection. A physical collector component may instead
 declare a repeatable `many` port. Persisted connections then share that stable
@@ -270,8 +287,11 @@ port ID, while runtime evaluation keeps their flows separate by connection ID;
 the generic connection check never balances an aggregate in place of an
 individual connection.
 
-The ambient boundary has one repeatable incoming `heat-in` port and reports the
-aggregate heat received across its independently checked connections. The
+The constant-temperature component has one repeatable incoming `heat-in` port
+and reports the aggregate heat received across its independently checked
+connections. It is an imposed boundary: its prescribed temperature may vary
+between timesteps, but received heat does not change it. An instance named
+“Ambient” represents the environment. The
 electrical bus similarly has one repeatable bidirectional `terminal` port and
 owns the power balance across its independently checked connections. Neither
 component has an arbitrary connection-count limit, and neither requires
@@ -282,12 +302,13 @@ The Push 1B reference model uses one deliberately fixed thermal topology:
 ```text
 grid -> electric heater -> thermal store (hot-water instance) -> heat demand
                            |
-                           +-> ambient boundary
+                           +-> heat transfer -> constant temperature (“Ambient”)
 ```
 
-The grid, heater, store, demand, and ambient boundary own their respective
-equations. The policy chooses operational targets and explicitly identifies
-the grid as the balancing component. The runtime orders the component
+The grid, heater, store, heat-transfer, demand, and constant-temperature components
+own their respective equations. The policy chooses operational targets and
+explicitly identifies the grid as the balancing component. The runtime orders
+the component
 calculations and transfers their typed port flows; it must not use a whole-model
 coupled resolver. Thermal branching requires a visible junction component with
 an explicit component-owned allocation or mixing contract; it is not inferred

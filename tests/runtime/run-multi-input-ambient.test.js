@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ambientBoundaryDefinition } from
-  "../../src/components/thermal/ambient-boundary.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { resolutionDescription } from
   "../../src/components/model-resolution.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
@@ -40,7 +40,7 @@ function heatSourceDefinition({ type, name, heatFlowkW, sourceTemperatureC }) {
         const flow = createThermalFlow({
           heatFlowkW,
           sourceTemperatureC,
-          deliveryTemperatureC: ambientLimits.ambientTemperatureC
+          deliveryTemperatureC: ambientLimits.temperatureC
         });
         return {
           feasibleCommand: null,
@@ -102,8 +102,8 @@ function fixture() {
         },
         {
           id: "ambient",
-          type: ambientBoundaryDefinition.type,
-          definitionVersion: ambientBoundaryDefinition.version,
+          type: constantTemperatureDefinition.type,
+          definitionVersion: constantTemperatureDefinition.version,
           name: "Ambient",
           parameters: { temperatureSeriesId: "ambient-temperature" },
           initialState: {}
@@ -144,12 +144,12 @@ function fixture() {
     registry: createComponentRegistry([
       firstSourceDefinition,
       secondSourceDefinition,
-      ambientBoundaryDefinition
+      constantTemperatureDefinition
     ])
   };
 }
 
-test("one ambient boundary receives and balances independent heat losses", () => {
+test("one Ambient constant-temperature boundary receives independent heat losses", () => {
   const result = runScenario(fixture());
 
   assert.equal(result.completed, true, JSON.stringify(result.diagnostics));
@@ -187,12 +187,12 @@ test("one ambient boundary receives and balances independent heat losses", () =>
 
 test("a repeatable port evaluates every attached connection separately", () => {
   const incompleteAmbientDefinition = {
-    ...ambientBoundaryDefinition,
-    version: "0.3.1-test",
+    ...constantTemperatureDefinition,
+    version: "0.1.1-test",
     model: {
-      ...ambientBoundaryDefinition.model,
+      ...constantTemperatureDefinition.model,
       evaluate(runtimeComponent, actualCommand, stepContext) {
-        const evaluation = ambientBoundaryDefinition.model.evaluate(
+        const evaluation = constantTemperatureDefinition.model.evaluate(
           runtimeComponent,
           actualCommand,
           stepContext

@@ -526,6 +526,25 @@ h2 {
   font-size: 10px;
 }
 
+.workbench-box--heat-transfer .component-card {
+  justify-content: center;
+  padding: 7px 9px;
+}
+
+.workbench-box--heat-transfer .component-card-type,
+.workbench-box--heat-transfer .component-card-metric {
+  display: none;
+}
+
+.workbench-box--heat-transfer .component-card-name {
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.workbench-box--heat-transfer .component-card-value {
+  font-size: 14px;
+}
+
 .flow-legend {
   justify-content: space-between;
   min-height: 34px;

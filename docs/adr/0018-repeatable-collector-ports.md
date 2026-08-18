@@ -1,6 +1,6 @@
 # ADR 0018: Repeatable collector ports
 
-**Status:** Accepted
+**Status:** Partly superseded by ADR 0020
 
 **Date:** 2026-08-17
 

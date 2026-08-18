@@ -29,7 +29,7 @@
     {
       "id": "store",
       "type": "thermal.store",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Hot-water store",
       "parameters": {
         "maximumMassKg": 10000,
@@ -37,7 +37,6 @@
         "enthalpyReferenceTemperatureC": 0,
         "maximumTemperatureC": 90,
         "minimumUsefulTemperatureC": 70,
-        "heatLossCoefficientkWPerK": 0.05,
         "maximumHeatInputkW": 80,
         "maximumHeatOutputkW": 120
       },
@@ -45,6 +44,16 @@
         "massKg": 10000,
         "containedEnthalpykWh": 800
       }
+    },
+    {
+      "id": "store-loss",
+      "type": "thermal.heat-transfer",
+      "definitionVersion": "0.1.0",
+      "name": "Heat loss",
+      "parameters": {
+        "conductancekWPerK": 0.05
+      },
+      "initialState": {}
     },
     {
       "id": "heat-demand",
@@ -60,8 +69,8 @@
     },
     {
       "id": "ambient",
-      "type": "thermal.ambient-boundary",
-      "definitionVersion": "0.3.0",
+      "type": "thermal.constant-temperature",
+      "definitionVersion": "0.1.0",
       "name": "Ambient",
       "parameters": {
         "temperatureSeriesId": "ambient-temperature"
@@ -107,11 +116,23 @@
       }
     },
     {
-      "id": "store-to-ambient",
-      "name": "Hot-water store heat loss",
+      "id": "store-to-loss",
+      "name": "Hot-water store to heat loss",
       "from": {
         "componentId": "store",
-        "portId": "heat-loss"
+        "portId": "passive-heat-out"
+      },
+      "to": {
+        "componentId": "store-loss",
+        "portId": "source"
+      }
+    },
+    {
+      "id": "store-to-ambient",
+      "name": "Hot-water store heat loss to ambient",
+      "from": {
+        "componentId": "store-loss",
+        "portId": "sink"
       },
       "to": {
         "componentId": "ambient",

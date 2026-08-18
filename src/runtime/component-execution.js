@@ -443,14 +443,43 @@ function validateEvaluationShape(evaluation, component, stepIndex, diagnostics) 
       `${path}/portFlows`
     ));
   }
-  for (const [portId, flow] of Object.entries(evaluation.portFlows)) {
+  for (const [portId, portFlowValue] of Object.entries(evaluation.portFlows)) {
     const port = component.ports.find((candidate) => candidate.id === portId);
     if (!port) {
       continue;
     }
-    const validationMessage = flowValidationMessage(port.flowType, flow, {
-      direction: port.direction
-    });
+    if (port.cardinality === "many") {
+      const connectionIds = new Set(port.connectionIds);
+      if (
+        !isRecord(portFlowValue) ||
+        !hasExactFields(portFlowValue, connectionIds)
+      ) {
+        diagnostics.push(runtimeDiagnostic(
+          "runtime.component-port-flow-contract",
+          `${port.flowType} port ${portId} must return one flow for every connected connection and no others`,
+          `${path}/portFlows/${portId}`
+        ));
+        continue;
+      }
+      for (const [connectionId, flow] of Object.entries(portFlowValue)) {
+        const validationMessage = flowValidationMessage(port.flowType, flow, {
+          direction: port.direction
+        });
+        if (validationMessage) {
+          diagnostics.push(runtimeDiagnostic(
+            "runtime.component-port-flow-contract",
+            `${port.flowType} port ${portId} connection ${connectionId} is invalid: ${validationMessage}`,
+            `${path}/portFlows/${portId}/${connectionId}`
+          ));
+        }
+      }
+      continue;
+    }
+    const validationMessage = flowValidationMessage(
+      port.flowType,
+      portFlowValue,
+      { direction: port.direction }
+    );
     if (validationMessage) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.component-port-flow-contract",

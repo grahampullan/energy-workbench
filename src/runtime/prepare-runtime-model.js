@@ -146,6 +146,7 @@ function buildRuntimeComponents(model, scenario, registry, diagnostics) {
         id: port.id,
         flowType: port.flowType,
         direction: port.direction,
+        cardinality: port.cardinality ?? "one",
         connectionIds: []
       }))
     };

@@ -251,22 +251,37 @@ test("ambient boundary provides the timestep temperature for rejected heat", () 
     seriesValues: { "ambient-temperature": 15 }
   });
   const evaluation = component.definition.model.evaluate(component, {
-    heatFlowkW: 10,
-    sourceTemperatureC: 60
+    connectionFlows: {
+      "first-loss": {
+        heatFlowkW: 10,
+        sourceTemperatureC: 60,
+        deliveryTemperatureC: 15
+      },
+      "second-loss": {
+        heatFlowkW: 5,
+        sourceTemperatureC: 45,
+        deliveryTemperatureC: 15
+      }
+    }
   }, context);
 
   assert.deepEqual(
     component.definition.model.getOperatingLimits(component, context),
     { ambientTemperatureC: 15 }
   );
-  assert.deepEqual(evaluation.portFlows["heat-in"], {
+  assert.deepEqual(evaluation.portFlows["heat-in"]["first-loss"], {
     heatFlowkW: 10,
     sourceTemperatureC: 60,
     deliveryTemperatureC: 15
   });
+  assert.deepEqual(evaluation.portFlows["heat-in"]["second-loss"], {
+    heatFlowkW: 5,
+    sourceTemperatureC: 45,
+    deliveryTemperatureC: 15
+  });
   assert.deepEqual(evaluation.outputs, {
     ambientTemperatureC: 15,
-    receivedHeatFlowkW: 10
+    receivedHeatFlowkW: 15
   });
 });
 

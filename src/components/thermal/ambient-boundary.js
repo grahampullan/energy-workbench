@@ -3,10 +3,11 @@ import {
   createThermalFlow
 } from "../../core/thermal-flow.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../core/flow-types.js";
-import {
-  singleConnection,
-  singlePortFlowConsumerResolution
-} from "../model-resolution.js";
+import { resolutionDescription } from "../model-resolution.js";
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
 function parameterValue(component, parameter) {
   return Object.hasOwn(component.parameters, parameter)
@@ -26,9 +27,45 @@ function ambientTemperatureC(runtimeComponent, stepContext) {
   return temperature;
 }
 
+function ambientConnectionFlows(context) {
+  const ambientTemperatureC = context.operatingLimits.ambientTemperatureC;
+  const connectionFlows = {};
+  for (const connection of context.connections) {
+    const flow = context.getConnectionFlow(connection.id);
+    if (flow === undefined) {
+      return null;
+    }
+    connectionFlows[connection.id] = createThermalFlow({
+      heatFlowkW: flow.heatFlowkW,
+      sourceTemperatureC: flow.sourceTemperatureC,
+      deliveryTemperatureC: ambientTemperatureC
+    });
+  }
+  return connectionFlows;
+}
+
+function evaluatedConnectionFlows(actualCommand, temperatureC) {
+  if (
+    !isRecord(actualCommand) ||
+    Object.keys(actualCommand).length !== 1 ||
+    !isRecord(actualCommand.connectionFlows)
+  ) {
+    throw new TypeError(
+      "Ambient-boundary command must contain exactly its connection flows"
+    );
+  }
+  return Object.fromEntries(Object.entries(actualCommand.connectionFlows).map(
+    ([connectionId, flow]) => [connectionId, createThermalFlow({
+      heatFlowkW: flow?.heatFlowkW,
+      sourceTemperatureC: flow?.sourceTemperatureC,
+      deliveryTemperatureC: temperatureC
+    })]
+  ));
+}
+
 export const ambientBoundaryDefinition = {
   type: "thermal.ambient-boundary",
-  version: "0.2.0",
+  version: "0.3.0",
   name: "Ambient boundary",
 
   parameters: {
@@ -43,7 +80,8 @@ export const ambientBoundaryDefinition = {
   ports: [{
     id: "heat-in",
     flowType: THERMAL_HEAT_FLOW_TYPE,
-    direction: "in"
+    direction: "in",
+    cardinality: "many"
   }],
 
   outputs: {
@@ -70,7 +108,13 @@ export const ambientBoundaryDefinition = {
     return [];
   },
 
-  resolution: singlePortFlowConsumerResolution("heat-in"),
+  resolution: {
+    describe(runtimeComponent, context) {
+      return resolutionDescription({
+        connectionFlows: context.connections.map((connection) => connection.id)
+      });
+    }
+  },
 
   model: {
     prepare(modelComponent, context) {
@@ -98,36 +142,28 @@ export const ambientBoundaryDefinition = {
     },
 
     resolve(runtimeComponent, context) {
-      const connection = singleConnection(runtimeComponent, context, "heat-in");
-      const flow = context.getConnectionFlow(connection.id);
-      if (flow === undefined) {
+      const connectionFlows = ambientConnectionFlows(context);
+      if (connectionFlows === null) {
         return null;
       }
       return {
         feasibleCommand: null,
-        actualCommand: {
-          heatFlowkW: flow.heatFlowkW,
-          sourceTemperatureC: flow.sourceTemperatureC
-        },
+        actualCommand: { connectionFlows },
         connectionFlows: {}
       };
     },
 
     evaluate(runtimeComponent, actualCommand, stepContext) {
-      if (!actualCommand || !Number.isFinite(actualCommand.sourceTemperatureC)) {
-        throw new TypeError("Ambient heat receipt requires a finite sourceTemperatureC");
-      }
       const temperatureC = ambientTemperatureC(runtimeComponent, stepContext);
-      const flow = createThermalFlow({
-        heatFlowkW: actualCommand.heatFlowkW,
-        sourceTemperatureC: actualCommand.sourceTemperatureC,
-        deliveryTemperatureC: temperatureC
-      });
+      const connectionFlows = evaluatedConnectionFlows(actualCommand, temperatureC);
       return {
-        portFlows: { "heat-in": flow },
+        portFlows: { "heat-in": connectionFlows },
         outputs: {
           ambientTemperatureC: temperatureC,
-          receivedHeatFlowkW: flow.heatFlowkW
+          receivedHeatFlowkW: Object.values(connectionFlows).reduce(
+            (total, flow) => total + flow.heatFlowkW,
+            0
+          )
         },
         nextState: {},
         diagnostics: []

@@ -1,5 +1,6 @@
 export const ACTIVE_POWER_FLOW_TYPE = "electricity.active-power";
 export const THERMAL_HEAT_FLOW_TYPE = "thermal.heat-flow";
+export const MATERIAL_MASS_FLOW_TYPE = "material.mass-flow";
 export const ABSOLUTE_ZERO_C = -273.15;
 
 const ACTIVE_POWER_FIELDS = Object.freeze({
@@ -10,6 +11,10 @@ const THERMAL_HEAT_FLOW_FIELDS = Object.freeze({
   sourceTemperatureC: Object.freeze({ unit: "°C" }),
   deliveryTemperatureC: Object.freeze({ unit: "°C" })
 });
+const MATERIAL_MASS_FLOW_FIELDS = Object.freeze({
+  massFlowKgPerSecond: Object.freeze({ unit: "kg/s" }),
+  specificEnthalpyKjPerKg: Object.freeze({ unit: "kJ/kg" })
+});
 
 const FLOW_TYPES = Object.freeze([
   Object.freeze({
@@ -19,6 +24,10 @@ const FLOW_TYPES = Object.freeze([
   Object.freeze({
     id: THERMAL_HEAT_FLOW_TYPE,
     fields: THERMAL_HEAT_FLOW_FIELDS
+  }),
+  Object.freeze({
+    id: MATERIAL_MASS_FLOW_TYPE,
+    fields: MATERIAL_MASS_FLOW_FIELDS
   })
 ]);
 const FLOW_TYPES_BY_ID = new Map(
@@ -67,19 +76,29 @@ export function flowValidationMessage(flowType, flow, { direction } = {}) {
     return null;
   }
 
-  if (!Number.isFinite(flow.heatFlowkW) || flow.heatFlowkW < 0) {
-    return "heatFlowkW must be a finite, non-negative number";
-  }
-  for (const temperature of ["sourceTemperatureC", "deliveryTemperatureC"]) {
-    if (!Number.isFinite(flow[temperature]) || flow[temperature] < ABSOLUTE_ZERO_C) {
-      return `${temperature} must be finite and no lower than absolute zero`;
+  if (flowType === THERMAL_HEAT_FLOW_TYPE) {
+    if (!Number.isFinite(flow.heatFlowkW) || flow.heatFlowkW < 0) {
+      return "heatFlowkW must be a finite, non-negative number";
     }
+    for (const temperature of ["sourceTemperatureC", "deliveryTemperatureC"]) {
+      if (!Number.isFinite(flow[temperature]) || flow[temperature] < ABSOLUTE_ZERO_C) {
+        return `${temperature} must be finite and no lower than absolute zero`;
+      }
+    }
+    if (
+      flow.heatFlowkW > 0 &&
+      flow.deliveryTemperatureC > flow.sourceTemperatureC
+    ) {
+      return "A positive directed heat flow cannot be delivered above its source temperature";
+    }
+    return null;
   }
-  if (
-    flow.heatFlowkW > 0 &&
-    flow.deliveryTemperatureC > flow.sourceTemperatureC
-  ) {
-    return "A positive directed heat flow cannot be delivered above its source temperature";
+
+  if (!Number.isFinite(flow.massFlowKgPerSecond) || flow.massFlowKgPerSecond < 0) {
+    return "massFlowKgPerSecond must be a finite, non-negative number";
+  }
+  if (!Number.isFinite(flow.specificEnthalpyKjPerKg)) {
+    return "specificEnthalpyKjPerKg must be a finite number";
   }
   return null;
 }
@@ -115,6 +134,15 @@ export function connectionFlowsMatch(
         Math.abs(flow[field] - expectedFlow[field]) <= (
           field === "heatFlowkW" ? powerTolerancekW : 1e-9
         )
+      )
+    );
+  }
+
+  if (flowType === MATERIAL_MASS_FLOW_TYPE) {
+    return expectedFlow && [fromFlow, toFlow].every((flow) =>
+      flow && Object.keys(expectedFlow).every((field) =>
+        Number.isFinite(flow[field]) &&
+        Math.abs(flow[field] - expectedFlow[field]) <= 1e-9
       )
     );
   }

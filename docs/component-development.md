@@ -121,6 +121,9 @@ the first runtime slice.
   state constraints that depend on parameters or other state fields.
 - Ports declare compatibility through `flowType` and permitted direction. A
   connection stores only endpoint references and does not duplicate either.
+- A port accepts one connection by default. Set `cardinality: "many"` only when
+  the component physically represents a collector whose one logical boundary
+  can accept any number of independent connections.
 - `validate` checks engineering meaning that JSON Schema cannot express. It
   returns an array of `{ severity, code, message, path }` diagnostics, or
   `undefined` when there are none; omitted severity means `error`.
@@ -175,6 +178,13 @@ current flow must not depend on a proposed next state. Integrated rate totals
 use the same current-step rectangular sum; timestep refinement controls
 accuracy.
 
+In browser presentation, step `n` is labelled as the interval
+`[t(n), t(n+1))`. Commands, prescribed inputs, and connection rates apply
+during that interval. Component state is labelled at the timestep end. Rate
+plots use zero-order-hold steps and extend through the run's final boundary;
+calculated state plots may connect boundary samples with straight visual
+segments.
+
 - The runtime evaluates every component's current operating limits once before
   requesting policy operation.
 - `policy.request(runtimeModel, stepContext, policyContext)` returns
@@ -195,9 +205,12 @@ accuracy.
   connected components.
 - `stepContext` contains `stepIndex`, `timeStepSeconds`, `durationHours`,
   `elapsedSeconds`, current `seriesValues`, and isolated component state.
-- `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. Electrical
-  directed-port flow is non-negative in the declared direction. Bidirectional
-  port flow is signed: positive export and negative import.
+- `evaluate` returns `{ portFlows, outputs, nextState, diagnostics }`. A normal
+  port value is one flow object. A `many` port value is an object keyed by the
+  IDs of every connection attached to that port, with one flow object per
+  connection. Electrical directed-port flow is non-negative in the declared
+  direction. Bidirectional port flow is signed: positive export and negative
+  import.
 - The runtime commits all proposed next states only after every connection has
   passed its balance check.
 - External series must be loaded and materialised before calling `runScenario`.
@@ -213,11 +226,11 @@ of component IDs that can resolve at the same dependency depth. The full plan
 returned by `prepareResolutionPlan` also exposes each component's prerequisites
 and determined connections for diagnostics.
 
-The current `electrical.bus` has four bidirectional terminals. It waits for its
-non-balancing terminal flows, applies its own conservation equation, and
-settles the terminal connected to the policy's `balancingComponentId`. The
-balancing component then checks that residual against its own limits. A grid is
-one possible balancing component; it is not selected automatically.
+The current `electrical.bus` has one repeatable bidirectional `terminal` port.
+It waits for its non-balancing connection flows, applies its own conservation
+equation, and settles the connection to the policy's `balancingComponentId`.
+The balancing component then checks that residual against its own limits. A
+grid is one possible balancing component; it is not selected automatically.
 Positive grid power is import into the model; negative grid power is export.
 The grid limits can make a timestep infeasible.
 
@@ -247,6 +260,35 @@ supply temperature, the hot-water store requires incoming heat to be hot enough
 to charge it, and the demand reports heat below its minimum delivery temperature
 as unmet. Thermal connections do not infer mass flow, pressure, mixing, or pipe
 delay.
+
+The ambient boundary exposes one repeatable incoming `heat-in` port. Every
+physical loss connection references that port but retains its own settled
+thermal flow and endpoint balance check; the ambient component reports their
+sum as `receivedHeatFlowkW`. Do not add an aggregation component solely to
+combine heat losses before the ambient boundary.
+
+### Material mass and enthalpy flow
+
+A directed `material.mass-flow` port reports exactly:
+
+```js
+{
+  massFlowKgPerSecond,
+  specificEnthalpyKjPerKg
+}
+```
+
+Mass flow is finite and non-negative in the declared direction. Specific
+enthalpy is finite; its reference state belongs to the component model. The
+transported enthalpy rate is
+`massFlowKgPerSecond * specificEnthalpyKjPerKg` in kW. Do not duplicate
+temperature on this connection or infer composition, pressure, phase, or
+mixing in generic connection execution.
+
+The heated material inventory uses start-of-step mass and specific enthalpy to
+limit and characterise outflow. It then advances contained mass and enthalpy
+from the settled current-step material and thermal flows. An empty inventory
+has zero contained enthalpy and reports its reference temperature.
 
 The hot-water store has separate `heat-in`, `heat-out`, and `heat-loss` ports.
 Its actual command names charge heat flow and temperatures, discharge heat flow,

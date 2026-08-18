@@ -220,6 +220,7 @@ export function validateModel(model, { registry } = {}) {
 
   const componentsById = new Map(model.components.map((component) => [component.id, component]));
   const definitionsByComponentId = new Map();
+  const endpointUsagesByPort = new Map();
 
   model.components.forEach((component, componentIndex) => {
     const definition = registry.get(component.type, component.definitionVersion);
@@ -270,6 +271,15 @@ export function validateModel(model, { registry } = {}) {
     if (!fromPort || !toPort) {
       return;
     }
+    for (const [endpointName, endpoint, port] of [
+      ["from", connection.from, fromPort],
+      ["to", connection.to, toPort]
+    ]) {
+      const key = `${endpoint.componentId}\u0000${port.id}`;
+      const usages = endpointUsagesByPort.get(key) ?? [];
+      usages.push({ connectionIndex, endpointName });
+      endpointUsagesByPort.set(key, usages);
+    }
     if (fromPort.direction !== "out" && fromPort.direction !== "bidirectional") {
       diagnostics.push(createDiagnostic({
         code: "model.invalid-from-port-direction",
@@ -292,6 +302,20 @@ export function validateModel(model, { registry } = {}) {
       }));
     }
   });
+
+  for (const [key, usages] of endpointUsagesByPort) {
+    const [componentId, portId] = key.split("\u0000");
+    const definition = definitionsByComponentId.get(componentId);
+    const port = definition?.ports.find((candidate) => candidate.id === portId);
+    if ((port?.cardinality ?? "one") === "many" || usages.length <= 1) {
+      continue;
+    }
+    diagnostics.push(createDiagnostic({
+      code: "model.port-connection-cardinality",
+      message: `Port ${componentId}.${portId} allows one connection but is referenced by ${usages.length} connections`,
+      path: `/connections/${usages[1].connectionIndex}/${usages[1].endpointName}/portId`
+    }));
+  }
 
   return createValidationResult(diagnostics);
 }

@@ -17,25 +17,27 @@ models on the validated electrical–thermal foundation.
 - [Legacy electrical regression](docs/regression/blog-electrical.md)
 - [Coupled thermal reference](docs/regression/coupled-thermal.md)
 - [Batch-heating reference](docs/regression/batch-heating.md)
+- [Material-inventory reference](docs/regression/material-inventory.md)
 
 JSON Schemas for the initial study documents live in `src/core/schemas`.
 
-The executable runtime supports deterministic fixed-timestep runs on one
-four-terminal electrical bus with fixed load and PV profiles, branching,
-policy-controlled battery storage and generation, and a residual grid boundary
-with import and export limits. It also supports the Push 1B coupled topology:
+The executable runtime supports deterministic fixed-timestep runs on an
+electrical bus with a repeatable terminal, fixed load and PV profiles,
+branching, policy-controlled battery storage and generation, and a residual
+grid boundary with import and export limits. It also supports the Push 1B coupled topology:
 an electric heater, hot-water store, heat demand, and ambient heat-loss
 boundary. Push 2 adds a scheduled electric heater and one-node batch thermal
-mass with a required final temperature. All three public examples run
-headlessly on the same contracts, with reviewed results recorded by regression
+mass with a required final temperature, plus a material inventory that
+transports mass and enthalpy. All four public examples run headlessly and in
+the browser on the same contracts, with reviewed results recorded by regression
 tests.
 
 The browser workbench can load any committed example through the same
-runtime. It presents the saved topology, live electrical and thermal flows, a
-definition-driven component inspector, run KPIs, linked flow-rate and
-integrated-energy charts, component temperature charts, and timestep
-scrubbing. Numeric parameter controls create temporary preview runs which can
-be reset or applied to the in-memory working model.
+runtime. It presents the saved topology, live electrical, thermal, and material
+flows, a definition-driven component inspector, run KPIs, linked power- and
+mass-flow charts, integrated-energy results, component temperature charts, and
+timestep scrubbing. Numeric parameter controls create temporary preview runs
+which can be reset or applied to the in-memory working model.
 Components can also be moved and resized as temporary layout changes;
 reloading restores the saved layout. The applied working model can be
 downloaded and opened again as JSON, while a completed preview can be

@@ -8,22 +8,7 @@ import {
   resolutionError
 } from "../model-resolution.js";
 
-const terminalIds = ["terminal-1", "terminal-2", "terminal-3", "terminal-4"];
-
 function busConnections(runtimeComponent, context) {
-  for (const port of runtimeComponent.ports) {
-    const connectionCount = context.connections.filter((connection) =>
-      (connection.from.component === runtimeComponent && connection.from.port === port) ||
-      (connection.to.component === runtimeComponent && connection.to.port === port)
-    ).length;
-    if (connectionCount > 1) {
-      throw resolutionError(
-        "runtime.electrical-bus-terminal-count",
-        `Bus terminal ${runtimeComponent.id}.${port.id} has more than one connection`
-      );
-    }
-  }
-
   const balancingConnections = context.connections.filter((connection) => {
     const otherComponent = connection.from.component === runtimeComponent
       ? connection.to.component
@@ -86,40 +71,34 @@ function resolveBus(runtimeComponent, context) {
   );
   settledFlows.set(balancingConnection, balancingFlow);
 
-  const portPowerkW = Object.fromEntries(
-    runtimeComponent.ports.map((port) => [port.id, 0])
-  );
-  for (const [connection, flow] of settledFlows) {
-    const port = connection.from.component === runtimeComponent
-      ? connection.from.port
-      : connection.to.port;
-    portPowerkW[port.id] = componentPowerFromConnection(
-      runtimeComponent,
-      connection,
-      flow
-    );
-  }
+  const connectionPowerkW = Object.fromEntries([...settledFlows].map(
+    ([connection, flow]) => [
+      connection.id,
+      componentPowerFromConnection(runtimeComponent, connection, flow)
+    ]
+  ));
 
   return {
     feasibleCommand: { powerkW: 0 },
-    actualCommand: { powerkW: 0, portPowerkW },
+    actualCommand: { powerkW: 0, connectionPowerkW },
     connectionFlows: { [balancingConnection.id]: balancingFlow }
   };
 }
 
 export const electricalBusDefinition = {
   type: "electrical.bus",
-  version: "0.2.0",
+  version: "0.3.0",
   name: "Electrical bus",
 
   parameters: {},
   initialState: {},
 
-  ports: terminalIds.map((id) => ({
-    id,
+  ports: [{
+    id: "terminal",
     flowType: ACTIVE_POWER_FLOW_TYPE,
-    direction: "bidirectional"
-  })),
+    direction: "bidirectional",
+    cardinality: "many"
+  }],
 
   outputs: {
     powerBalanceErrorkW: { unit: "kW" }
@@ -158,17 +137,19 @@ export const electricalBusDefinition = {
     },
 
     evaluate(runtimeComponent, actualCommand) {
-      const portFlows = Object.fromEntries(runtimeComponent.ports.map((port) => [
-        port.id,
-        { powerkW: actualCommand.portPowerkW[port.id] }
-      ]));
-      const powerBalanceErrorkW = Object.values(portFlows).reduce(
+      const connectionFlows = Object.fromEntries(
+        runtimeComponent.ports[0].connectionIds.map((connectionId) => [
+          connectionId,
+          { powerkW: actualCommand.connectionPowerkW[connectionId] }
+        ])
+      );
+      const powerBalanceErrorkW = Object.values(connectionFlows).reduce(
         (total, flow) => total + flow.powerkW,
         0
       );
 
       return {
-        portFlows,
+        portFlows: { terminal: connectionFlows },
         outputs: { powerBalanceErrorkW },
         nextState: {},
         diagnostics: []

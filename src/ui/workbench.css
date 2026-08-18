@@ -368,6 +368,15 @@ h2 {
   stroke: var(--green);
 }
 
+.connection-line--material {
+  stroke: #76579b;
+  stroke-dasharray: 2 4;
+}
+
+.connection-line--material.connection-line--highlighted {
+  stroke: var(--green);
+}
+
 #flow-arrow path {
   fill: #45655b;
 }
@@ -547,6 +556,14 @@ h2 {
   );
 }
 
+.legend-line--material {
+  background: repeating-linear-gradient(
+    to right,
+    #76579b 0 2px,
+    transparent 2px 6px
+  );
+}
+
 .inspector-panel {
   grid-column: 2;
   grid-row: 1 / -1;
@@ -559,10 +576,16 @@ h2 {
 }
 
 .inspector-definition,
+.inspector-timestep,
 .inspector-empty > p:last-child {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 13px;
+}
+
+.inspector-timestep {
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
 }
 
 .inspector-live-result {

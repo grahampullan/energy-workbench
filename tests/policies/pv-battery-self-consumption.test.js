@@ -90,25 +90,25 @@ function createFixture({
           id: "grid-to-bus",
           name: "Grid to bus",
           from: { componentId: "grid", portId: "electricity" },
-          to: { componentId: "bus", portId: "terminal-1" }
+          to: { componentId: "bus", portId: "terminal" }
         },
         {
           id: "pv-to-bus",
           name: "PV to bus",
           from: { componentId: "pv", portId: "electricity-out" },
-          to: { componentId: "bus", portId: "terminal-2" }
+          to: { componentId: "bus", portId: "terminal" }
         },
         {
           id: "bus-to-load",
           name: "Bus to load",
-          from: { componentId: "bus", portId: "terminal-3" },
+          from: { componentId: "bus", portId: "terminal" },
           to: { componentId: "load", portId: "electricity-in" }
         },
         {
           id: "battery-to-bus",
           name: "Battery to bus",
           from: { componentId: "battery", portId: "electricity" },
-          to: { componentId: "bus", portId: "terminal-4" }
+          to: { componentId: "bus", portId: "terminal" }
         }
       ]
     },

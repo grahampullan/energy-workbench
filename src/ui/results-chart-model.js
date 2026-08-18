@@ -1,6 +1,7 @@
 import { integrateStepPowerkWh } from "../core/energy-integration.js";
 import {
   ACTIVE_POWER_FLOW_TYPE,
+  MATERIAL_MASS_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../core/flow-types.js";
 
@@ -51,6 +52,43 @@ function flowSeries({
     integratedEnergykWh: integrateStepPowerkWh(
       values.map((powerkW) => forward ? Math.max(0, powerkW) : Math.max(0, -powerkW)),
       timeStepSeconds
+    )
+  };
+}
+
+function materialMassSeries({
+  connection,
+  fromComponent,
+  toComponent,
+  flows,
+  elapsedSeconds,
+  timeStepSeconds
+}) {
+  const values = flows.map((flow, stepIndex) => {
+    const massFlowKgPerSecond = flow?.massFlowKgPerSecond;
+    if (!Number.isFinite(massFlowKgPerSecond) || massFlowKgPerSecond < 0) {
+      throw new TypeError(
+        `Connection ${connection.id} mass flow must be finite and non-negative at step ${stepIndex}`
+      );
+    }
+    return {
+      stepIndex,
+      elapsedSeconds: elapsedSeconds[stepIndex],
+      massFlowKgPerSecond
+    };
+  });
+  return {
+    id: `${connection.id}:mass-forward`,
+    connectionId: connection.id,
+    componentIds: [fromComponent.id, toComponent.id],
+    direction: "forward",
+    flowType: MATERIAL_MASS_FLOW_TYPE,
+    kind: "calculated",
+    label: `${fromComponent.name} → ${toComponent.name}`,
+    values,
+    integratedMassKg: values.reduce(
+      (total, point) => total + point.massFlowKgPerSecond * timeStepSeconds,
+      0
     )
   };
 }
@@ -114,6 +152,30 @@ function createPrescribedPowerSeries({ scenario, stepCount, timeStepSeconds }) {
   });
 }
 
+function createPrescribedMassSeries({ scenario, stepCount, timeStepSeconds }) {
+  return scenarioSeriesWithUnit(scenario, "kg/s", stepCount).map((series) => {
+    if (series.data.values.some((value) => value < 0)) {
+      throw new RangeError(
+        `Prescribed mass-flow series ${series.id} must contain non-negative values`
+      );
+    }
+    return {
+      id: `scenario:${series.id}`,
+      connectionId: null,
+      componentIds: [],
+      direction: null,
+      flowType: MATERIAL_MASS_FLOW_TYPE,
+      kind: "prescribed",
+      label: `${series.name} · prescribed`,
+      values: series.data.values.map((massFlowKgPerSecond, stepIndex) => ({
+        stepIndex,
+        elapsedSeconds: stepIndex * timeStepSeconds,
+        massFlowKgPerSecond
+      }))
+    };
+  });
+}
+
 function createPrescribedTemperatureSeries({
   scenario,
   stepCount,
@@ -133,6 +195,7 @@ function createPrescribedTemperatureSeries({
       label: `${series.name} · prescribed`,
       thresholdC: null,
       thresholdLabel: null,
+      stepValueOffset: 0,
       values
     };
   });
@@ -166,47 +229,76 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
       if (chart === undefined) {
         return [];
       }
-      const { stateField, thresholdParameter, thresholdLabel } = chart;
+      const {
+        stateField,
+        outputField,
+        thresholdParameter,
+        thresholdLabel
+      } = chart;
+      const usesState = typeof stateField === "string";
+      const usesOutput = typeof outputField === "string";
+      const hasThreshold = thresholdParameter !== undefined ||
+        thresholdLabel !== undefined;
       if (
-        typeof stateField !== "string" ||
-        typeof thresholdParameter !== "string" ||
-        typeof thresholdLabel !== "string"
+        usesState === usesOutput ||
+        (
+          hasThreshold &&
+          (
+            typeof thresholdParameter !== "string" ||
+            typeof thresholdLabel !== "string"
+          )
+        )
       ) {
         throw new TypeError(
           `Component ${component.id} temperature-chart metadata is invalid`
         );
       }
-      const initialTemperatureC = stateForComponent(
-        results.initialStates,
-        component.id,
-        "Run results initial states"
-      )[stateField];
-      if (!Number.isFinite(initialTemperatureC)) {
-        throw new TypeError(
-          `Component ${component.id} initial temperature must be finite`
-        );
-      }
-      const values = [{
-        stepIndex: -1,
-        elapsedSeconds: 0,
-        temperatureC: initialTemperatureC
-      }, ...results.steps.map((step, stepIndex) => {
-        const temperatureC = stateForComponent(
-          step.components,
+      let values;
+      let stepValueOffset;
+      if (usesState) {
+        const initialTemperatureC = stateForComponent(
+          results.initialStates,
           component.id,
-          `Run results step ${stepIndex}`
+          "Run results initial states"
         )[stateField];
-        if (!Number.isFinite(temperatureC)) {
+        if (!Number.isFinite(initialTemperatureC)) {
           throw new TypeError(
-            `Component ${component.id} temperature must be finite at step ${stepIndex}`
+            `Component ${component.id} initial temperature must be finite`
           );
         }
-        return {
+        values = [{
+          stepIndex: -1,
+          elapsedSeconds: 0,
+          temperatureC: initialTemperatureC
+        }, ...results.steps.map((step, stepIndex) => ({
           stepIndex,
           elapsedSeconds: step.elapsedSeconds + timeStepSeconds,
-          temperatureC
-        };
-      })];
+          temperatureC: stateForComponent(
+            step.components,
+            component.id,
+            `Run results step ${stepIndex}`
+          )[stateField]
+        }))];
+        stepValueOffset = 1;
+      } else {
+        values = results.steps.map((step, stepIndex) => {
+          const componentResult = step.components.find(
+            (candidate) => candidate.componentId === component.id
+          );
+          const temperatureC = componentResult?.outputs?.[outputField];
+          return {
+            stepIndex,
+            elapsedSeconds: step.elapsedSeconds + timeStepSeconds,
+            temperatureC
+          };
+        });
+        stepValueOffset = 0;
+      }
+      if (values.some(({ temperatureC }) => !Number.isFinite(temperatureC))) {
+        throw new TypeError(
+          `Component ${component.id} temperature series must be finite`
+        );
+      }
 
       return {
         id: `${component.id}:temperature`,
@@ -214,12 +306,11 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
         componentIds: [component.id],
         kind: "calculated",
         label: `${component.name} temperature`,
-        thresholdC: componentParameter(
-          component,
-          definition,
-          thresholdParameter
-        ),
-        thresholdLabel,
+        thresholdC: hasThreshold
+          ? componentParameter(component, definition, thresholdParameter)
+          : null,
+        thresholdLabel: hasThreshold ? thresholdLabel : null,
+        stepValueOffset,
         values
       };
     });
@@ -243,11 +334,12 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
     component
   ]));
   const elapsedSeconds = results.steps.map((step) => step.elapsedSeconds);
+  const endElapsedSeconds = elapsedSeconds.at(-1) + timeStepSeconds;
   const connectionResultsByStep = results.steps.map((step) => new Map(
     step.connections.map((connection) => [connection.connectionId, connection])
   ));
 
-  const series = model.connections.flatMap((connection) => {
+  const connectionEntries = model.connections.map((connection) => {
     const fromComponent = componentsById.get(connection.from.componentId);
     const toComponent = componentsById.get(connection.to.componentId);
     if (!fromComponent || !toComponent) {
@@ -263,11 +355,12 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
     }
     if (
       flowType !== ACTIVE_POWER_FLOW_TYPE &&
-      flowType !== THERMAL_HEAT_FLOW_TYPE
+      flowType !== THERMAL_HEAT_FLOW_TYPE &&
+      flowType !== MATERIAL_MASS_FLOW_TYPE
     ) {
       throw new TypeError(`Connection ${connection.id} has unsupported flow type ${flowType}`);
     }
-    const values = connectionResultsByStep.map((resultsByConnection, stepIndex) => {
+    const flows = connectionResultsByStep.map((resultsByConnection, stepIndex) => {
       const result = resultsByConnection.get(connection.id);
       if (!result) {
         throw new Error(
@@ -279,12 +372,22 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
           `Connection ${connection.id} must have ${flowType} results`
         );
       }
+      return result.flow;
+    });
+    return { connection, fromComponent, toComponent, fromPort, toPort, flowType, flows };
+  });
+
+  const series = connectionEntries.flatMap((entry) => {
+    const { connection, fromComponent, toComponent, fromPort, toPort, flowType, flows } = entry;
+    const values = flows.map((flow, stepIndex) => {
       const powerkW = flowType === ACTIVE_POWER_FLOW_TYPE
-        ? result.flow?.powerkW
-        : result.flow?.heatFlowkW;
+        ? flow?.powerkW
+        : flowType === THERMAL_HEAT_FLOW_TYPE
+          ? flow?.heatFlowkW
+          : flow?.massFlowKgPerSecond * flow?.specificEnthalpyKjPerKg;
       if (!Number.isFinite(powerkW)) {
         throw new TypeError(
-          `Connection ${connection.id} flow must be finite at step ${stepIndex}`
+          `Connection ${connection.id} energy flow must be finite at step ${stepIndex}`
         );
       }
       return powerkW;
@@ -306,13 +409,27 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
       timeStepSeconds
     }));
   });
+  const materialSeries = connectionEntries
+    .filter(({ flowType }) => flowType === MATERIAL_MASS_FLOW_TYPE)
+    .map((entry) => materialMassSeries({
+      ...entry,
+      elapsedSeconds,
+      timeStepSeconds
+    }));
 
   return {
     timeStepSeconds,
     stepCount: results.steps.length,
     elapsedSeconds,
+    endElapsedSeconds,
     series,
+    materialSeries,
     prescribedPowerSeries: createPrescribedPowerSeries({
+      scenario,
+      stepCount: results.steps.length,
+      timeStepSeconds
+    }),
+    prescribedMassSeries: createPrescribedMassSeries({
       scenario,
       stepCount: results.steps.length,
       timeStepSeconds

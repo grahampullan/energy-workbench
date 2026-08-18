@@ -143,6 +143,44 @@ test("model validation reports dangling and incompatible port references", () =>
   assert.ok(diagnosticCodes(incompatibleResult).includes("model.incompatible-port-flow-types"));
 });
 
+test("model validation permits repeated connections only on many ports", () => {
+  const branchingModel = structuredClone(model);
+  branchingModel.components.push({
+    ...structuredClone(branchingModel.components[1]),
+    id: "second-load",
+    name: "Second load"
+  });
+  branchingModel.connections.push({
+    id: "source-to-second-load",
+    name: "Source to second load",
+    from: { componentId: "source", portId: "electricity-out" },
+    to: { componentId: "second-load", portId: "electricity-in" }
+  });
+
+  const singleResult = validateModel(branchingModel, { registry });
+  assert.equal(singleResult.valid, false);
+  assert.ok(
+    diagnosticCodes(singleResult).includes("model.port-connection-cardinality")
+  );
+
+  const repeatableSource = createTestComponentDefinition({
+    ...sourceDefinition,
+    ports: [{
+      ...sourceDefinition.ports[0],
+      cardinality: "many"
+    }]
+  });
+  const repeatableRegistry = createComponentRegistry([
+    repeatableSource,
+    loadDefinition
+  ]);
+  const repeatableResult = validateModel(branchingModel, {
+    registry: repeatableRegistry
+  });
+  assert.equal(repeatableResult.valid, true);
+  assert.deepEqual(repeatableResult.diagnostics, []);
+});
+
 test("component-specific validators contribute diagnostics without owning runtime state", () => {
   const checkedLoad = createTestComponentDefinition({
     ...loadDefinition,

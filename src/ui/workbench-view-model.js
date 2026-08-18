@@ -1,5 +1,6 @@
 import {
   ACTIVE_POWER_FLOW_TYPE,
+  MATERIAL_MASS_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../core/flow-types.js";
 
@@ -77,6 +78,15 @@ function connectionFlowView(connectionResult) {
     return {
       signedFlow: value,
       displayFlow: formatEngineeringValue(value, "kW")
+    };
+  }
+  if (connectionResult.flowType === MATERIAL_MASS_FLOW_TYPE) {
+    const massFlow = connectionResult.flow?.massFlowKgPerSecond;
+    const specificEnthalpy = connectionResult.flow?.specificEnthalpyKjPerKg;
+    return {
+      signedFlow: massFlow,
+      displayFlow: `${formatEngineeringValue(massFlow, "kg/s")} · ` +
+        formatEngineeringValue(specificEnthalpy, "kJ/kg")
     };
   }
   throw new Error(`Run results contain an unsupported flow type: ${connectionResult.flowType}`);
@@ -229,7 +239,13 @@ function powerTone(metric) {
   return metric.value > 0 ? "exporting" : "importing";
 }
 
-function componentView(component, definition, componentResult, parameterOverrides) {
+function componentView(
+  component,
+  definition,
+  componentResult,
+  parameterOverrides,
+  timestepLabel
+) {
   const metric = primaryMetric(definition, componentResult);
   const parameterFields = fieldViews(definition.parameters, {
     ...component.parameters,
@@ -241,6 +257,7 @@ function componentView(component, definition, componentResult, parameterOverride
     type: component.type,
     definitionName: definition.name,
     definitionVersion: definition.version,
+    timestepLabel,
     metric,
     powerTone: powerTone(metric),
     parameterGroups: parameterGroups(definition, parameterFields),
@@ -342,6 +359,10 @@ export function createWorkbenchView({
   }
 
   const step = results.steps[stepIndex];
+  const endElapsedSeconds = step.elapsedSeconds + results.time.timeStepSeconds;
+  const timestepLabel = `${formatElapsedTime(step.elapsedSeconds)}–${
+    formatElapsedTime(endElapsedSeconds)
+  } · step ${stepIndex + 1} of ${results.steps.length}`;
   const componentResultsById = new Map(
     step.components.map((componentResult) => [componentResult.componentId, componentResult])
   );
@@ -364,7 +385,8 @@ export function createWorkbenchView({
       component,
       definitionFor(registry, component),
       componentResult,
-      overridesByComponentId.get(component.id) ?? {}
+      overridesByComponentId.get(component.id) ?? {},
+      timestepLabel
     );
   });
 
@@ -389,7 +411,8 @@ export function createWorkbenchView({
     stepIndex,
     stepCount: results.steps.length,
     elapsedSeconds: step.elapsedSeconds,
-    timelineLabel: `${formatElapsedTime(step.elapsedSeconds)} · step ${stepIndex + 1} of ${results.steps.length}`,
+    endElapsedSeconds,
+    timelineLabel: timestepLabel,
     components,
     connections
   };

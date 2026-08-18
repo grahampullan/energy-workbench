@@ -161,9 +161,10 @@ contracts provide the boundary semantics. The user does not manually assign
 
 A small central `FlowType` contract owns the exact fields, units, and boundary
 validation for each kind of flow. The current types are
-`electricity.active-power` and `thermal.heat-flow`. Their prefixes imply the
-broad engineering domain; do not store a separate `domain` or `medium` field.
-This is a fixed core contract, not a plugin system or generic physics engine.
+`electricity.active-power`, `thermal.heat-flow`, and `material.mass-flow`.
+Their prefixes imply the broad engineering domain; do not store a separate
+`domain` or `medium` field. This is a fixed core contract, not a plugin system
+or generic physics engine.
 
 Keep ownership precise:
 
@@ -171,7 +172,7 @@ Keep ownership precise:
 | --- | --- |
 | `ModelComponent` | Identity, definition version, parameter values, and initial state |
 | `ComponentDefinition` | Ports, parameter/state/output specifications, equations, validation, and editor metadata |
-| Port | `{ id, flowType, direction }`, where direction is `in`, `out`, or `bidirectional` |
+| Port | `{ id, flowType, direction, cardinality? }`, where direction is `in`, `out`, or `bidirectional`, and cardinality is `one` by default or explicitly `many` |
 | Persisted connection | Identity, name, and `from`/`to` component-port references only |
 | Runtime connection | Resolved endpoints and the `flowType` derived from their ports |
 | Runtime connection result | `{ connectionId, flowType, flow }` |
@@ -223,11 +224,51 @@ temperature; a connection adds no fluid equations. This restricted contract
 does not represent mass flow, pressure, mixing, enthalpy transport, or pipe
 delay.
 
+Every directed material mass flow has exactly:
+
+```text
+massFlowKgPerSecond
+specificEnthalpyKjPerKg
+```
+
+Mass flow is non-negative in the declared direction. Specific enthalpy is
+finite and may be negative because its reference state is component-defined.
+Their product is the transported enthalpy rate in kW. The connection carries
+no duplicated temperature, composition, pressure, or phase model; a component
+that needs those properties must own and expose their governing relationship.
+
+The heated material inventory owns `massKg` and `containedEnthalpykWh`. It
+determines outgoing material from its current state, accepts heat through a
+separate thermal port, and advances both states explicitly:
+
+```text
+massNext = mass + (massIn - massOut) * dtSeconds
+enthalpyNext = enthalpy
+             + (enthalpyIn + heatIn - enthalpyOut) * dtSeconds / 3600
+```
+
+Temperature is derived from contained mass, contained enthalpy, specific heat
+capacity, and the component's enthalpy-reference temperature. Cumulative mass
+and energy transfers are result integrations, not component state.
+
 The hot-water store owns the joint feasibility of its charge, discharge,
 ambient-loss, temperature, and capacity constraints. Its resolved actual
 command keeps those boundary conditions explicit, and its temperature state
 advances by explicit integration over `durationHours`. The runtime must not
 repeat or partially reimplement the store equation.
+
+Most ports accept one connection. A physical collector component may instead
+declare a repeatable `many` port. Persisted connections then share that stable
+port ID, while runtime evaluation keeps their flows separate by connection ID;
+the generic connection check never balances an aggregate in place of an
+individual connection.
+
+The ambient boundary has one repeatable incoming `heat-in` port and reports the
+aggregate heat received across its independently checked connections. The
+electrical bus similarly has one repeatable bidirectional `terminal` port and
+owns the power balance across its independently checked connections. Neither
+component has an arbitrary connection-count limit, and neither requires
+numbered placeholder ports.
 
 The Push 1B reference model uses one deliberately fixed thermal topology:
 
@@ -270,6 +311,10 @@ model; negative grid power exports it.
 - Integrated rate totals use the same current-step rectangular sum as state
   transitions. Timestep refinement, chosen by the user, controls integration
   accuracy.
+- A result step represents `[t(n), t(n+1))`. Prescribed values and settled
+  rates are zero-order-held over that interval and plotted as stepped lines.
+  Initial and resulting states belong at `t(n)` and `t(n+1)` respectively;
+  straight chart segments between state samples are presentation only.
 - A run does not mutate the persisted model.
 - Preview overrides are temporary. Apply changes the working model through a
   command. A saved variant is a separate reproducible state.

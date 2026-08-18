@@ -46,7 +46,7 @@
     {
       "id": "ambient",
       "type": "thermal.ambient-boundary",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Ambient",
       "parameters": {
         "temperatureSeriesId": "ambient-temperature"

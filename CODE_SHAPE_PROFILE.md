@@ -71,6 +71,11 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
   input data from canonical run results.
 - Continue to use board-box for topology mechanics. Use ordinary DOM APIs for
   semantic interface elements such as forms, buttons, and inspectors.
+- Lay out topology inputs such as power, fuel, and material towards the left
+  and process outputs towards the right. Place hotter thermal components
+  qualitatively higher and use a wide ambient boundary along the bottom so
+  heat-loss connections descend into it. This is visual meaning, not a scaled
+  temperature axis.
 - Coalesce continuous drag, resize, scrub, and chart rendering to one animation
   frame. Preview scheduling must still preserve the latest pending value.
 

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "model.material-inventory-synthetic",
+  "name": "Synthetic heated material inventory",
+  "components": [
+    {
+      "id": "material-source",
+      "type": "material.source",
+      "definitionVersion": "0.1.0",
+      "name": "Material source",
+      "parameters": {
+        "massFlowSeriesId": "material-inflow",
+        "specificEnthalpyKjPerKg": 100
+      },
+      "initialState": {}
+    },
+    {
+      "id": "grid",
+      "type": "electrical.grid",
+      "definitionVersion": "0.2.0",
+      "name": "Grid",
+      "parameters": {
+        "maximumImportPowerkW": 20,
+        "maximumExportPowerkW": 0
+      },
+      "initialState": {}
+    },
+    {
+      "id": "heater",
+      "type": "thermal.electric-heater",
+      "definitionVersion": "0.2.0",
+      "name": "Electric heater",
+      "parameters": {
+        "maximumElectricalInputPowerkW": 10,
+        "efficiency": 1,
+        "supplyTemperatureC": 150
+      },
+      "initialState": {}
+    },
+    {
+      "id": "inventory",
+      "type": "process.heated-material-inventory",
+      "definitionVersion": "0.1.0",
+      "name": "Heated inventory",
+      "parameters": {
+        "maximumMassKg": 120,
+        "specificHeatCapacityKjPerKgK": 1,
+        "enthalpyReferenceTemperatureC": 0
+      },
+      "initialState": {
+        "massKg": 0,
+        "containedEnthalpykWh": 0
+      }
+    },
+    {
+      "id": "material-sink",
+      "type": "material.sink",
+      "definitionVersion": "0.1.0",
+      "name": "Material sink",
+      "parameters": {},
+      "initialState": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "source-to-inventory",
+      "name": "Material source to inventory",
+      "from": {
+        "componentId": "material-source",
+        "portId": "material-out"
+      },
+      "to": {
+        "componentId": "inventory",
+        "portId": "material-in"
+      }
+    },
+    {
+      "id": "grid-to-heater",
+      "name": "Grid to heater",
+      "from": {
+        "componentId": "grid",
+        "portId": "electricity"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "electricity-in"
+      }
+    },
+    {
+      "id": "heater-to-inventory",
+      "name": "Heater to inventory",
+      "from": {
+        "componentId": "heater",
+        "portId": "heat-out"
+      },
+      "to": {
+        "componentId": "inventory",
+        "portId": "heat-in"
+      }
+    },
+    {
+      "id": "inventory-to-sink",
+      "name": "Inventory to material sink",
+      "from": {
+        "componentId": "inventory",
+        "portId": "material-out"
+      },
+      "to": {
+        "componentId": "material-sink",
+        "portId": "material-in"
+      }
+    }
+  ]
+}

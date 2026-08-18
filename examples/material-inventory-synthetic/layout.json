@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "layout.material-inventory-synthetic",
+  "modelId": "model.material-inventory-synthetic",
+  "components": [
+    {
+      "componentId": "grid",
+      "x": 20,
+      "y": 20
+    },
+    {
+      "componentId": "heater",
+      "x": 260,
+      "y": 20
+    },
+    {
+      "componentId": "material-source",
+      "x": 20,
+      "y": 180
+    },
+    {
+      "componentId": "inventory",
+      "x": 260,
+      "y": 180
+    },
+    {
+      "componentId": "material-sink",
+      "x": 500,
+      "y": 180
+    }
+  ]
+}

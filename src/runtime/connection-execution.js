@@ -9,6 +9,14 @@ function runtimeDiagnostic(code, message, path) {
   return createDiagnostic({ code, message, path });
 }
 
+function evaluatedEndpointFlow(evaluationsByComponentId, endpoint, connectionId) {
+  const portFlowValue = evaluationsByComponentId.get(endpoint.component.id)
+    .portFlows[endpoint.port.id];
+  return endpoint.port.cardinality === "many"
+    ? portFlowValue?.[connectionId]
+    : portFlowValue;
+}
+
 export function checkConnectionBalances(
   runtimeModel,
   evaluationsByComponentId,
@@ -19,10 +27,16 @@ export function checkConnectionBalances(
 ) {
   return runtimeModel.connections.map((connection) => {
     const expectedFlow = connectionFlows.get(connection.id);
-    const fromFlow = evaluationsByComponentId.get(connection.from.component.id)
-      .portFlows[connection.from.port.id];
-    const toFlow = evaluationsByComponentId.get(connection.to.component.id)
-      .portFlows[connection.to.port.id];
+    const fromFlow = evaluatedEndpointFlow(
+      evaluationsByComponentId,
+      connection.from,
+      connection.id
+    );
+    const toFlow = evaluatedEndpointFlow(
+      evaluationsByComponentId,
+      connection.to,
+      connection.id
+    );
     const path = `/steps/${stepIndex}/connections/${connection.id}`;
     const validationMessage = flowValidationMessage(
       connection.flowType,

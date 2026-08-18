@@ -53,6 +53,7 @@ export function createComponentInspector({
   let bindings = [];
   let parameterRowsByKey = new Map();
   let liveResult;
+  let timestep;
   let resultSections;
   let previewStatus;
   let resetButton;
@@ -161,11 +162,13 @@ export function createComponentInspector({
     const definitionName = document.createElement("p");
     definitionName.className = "inspector-definition";
     definitionName.textContent = component.definitionName;
+    timestep = document.createElement("p");
+    timestep.className = "inspector-timestep";
 
     liveResult = document.createElement("div");
     liveResult.className = "inspector-live-result";
     liveResult.append(document.createElement("span"), document.createElement("strong"));
-    target.append(eyebrow, heading, definitionName, liveResult);
+    target.append(eyebrow, heading, definitionName, timestep, liveResult);
 
     for (const group of component.parameterGroups) {
       target.append(parameterGroup(component, group));
@@ -208,14 +211,15 @@ export function createComponentInspector({
   }
 
   function updateResults(component) {
+    timestep.textContent = component.timestepLabel;
     liveResult.dataset.powerTone = component.powerTone;
     liveResult.querySelector("span").textContent = component.metric.label;
     liveResult.querySelector("strong").textContent = component.metric.displayValue;
     resultSections.replaceChildren();
     for (const [title, fields] of [
-      ["Operation", component.operationFields],
-      ["Outputs", component.outputFields],
-      ["State after timestep", component.stateFields]
+      ["Operation during timestep", component.operationFields],
+      ["Timestep results", component.outputFields],
+      ["State at timestep end", component.stateFields]
     ]) {
       const section = inspectorSection(title, fields);
       if (section) {

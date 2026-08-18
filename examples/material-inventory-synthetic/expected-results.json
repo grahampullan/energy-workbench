@@ -1,0 +1,95 @@
+{
+  "numericContract": {
+    "timeStepSeconds": 6,
+    "stepCount": 160
+  },
+  "checkpoints": [
+    {
+      "stepIndex": 0,
+      "containedMassKg": 0,
+      "containedEnthalpykWh": 0,
+      "temperatureC": 0
+    },
+    {
+      "stepIndex": 19,
+      "containedMassKg": 0,
+      "containedEnthalpykWh": 0,
+      "temperatureC": 0
+    },
+    {
+      "stepIndex": 20,
+      "containedMassKg": 6,
+      "containedEnthalpykWh": 0.16666666666666666,
+      "temperatureC": 100
+    },
+    {
+      "stepIndex": 39,
+      "containedMassKg": 120,
+      "containedEnthalpykWh": 3.3333333333333335,
+      "temperatureC": 100
+    },
+    {
+      "stepIndex": 59,
+      "containedMassKg": 120,
+      "containedEnthalpykWh": 3.3333333333333335,
+      "temperatureC": 100
+    },
+    {
+      "stepIndex": 60,
+      "containedMassKg": 120,
+      "containedEnthalpykWh": 3.35,
+      "temperatureC": 100.5
+    },
+    {
+      "stepIndex": 69,
+      "containedMassKg": 120,
+      "containedEnthalpykWh": 3.5,
+      "temperatureC": 105
+    },
+    {
+      "stepIndex": 79,
+      "containedMassKg": 120,
+      "containedEnthalpykWh": 3.6666666666666665,
+      "temperatureC": 110
+    },
+    {
+      "stepIndex": 109,
+      "containedMassKg": 120,
+      "containedEnthalpykWh": 3.6666666666666665,
+      "temperatureC": 110
+    },
+    {
+      "stepIndex": 110,
+      "containedMassKg": 114,
+      "containedEnthalpykWh": 3.4833333333333334,
+      "temperatureC": 110
+    },
+    {
+      "stepIndex": 119,
+      "containedMassKg": 60,
+      "containedEnthalpykWh": 1.8333333333333333,
+      "temperatureC": 110
+    },
+    {
+      "stepIndex": 129,
+      "containedMassKg": 0,
+      "containedEnthalpykWh": 0,
+      "temperatureC": 0
+    },
+    {
+      "stepIndex": 159,
+      "containedMassKg": 0,
+      "containedEnthalpykWh": 0,
+      "temperatureC": 0
+    }
+  ],
+  "summary": {
+    "totalMassInKg": 120,
+    "totalMassOutKg": 120,
+    "totalEnthalpyInKWh": 3.3333333333333335,
+    "totalHeatInputKWh": 0.3333333333333333,
+    "totalEnthalpyOutKWh": 3.6666666666666665,
+    "finalContainedMassKg": 0,
+    "finalContainedEnthalpykWh": 0
+  }
+}

@@ -97,12 +97,37 @@ test("component registry rejects duplicate ports and malformed parameter ranges"
 test("component registry rejects unsupported flow types", () => {
   const definition = createTestComponentDefinition({
     ports: [
-      { id: "material-out", flowType: "material.mass-flow", direction: "out" }
+      { id: "fluid-out", flowType: "fluid.volume-flow", direction: "out" }
     ]
   });
 
   assert.throws(
     () => createComponentRegistry([definition]),
     /flowType is not supported/u
+  );
+});
+
+test("component registry accepts one or many port cardinality", () => {
+  const repeatablePort = createTestComponentDefinition({
+    ports: [{
+      id: "terminal",
+      flowType: "electricity.active-power",
+      direction: "bidirectional",
+      cardinality: "many"
+    }]
+  });
+  assert.doesNotThrow(() => createComponentRegistry([repeatablePort]));
+
+  const invalidCardinality = createTestComponentDefinition({
+    ports: [{
+      id: "terminal",
+      flowType: "electricity.active-power",
+      direction: "bidirectional",
+      cardinality: "unlimited"
+    }]
+  });
+  assert.throws(
+    () => createComponentRegistry([invalidCardinality]),
+    /cardinality is invalid/u
   );
 });

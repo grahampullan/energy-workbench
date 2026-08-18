@@ -74,18 +74,18 @@ function createFixture({
         id: "grid-to-bus",
         name: "Grid to bus",
         from: { componentId: "grid", portId: "electricity" },
-        to: { componentId: "bus", portId: "terminal-1" }
+        to: { componentId: "bus", portId: "terminal" }
       },
       {
         id: "pv-to-bus",
         name: "PV to bus",
         from: { componentId: "pv", portId: "electricity-out" },
-        to: { componentId: "bus", portId: "terminal-2" }
+        to: { componentId: "bus", portId: "terminal" }
       },
       {
         id: "bus-to-load",
         name: "Bus to load",
-        from: { componentId: "bus", portId: "terminal-3" },
+        from: { componentId: "bus", portId: "terminal" },
         to: { componentId: "load", portId: "electricity-in" }
       }
     ]
@@ -138,7 +138,7 @@ function addDispatchableSource(fixture) {
     id: "source-to-bus",
     name: "Source to bus",
     from: { componentId: "source", portId: "electricity-out" },
-    to: { componentId: "bus", portId: "terminal-4" }
+    to: { componentId: "bus", portId: "terminal" }
   });
 }
 
@@ -186,11 +186,10 @@ test("runScenario records fixed PV and load operation with residual grid import 
   assert.deepEqual(bus.feasibleCommand, { powerkW: 0 });
   assert.deepEqual(bus.actualCommand, {
     powerkW: 0,
-    portPowerkW: {
-      "terminal-1": -10,
-      "terminal-2": -5,
-      "terminal-3": 15,
-      "terminal-4": 0
+    connectionPowerkW: {
+      "pv-to-bus": -5,
+      "bus-to-load": 15,
+      "grid-to-bus": -10
     }
   });
   assert.deepEqual(bus.outputs, { powerBalanceErrorkW: 0 });
@@ -483,32 +482,34 @@ test("connection balance is checked against component-evaluated port flows", () 
   assert.ok(diagnosticCodes(result).includes("runtime.connection-balance"));
 });
 
-test("the bus balances branching electrical loads through the selected component", () => {
+test("the bus accepts more than four connections and balances branching loads", () => {
   const fixture = createFixture();
-  fixture.model.components.push({
-    id: "second-load",
-    type: electricalLoadDefinition.type,
-    definitionVersion: electricalLoadDefinition.version,
-    name: "Second load",
-    parameters: { demandSeriesId: "demand", profileMultiplier: 1 },
-    initialState: {}
-  });
-  fixture.model.connections.push({
-    id: "bus-to-second-load",
-    name: "Bus to second load",
-    from: { componentId: "bus", portId: "terminal-4" },
-    to: { componentId: "second-load", portId: "electricity-in" }
-  });
+  for (const ordinal of ["second", "third"]) {
+    fixture.model.components.push({
+      id: `${ordinal}-load`,
+      type: electricalLoadDefinition.type,
+      definitionVersion: electricalLoadDefinition.version,
+      name: `${ordinal} load`,
+      parameters: { demandSeriesId: "demand", profileMultiplier: 1 },
+      initialState: {}
+    });
+    fixture.model.connections.push({
+      id: `bus-to-${ordinal}-load`,
+      name: `Bus to ${ordinal} load`,
+      from: { componentId: "bus", portId: "terminal" },
+      to: { componentId: `${ordinal}-load`, portId: "electricity-in" }
+    });
+  }
 
   const result = runScenario(fixture);
 
   assert.equal(result.completed, true);
   assert.deepEqual(result.results.steps[0].components[0].actualCommand, {
-    powerkW: 20
+    powerkW: 30
   });
   assert.deepEqual(
     result.results.steps[0].connections.map((connection) => connection.flow.powerkW),
-    [20, 5, 15, 10]
+    [30, 5, 15, 10, 10]
   );
   assert.equal(
     result.results.steps[0].components[1].outputs.powerBalanceErrorkW,

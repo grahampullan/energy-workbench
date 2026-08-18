@@ -162,3 +162,41 @@ export function createBatchHeatingRunKpis(results) {
     )
   ];
 }
+
+export function createMaterialInventoryRunKpis(results) {
+  requireResults(results);
+  const integrateEnergy = (field) => integrateStepPowerkWh(
+    outputSeries(results, "inventory", field),
+    results.time.timeStepSeconds
+  );
+  const integrateMass = (field) => outputSeries(
+    results,
+    "inventory",
+    field
+  ).reduce(
+    (total, value) => total + value * results.time.timeStepSeconds,
+    0
+  );
+  const temperaturesC = outputSeries(results, "inventory", "temperatureC");
+
+  return [
+    kpi("material-mass-in", "Material in", integrateMass(
+      "massInflowKgPerSecond"
+    ), "kg"),
+    kpi("material-mass-out", "Material out", integrateMass(
+      "massOutflowKgPerSecond"
+    ), "kg"),
+    kpi("material-enthalpy-in", "Material energy in", integrateEnergy(
+      "enthalpyInflowkW"
+    ), "kWh"),
+    kpi("heat-input-energy", "Heat supplied", integrateEnergy(
+      "heatInputkW"
+    ), "kWh"),
+    kpi("material-enthalpy-out", "Material energy out", integrateEnergy(
+      "enthalpyOutflowkW"
+    ), "kWh"),
+    kpi("peak-inventory-temperature", "Peak inventory temp", Math.max(
+      ...temperaturesC
+    ), "°C")
+  ];
+}

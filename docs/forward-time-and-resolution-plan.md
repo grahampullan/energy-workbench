@@ -1,7 +1,7 @@
 # Forward-time integration and topology-resolution plan
 
-**Status:** Implemented for the current electrical and thermal components;
-future flow types must extend the same small contract
+**Status:** Implemented for the current electrical, thermal, and material-flow
+components; future flow types must extend the same small contract
 
 **Date:** 15 August 2026
 
@@ -34,10 +34,12 @@ state(n+1) = state(n) + rate(n) * timestep
 ```
 
 Reported energy and material totals must use the same current-step rectangular
-sum as the state transitions. Scenario and result samples may be joined by
-straight lines for presentation, but that does not change the values used by
-the runtime. The user is responsible for choosing a sufficiently fine
-timestep; component tests should check timestep refinement where it matters.
+sum as the state transitions. Prescribed values and resolved rates are held
+constant over `[t(n), t(n+1))` and plotted as stepped intervals through the
+final timestep boundary. States are plotted at their time boundaries; straight
+lines between state points are visual interpolation only. The user is
+responsible for choosing a sufficiently fine timestep; component tests should
+check timestep refinement where it matters.
 
 The preserved Visual Energy Modeller fixture remains historical evidence of
 its trapezoidal chart integration. New Energy Workbench results should follow
@@ -138,13 +140,13 @@ thermal storage remain conditional Push 3 scope.
 
 ## Material-inventory proof
 
-Before the private ladle model, add a small public headless proof:
+The public headless proof is:
 
 ```text
 Material source -> Heated inventory -> Material sink
 ```
 
-The inventory should conserve:
+The inventory conserves:
 
 - incoming mass;
 - contained mass;
@@ -153,10 +155,12 @@ The inventory should conserve:
 - contained enthalpy; and
 - heat transferred through separate thermal ports.
 
-Temperature is derived from material inventory and enthalpy. Cumulative mass
-in and out are integrated results rather than additional stored states. The
-exact fields of the material-flow contract remain open until this proof is
-designed and tested.
+The material connection contains exactly mass flow in kg/s and specific
+enthalpy in kJ/kg. Temperature is derived from material inventory and
+enthalpy. Cumulative mass in and out are integrated results rather than
+additional stored states. The reviewed fixture tests fill, hold, heat, empty,
+outflow limiting, conservation, dependency order, and aligned timestep
+refinement.
 
 ## Ladle component direction
 
@@ -166,10 +170,11 @@ because they have different lifecycles:
 - The refractory persists and has approximately fixed mass.
 - The molten-metal inventory is filled, held, and emptied.
 
-A thermal-contact component or an equally explicit component-owned contact
-rule determines heat exchange from current-time temperatures and capabilities.
-The model must not hide tapping as an unexplained temperature reset or treat
-material transfer as an ordinary thermal-flow connection.
+The refractory component determines metal-to-refractory heat exchange from
+current-time temperatures and capabilities. The direct connection carries the
+settled thermal flow; there is no separate thermal-contact component. The model
+must not hide tapping as an unexplained temperature reset or treat material
+transfer as an ordinary thermal-flow connection.
 
 The public repository should contain reusable process, inventory, contact,
 fuel, and burner components with neutral synthetic tests. Private MHI-informed
@@ -184,9 +189,9 @@ repository.
 2. Add the minimal resolution declarations and derive a checked resolution
    plan for all existing examples. **Complete.**
 3. Prove material mass and enthalpy conservation headlessly through fill,
-   hold, and empty operation.
-4. Add separate refractory, molten-metal inventory, and thermal-contact
-   behaviour with timestep-refinement tests.
+   hold, and empty operation. **Complete.**
+4. Add separate refractory and molten-metal inventory behaviour, including
+   their direct heat-transfer connection, with timestep-refinement tests.
 5. Add fuel, burner, process modes, policy comparisons, and the private ladle
    UI required for External Gate 2.
 6. Use the later heat-exchanger, heat-pump, and store topology to test the

@@ -17,7 +17,7 @@
     {
       "id": "bus",
       "type": "electrical.bus",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Electrical bus",
       "parameters": {},
       "initialState": {}
@@ -71,7 +71,7 @@
       },
       "to": {
         "componentId": "bus",
-        "portId": "terminal-1"
+        "portId": "terminal"
       }
     },
     {
@@ -83,7 +83,7 @@
       },
       "to": {
         "componentId": "bus",
-        "portId": "terminal-2"
+        "portId": "terminal"
       }
     },
     {
@@ -91,7 +91,7 @@
       "name": "Bus to electrical load",
       "from": {
         "componentId": "bus",
-        "portId": "terminal-3"
+        "portId": "terminal"
       },
       "to": {
         "componentId": "load",
@@ -107,7 +107,7 @@
       },
       "to": {
         "componentId": "bus",
-        "portId": "terminal-4"
+        "portId": "terminal"
       }
     }
   ]

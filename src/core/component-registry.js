@@ -5,6 +5,7 @@ const STABLE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
 const FIELD_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*$/u;
 const SEMANTIC_VERSION_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const PORT_DIRECTIONS = new Set(["in", "out", "bidirectional"]);
+const PORT_CARDINALITIES = new Set(["one", "many"]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -128,6 +129,12 @@ function assertPorts(ports, definitionType) {
     }
     if (!PORT_DIRECTIONS.has(port.direction)) {
       throw new TypeError(`${definitionType}.ports.${port.id}.direction is invalid`);
+    }
+    if (
+      port.cardinality !== undefined &&
+      !PORT_CARDINALITIES.has(port.cardinality)
+    ) {
+      throw new TypeError(`${definitionType}.ports.${port.id}.cardinality is invalid`);
     }
     if (portIds.has(port.id)) {
       throw new TypeError(`${definitionType} declares duplicate port ID: ${port.id}`);

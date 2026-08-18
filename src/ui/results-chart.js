@@ -1,6 +1,7 @@
 import {
   axisBottom,
   axisLeft,
+  curveStepAfter,
   line,
   max,
   min,
@@ -37,6 +38,36 @@ function formatChartTime(elapsedSeconds) {
   const minutes = minutesWithinDay % 60;
   const clock = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   return days ? `D${days + 1} ${clock}` : clock;
+}
+
+function extendRateThroughTimestepEnd(values, endElapsedSeconds) {
+  const last = values.at(-1);
+  return [...values, { ...last, elapsedSeconds: endElapsedSeconds }];
+}
+
+export function chartStepIndexAtElapsedSeconds({
+  mode,
+  elapsedSeconds,
+  startElapsedSeconds,
+  stepCount,
+  timeStepSeconds
+}) {
+  if (
+    (mode !== "power" && mode !== "mass" && mode !== "temperature") ||
+    !Number.isFinite(elapsedSeconds) ||
+    !Number.isFinite(startElapsedSeconds) ||
+    !Number.isInteger(stepCount) ||
+    stepCount < 1 ||
+    !Number.isFinite(timeStepSeconds) ||
+    timeStepSeconds <= 0
+  ) {
+    throw new TypeError("Valid chart time and timestep state are required");
+  }
+  const stepPosition = (elapsedSeconds - startElapsedSeconds) / timeStepSeconds;
+  const approximateStep = mode === "temperature"
+    ? Math.ceil(stepPosition) - 1
+    : Math.floor(stepPosition);
+  return Math.max(0, Math.min(stepCount - 1, approximateStep));
 }
 
 export function nextChartStepIndex({
@@ -127,6 +158,7 @@ export function createResultsChart({
   legendTarget,
   powerButton,
   energyButton,
+  massButton,
   temperatureButton,
   headingTarget,
   onStepChange,
@@ -137,6 +169,7 @@ export function createResultsChart({
     !legendTarget ||
     !powerButton ||
     !energyButton ||
+    !massButton ||
     !temperatureButton ||
     !headingTarget
   ) {
@@ -191,6 +224,12 @@ export function createResultsChart({
   }
 
   function visibleSeries(model) {
+    if (mode === "mass") {
+      return [
+        ...model.materialSeries,
+        ...model.prescribedMassSeries
+      ];
+    }
     if (mode === "temperature") {
       return [
         ...model.temperatureSeries,
@@ -233,13 +272,13 @@ export function createResultsChart({
 
   function stepFromPointer(event) {
     const [pointerX] = pointer(event, svg.node());
-    const firstElapsedSeconds = mode === "temperature"
-      ? state.model.timeStepSeconds
-      : state.model.elapsedSeconds[0];
-    const approximateStep = Math.round(
-      (xScale.invert(pointerX) - firstElapsedSeconds) / state.model.timeStepSeconds
-    );
-    return Math.max(0, Math.min(state.model.stepCount - 1, approximateStep));
+    return chartStepIndexAtElapsedSeconds({
+      mode,
+      elapsedSeconds: xScale.invert(pointerX),
+      startElapsedSeconds: state.model.elapsedSeconds[0],
+      stepCount: state.model.stepCount,
+      timeStepSeconds: state.model.timeStepSeconds
+    });
   }
 
   function updateStepFromPointer(event) {
@@ -267,18 +306,15 @@ export function createResultsChart({
     const plotWidth = WIDTH - margin.left - margin.right;
     const plotHeight = HEIGHT - margin.top - margin.bottom;
     const series = visibleSeries(model);
+    const valueField = mode === "mass"
+      ? "massFlowKgPerSecond"
+      : "powerkW";
     const maximumPowerkW = max(series, (candidate) =>
-      max(candidate.values, (point) => point.powerkW)
+      max(candidate.values, (point) => point[valueField])
     ) ?? 0;
     const firstElapsedSeconds = model.elapsedSeconds[0];
-    const lastElapsedSeconds = model.elapsedSeconds.at(-1);
     xScale = scaleLinear()
-      .domain([
-        firstElapsedSeconds,
-        lastElapsedSeconds === firstElapsedSeconds
-          ? firstElapsedSeconds + model.timeStepSeconds
-          : lastElapsedSeconds
-      ])
+      .domain([firstElapsedSeconds, model.endElapsedSeconds])
       .range([margin.left, WIDTH - margin.right]);
     yScale = scaleLinear()
       .domain([0, maximumPowerkW || 1])
@@ -286,8 +322,12 @@ export function createResultsChart({
       .range([HEIGHT - margin.bottom, margin.top]);
     const powerLine = line()
       .x((point) => xScale(point.elapsedSeconds))
-      .y((point) => yScale(point.powerkW));
-    const pathFor = (candidate) => powerLine(candidate.values);
+      .y((point) => yScale(point[valueField]))
+      .curve(curveStepAfter);
+    const pathFor = (candidate) => powerLine(extendRateThroughTimestepEnd(
+      candidate.values,
+      model.endElapsedSeconds
+    ));
 
     xAxisLayer
       .attr("transform", `translate(0 ${HEIGHT - margin.bottom})`)
@@ -304,8 +344,10 @@ export function createResultsChart({
     gridLayer
       .attr("transform", `translate(${margin.left} 0)`)
       .call(axisLeft(yScale).ticks(6).tickSize(-plotWidth).tickFormat(""));
-    yLabel.text("Flow rate (kW)");
-    title.text("Energy flow rate over time");
+    yLabel.text(mode === "mass" ? "Mass flow (kg/s)" : "Power (kW)");
+    title.text(mode === "mass"
+      ? "Material mass flow rate over time"
+      : "Power over time");
 
     barLayer.selectAll("rect.results-energy-bar").remove();
     lineLayer.selectAll("path.results-temperature-line").remove();
@@ -412,10 +454,7 @@ export function createResultsChart({
     const plotWidth = WIDTH - margin.left - margin.right;
     const plotHeight = HEIGHT - margin.top - margin.bottom;
     const series = visibleSeries(model);
-    const firstElapsedSeconds = series[0].values[0].elapsedSeconds;
-    const lastElapsedSeconds = max(series, (candidate) =>
-      candidate.values.at(-1).elapsedSeconds
-    );
+    const firstElapsedSeconds = model.elapsedSeconds[0];
     const minimumTemperatureC = min(series, (candidate) => {
       const seriesMinimumC = min(
         candidate.values,
@@ -434,12 +473,7 @@ export function createResultsChart({
     const temperatureRangeC = maximumTemperatureC - minimumTemperatureC;
     const temperaturePaddingC = Math.max(1, temperatureRangeC * 0.12);
     xScale = scaleLinear()
-      .domain([
-        firstElapsedSeconds,
-        lastElapsedSeconds === firstElapsedSeconds
-          ? firstElapsedSeconds + model.timeStepSeconds
-          : lastElapsedSeconds
-      ])
+      .domain([firstElapsedSeconds, model.endElapsedSeconds])
       .range([margin.left, WIDTH - margin.right]);
     yScale = scaleLinear()
       .domain([
@@ -448,10 +482,21 @@ export function createResultsChart({
       ])
       .nice()
       .range([HEIGHT - margin.bottom, margin.top]);
-    const temperatureLine = line()
-      .x((point) => xScale(point.elapsedSeconds))
-      .y((point) => yScale(point.temperatureC));
-    const pathFor = (candidate) => temperatureLine(candidate.values);
+    const pathFor = (candidate) => {
+      const temperatureLine = line()
+        .x((point) => xScale(point.elapsedSeconds))
+        .y((point) => yScale(point.temperatureC));
+      const values = candidate.kind === "prescribed"
+        ? extendRateThroughTimestepEnd(
+            candidate.values,
+            model.endElapsedSeconds
+          )
+        : candidate.values;
+      if (candidate.kind === "prescribed") {
+        temperatureLine.curve(curveStepAfter);
+      }
+      return temperatureLine(values);
+    };
 
     xAxisLayer
       .attr("transform", `translate(0 ${HEIGHT - margin.bottom})`)
@@ -576,9 +621,11 @@ export function createResultsChart({
       return;
     }
     const series = visibleSeries(state.model);
+    const startElapsedSeconds = state.model.elapsedSeconds[state.stepIndex];
+    const endElapsedSeconds = startElapsedSeconds + state.model.timeStepSeconds;
     const elapsedSeconds = mode === "temperature"
-      ? state.model.elapsedSeconds[state.stepIndex] + state.model.timeStepSeconds
-      : state.model.elapsedSeconds[state.stepIndex];
+      ? endElapsedSeconds
+      : startElapsedSeconds;
     const cursorX = xScale(elapsedSeconds);
     cursorLine
       .attr("x1", cursorX)
@@ -597,23 +644,31 @@ export function createResultsChart({
       .attr("cy", (candidate) => yScale(
         mode === "temperature"
           ? candidate.values[
-              state.stepIndex + (candidate.kind === "prescribed" ? 0 : 1)
+              state.stepIndex + candidate.stepValueOffset
             ].temperatureC
-          : candidate.values[state.stepIndex].powerkW
+          : candidate.values[state.stepIndex][
+              mode === "mass" ? "massFlowKgPerSecond" : "powerkW"
+            ]
       ))
       .attr("fill", (candidate) => colourFor(candidate.id));
   }
 
   function updateLegend() {
     for (const series of visibleSeries(state.model)) {
-      const value = mode === "power"
-        ? series.values[state.stepIndex].powerkW
+      const value = mode === "power" || mode === "mass"
+        ? series.values[state.stepIndex][
+            mode === "mass" ? "massFlowKgPerSecond" : "powerkW"
+          ]
         : mode === "energy"
           ? series.integratedEnergykWh
           : series.values[
-              state.stepIndex + (series.kind === "prescribed" ? 0 : 1)
+              state.stepIndex + series.stepValueOffset
             ].temperatureC;
-      const unit = mode === "power" ? "kW" : mode === "energy" ? "kWh" : "°C";
+      const unit = mode === "power"
+        ? "kW"
+        : mode === "mass"
+          ? "kg/s"
+          : mode === "energy" ? "kWh" : "°C";
       legendBySeriesId.get(series.id).value.textContent = formatEngineeringValue(value, unit);
     }
   }
@@ -631,9 +686,11 @@ export function createResultsChart({
       return;
     }
 
+    const startElapsedSeconds = state.model.elapsedSeconds[state.stepIndex];
+    const endElapsedSeconds = startElapsedSeconds + state.model.timeStepSeconds;
     const elapsedSeconds = mode === "temperature"
-      ? state.model.elapsedSeconds[state.stepIndex] + state.model.timeStepSeconds
-      : state.model.elapsedSeconds[state.stepIndex];
+      ? endElapsedSeconds
+      : startElapsedSeconds;
     svg
       .attr("role", "slider")
       .attr("tabindex", 0)
@@ -641,16 +698,22 @@ export function createResultsChart({
         "aria-label",
         mode === "temperature"
           ? "Component temperature results timeline"
-          : "Energy flow results timeline"
+          : mode === "mass"
+            ? "Material mass-flow results timeline"
+            : "Power results timeline"
       )
       .attr("aria-valuemin", 1)
       .attr("aria-valuemax", state.model.stepCount)
       .attr("aria-valuenow", state.stepIndex + 1)
       .attr(
         "aria-valuetext",
-        `${formatChartTime(elapsedSeconds)}, ${
-          mode === "temperature" ? "state after " : ""
-        }step ${state.stepIndex + 1} of ${state.model.stepCount}`
+        mode === "temperature"
+          ? `${formatChartTime(elapsedSeconds)}, state after step ${
+              state.stepIndex + 1
+            } of ${state.model.stepCount}`
+          : `${formatChartTime(startElapsedSeconds)}–${
+              formatChartTime(endElapsedSeconds)
+            }, step ${state.stepIndex + 1} of ${state.model.stepCount}`
       );
   }
 
@@ -658,7 +721,7 @@ export function createResultsChart({
     if (state.model !== renderedModel || mode !== renderedMode) {
       rebuildLegend(state.model);
     }
-    if (mode === "power") {
+    if (mode === "power" || mode === "mass") {
       renderPower(state.model);
     } else if (mode === "energy") {
       renderEnergy(state.model);
@@ -676,9 +739,12 @@ export function createResultsChart({
       }
       powerButton.setAttribute("aria-pressed", String(mode === "power"));
       energyButton.setAttribute("aria-pressed", String(mode === "energy"));
+      massButton.setAttribute("aria-pressed", String(mode === "mass"));
       temperatureButton.setAttribute("aria-pressed", String(mode === "temperature"));
       headingTarget.textContent = mode === "power"
-        ? "Flow over time"
+        ? "Power over time"
+        : mode === "mass"
+          ? "Mass flow over time"
         : mode === "energy"
           ? "Integrated energy"
           : "Temperature over time";
@@ -706,7 +772,13 @@ export function createResultsChart({
     temperatureButton.hidden =
       nextState.model.temperatureSeries.length === 0 &&
       nextState.model.prescribedTemperatureSeries.length === 0;
+    massButton.hidden =
+      nextState.model.materialSeries.length === 0 &&
+      nextState.model.prescribedMassSeries.length === 0;
     if (mode === "temperature" && temperatureButton.hidden) {
+      mode = "power";
+    }
+    if (mode === "mass" && massButton.hidden) {
       mode = "power";
     }
     frameRenderer.request();
@@ -716,9 +788,17 @@ export function createResultsChart({
     if (
       nextMode !== "power" &&
       nextMode !== "energy" &&
+      nextMode !== "mass" &&
       nextMode !== "temperature"
     ) {
       throw new TypeError(`Unknown results chart mode: ${nextMode}`);
+    }
+    if (
+      nextMode === "mass" &&
+      state?.model.materialSeries.length === 0 &&
+      state?.model.prescribedMassSeries.length === 0
+    ) {
+      return;
     }
     if (
       nextMode === "temperature" &&
@@ -740,6 +820,7 @@ export function createResultsChart({
 
   const showPower = () => setMode("power");
   const showEnergy = () => setMode("energy");
+  const showMass = () => setMode("mass");
   const showTemperature = () => setMode("temperature");
   const handleKeyDown = (event) => {
     if (mode === "energy" || !state) {
@@ -761,6 +842,7 @@ export function createResultsChart({
   };
   powerButton.addEventListener("click", showPower);
   energyButton.addEventListener("click", showEnergy);
+  massButton.addEventListener("click", showMass);
   temperatureButton.addEventListener("click", showTemperature);
   svg.on("keydown", handleKeyDown);
 
@@ -771,6 +853,7 @@ export function createResultsChart({
       frameRenderer.dispose();
       powerButton.removeEventListener("click", showPower);
       energyButton.removeEventListener("click", showEnergy);
+      massButton.removeEventListener("click", showMass);
       temperatureButton.removeEventListener("click", showTemperature);
       svg.on("keydown", null);
       legendTarget.replaceChildren();

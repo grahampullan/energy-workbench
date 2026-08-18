@@ -7,8 +7,12 @@ import {
 } from "board-box";
 import { select } from "d3";
 
-import { THERMAL_HEAT_FLOW_TYPE } from "../core/flow-types.js";
+import {
+  MATERIAL_MASS_FLOW_TYPE,
+  THERMAL_HEAT_FLOW_TYPE
+} from "../core/flow-types.js";
 import { createFrameRenderer } from "./animation-frame.js";
+import { connectionGeometry } from "./topology-geometry.js";
 
 const BOX_WIDTH = 164;
 const BOX_HEIGHT = 104;
@@ -142,57 +146,18 @@ function addArrowMarkers(svg) {
     .attr("d", "M 0 0 L 10 5 L 0 10 z");
 }
 
-function boxEdgePoint(box, toward) {
-  const centre = {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2
-  };
-  const deltaX = toward.x - centre.x;
-  const deltaY = toward.y - centre.y;
-  if (deltaX === 0 && deltaY === 0) {
-    return centre;
-  }
-  const scale = 1 / Math.max(
-    Math.abs(deltaX) / (box.width / 2),
-    Math.abs(deltaY) / (box.height / 2)
-  );
-  return {
-    x: centre.x + deltaX * scale,
-    y: centre.y + deltaY * scale
-  };
-}
-
-function connectionGeometry(boxesByComponentId, connections) {
-  return connections.flatMap((connection) => {
-    const fromBox = boxesByComponentId.get(connection.fromComponentId);
-    const toBox = boxesByComponentId.get(connection.toComponentId);
-    if (!fromBox || !toBox) {
-      return [];
-    }
-
-    const fromCentre = {
-      x: fromBox.x + fromBox.width / 2,
-      y: fromBox.y + fromBox.height / 2
-    };
-    const toCentre = {
-      x: toBox.x + toBox.width / 2,
-      y: toBox.y + toBox.height / 2
-    };
-    const fromEdge = boxEdgePoint(fromBox, toCentre);
-    const toEdge = boxEdgePoint(toBox, fromCentre);
-    const { x: x1, y: y1 } = fromEdge;
-    const { x: x2, y: y2 } = toEdge;
-    return [{ ...connection, x1, y1, x2, y2 }];
-  });
-}
-
 function renderConnections(
   content,
   boxesByComponentId,
   view,
+  verticalBoundaryComponentIds,
   onConnectionHighlight
 ) {
-  const connections = connectionGeometry(boxesByComponentId, view.connections);
+  const connections = connectionGeometry(
+    boxesByComponentId,
+    view.connections,
+    verticalBoundaryComponentIds
+  );
 
   content
     .selectAll("line.connection-line")
@@ -206,6 +171,10 @@ function renderConnections(
     .classed(
       "connection-line--thermal",
       (connection) => connection.flowType === THERMAL_HEAT_FLOW_TYPE
+    )
+    .classed(
+      "connection-line--material",
+      (connection) => connection.flowType === MATERIAL_MASS_FLOW_TYPE
     )
     .classed(
       "connection-line--highlighted",
@@ -276,12 +245,16 @@ export function createTopologyBoard({
     .attr("class", "connection-content");
 
   const boxesByComponentId = new Map();
+  const verticalBoundaryComponentIds = new Set(model.components
+    .filter(({ type }) => type === "thermal.ambient-boundary")
+    .map(({ id }) => id));
   const connectionRenderer = createFrameRenderer({
     render() {
       renderConnections(
         connectionContent,
         boxesByComponentId,
         getView(),
+        verticalBoundaryComponentIds,
         onConnectionHighlight
       );
     }

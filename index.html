@@ -25,6 +25,7 @@
                 <option value="blog-electrical">PV and battery</option>
                 <option value="coupled-thermal">Coupled thermal</option>
                 <option value="batch-heating-synthetic">Batch heating</option>
+                <option value="material-inventory-synthetic">Material inventory</option>
               </select>
             </label>
             <input
@@ -62,6 +63,7 @@
           <div class="flow-legend" aria-label="Flow legend">
             <span><i class="legend-line" aria-hidden="true"></i> Electrical flow</span>
             <span><i class="legend-line legend-line--thermal" aria-hidden="true"></i> Thermal flow</span>
+            <span><i class="legend-line legend-line--material" aria-hidden="true"></i> Material flow</span>
             <span>Layout changes reset on reload</span>
           </div>
         </section>
@@ -70,11 +72,12 @@
           <div class="results-heading">
             <div>
               <p class="eyebrow">Run results</p>
-              <h2 id="results-chart-title">Flow over time</h2>
+              <h2 id="results-chart-title">Power over time</h2>
             </div>
             <div class="results-view-controls" aria-label="Results chart view">
-              <button id="show-power-chart" type="button" aria-pressed="true">Flow</button>
+              <button id="show-power-chart" type="button" aria-pressed="true">Power</button>
               <button id="show-energy-chart" type="button" aria-pressed="false">Energy</button>
+              <button id="show-mass-chart" type="button" aria-pressed="false" hidden>Mass</button>
               <button
                 id="show-temperature-chart"
                 type="button"

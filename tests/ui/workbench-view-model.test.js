@@ -59,7 +59,9 @@ test("browser presentation derives the selected timestep from canonical results"
   );
   const batteryView = view.components.find((component) => component.id === "battery");
 
-  assert.equal(view.timelineLabel, "12:00 · step 721 of 1440");
+  assert.equal(view.timelineLabel, "12:00–12:01 · step 721 of 1440");
+  assert.equal(view.elapsedSeconds, 43_200);
+  assert.equal(view.endElapsedSeconds, 43_260);
   assert.equal(view.components.length, model.components.length);
   assert.equal(view.connections.length, model.connections.length);
   assert.equal(batteryView.metric.value, runtimeBattery.actualCommand.powerkW);

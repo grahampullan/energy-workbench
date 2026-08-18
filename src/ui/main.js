@@ -4,7 +4,11 @@ import { electricalGridDefinition } from "../components/electrical/grid.js";
 import { electricalLoadDefinition } from "../components/electrical/load.js";
 import { electricalPvDefinition } from "../components/electrical/pv.js";
 import { electricalSourceDefinition } from "../components/electrical/source.js";
+import { materialSinkDefinition } from "../components/material/sink.js";
+import { materialSourceDefinition } from "../components/material/source.js";
 import { batchThermalMassDefinition } from "../components/process/batch-thermal-mass.js";
+import { heatedMaterialInventoryDefinition } from
+  "../components/process/heated-material-inventory.js";
 import { ambientBoundaryDefinition } from "../components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from "../components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../components/thermal/heat-demand.js";
@@ -14,6 +18,8 @@ import { validateVariant } from "../core/validation/validate-documents.js";
 import { createHeatDemandFollowingPolicy } from "../policies/heat-demand-following.js";
 import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-self-consumption.js";
 import { createScheduledHeatingPolicy } from "../policies/scheduled-heating.js";
+import { createScheduledMaterialInventoryPolicy } from
+  "../policies/scheduled-material-inventory.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
 import { createComponentInspector } from "./component-inspector.js";
@@ -28,7 +34,8 @@ import { createResultsChart } from "./results-chart.js";
 import {
   createBatchHeatingRunKpis,
   createCoupledThermalRunKpis,
-  createElectricalRunKpis
+  createElectricalRunKpis,
+  createMaterialInventoryRunKpis
 } from "./run-kpi-model.js";
 import {
   createParameterVariant,
@@ -82,6 +89,25 @@ const EXAMPLES = Object.freeze({
         balancingComponentId: componentIdForType(model, "electrical.grid")
       });
     }
+  }),
+  "material-inventory-synthetic": Object.freeze({
+    label: "Material inventory",
+    root: "/examples/material-inventory-synthetic",
+    topologyTitle: "Heated material inventory",
+    initialComponentType: "process.heated-material-inventory",
+    createKpis: createMaterialInventoryRunKpis,
+    createPolicy(model) {
+      return createScheduledMaterialInventoryPolicy({
+        heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
+        powerSeriesId: "heater-input-power",
+        inventoryComponentId: componentIdForType(
+          model,
+          "process.heated-material-inventory"
+        ),
+        outflowSeriesId: "material-outflow",
+        balancingComponentId: componentIdForType(model, "electrical.grid")
+      });
+    }
   })
 });
 
@@ -123,7 +149,10 @@ function definitionRegistry() {
     electricalLoadDefinition,
     electricalPvDefinition,
     electricalSourceDefinition,
+    materialSinkDefinition,
+    materialSourceDefinition,
     batchThermalMassDefinition,
+    heatedMaterialInventoryDefinition,
     ambientBoundaryDefinition,
     electricHeaterDefinition,
     heatDemandDefinition,
@@ -623,6 +652,7 @@ async function startWorkbench() {
     legendTarget: element("results-chart-legend"),
     powerButton: element("show-power-chart"),
     energyButton: element("show-energy-chart"),
+    massButton: element("show-mass-chart"),
     temperatureButton: element("show-temperature-chart"),
     headingTarget: element("results-chart-title"),
     onStepChange: selectStep,

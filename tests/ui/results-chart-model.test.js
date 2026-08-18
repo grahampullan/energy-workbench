@@ -54,6 +54,7 @@ test("chart model derives directional power series from canonical connection res
 
   assert.equal(chart.stepCount, 1440);
   assert.equal(chart.timeStepSeconds, 60);
+  assert.equal(chart.endElapsedSeconds, 86_400);
   assert.deepEqual(
     chart.series.map((series) => series.id),
     [

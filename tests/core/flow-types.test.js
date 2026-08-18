@@ -7,12 +7,13 @@ import {
   flowValidationMessage,
   getFlowType,
   hasFlowType,
+  MATERIAL_MASS_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../../src/core/flow-types.js";
 
 test("flow types declare exact field units in one immutable contract", () => {
   assert.equal(hasFlowType(ACTIVE_POWER_FLOW_TYPE), true);
-  assert.equal(hasFlowType("material.mass-flow"), false);
+  assert.equal(hasFlowType(MATERIAL_MASS_FLOW_TYPE), true);
   assert.deepEqual(getFlowType(ACTIVE_POWER_FLOW_TYPE), {
     id: ACTIVE_POWER_FLOW_TYPE,
     fields: { powerkW: { unit: "kW" } }
@@ -23,6 +24,13 @@ test("flow types declare exact field units in one immutable contract", () => {
       heatFlowkW: { unit: "kW" },
       sourceTemperatureC: { unit: "°C" },
       deliveryTemperatureC: { unit: "°C" }
+    }
+  });
+  assert.deepEqual(getFlowType(MATERIAL_MASS_FLOW_TYPE), {
+    id: MATERIAL_MASS_FLOW_TYPE,
+    fields: {
+      massFlowKgPerSecond: { unit: "kg/s" },
+      specificEnthalpyKjPerKg: { unit: "kJ/kg" }
     }
   });
   assert.equal(Object.isFrozen(getFlowType(ACTIVE_POWER_FLOW_TYPE)), true);
@@ -54,9 +62,9 @@ test("active power is signed only at bidirectional port boundaries", () => {
 });
 
 test("unknown flow types fail explicitly", () => {
-  assert.equal(getFlowType("material.mass-flow"), undefined);
+  assert.equal(getFlowType("fluid.volume-flow"), undefined);
   assert.match(
-    flowValidationMessage("material.mass-flow", { massFlowKgPerSecond: 1 }),
+    flowValidationMessage("fluid.volume-flow", { volumeFlowM3PerSecond: 1 }),
     /Unknown flow type/u
   );
 });

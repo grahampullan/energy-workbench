@@ -149,6 +149,8 @@ test("prepareRuntimeModel resolves defaults, component data, ports, and connecti
   assert.equal(connection.from.port, source.ports[0]);
   assert.equal(connection.to.component, load);
   assert.equal(connection.to.port, load.ports[0]);
+  assert.equal(source.ports[0].cardinality, "one");
+  assert.equal(load.ports[0].cardinality, "one");
   assert.deepEqual(source.ports[0].connectionIds, [connection.id]);
   assert.deepEqual(load.ports[0].connectionIds, [connection.id]);
   assert.equal(Object.isFrozen(source), true);

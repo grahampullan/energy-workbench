@@ -62,13 +62,13 @@ function createBatteryFixture({
           id: "grid-to-bus",
           name: "Grid to bus",
           from: { componentId: "grid", portId: "electricity" },
-          to: { componentId: "bus", portId: "terminal-1" }
+          to: { componentId: "bus", portId: "terminal" }
         },
         {
           id: "battery-to-bus",
           name: "Battery to bus",
           from: { componentId: "battery", portId: "electricity" },
-          to: { componentId: "bus", portId: "terminal-2" }
+          to: { componentId: "bus", portId: "terminal" }
         }
       ]
     },

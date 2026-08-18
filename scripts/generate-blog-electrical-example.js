@@ -34,7 +34,7 @@ const model = {
     {
       id: "bus",
       type: "electrical.bus",
-      definitionVersion: "0.2.0",
+      definitionVersion: "0.3.0",
       name: "Electrical bus",
       parameters: {},
       initialState: {}
@@ -83,25 +83,25 @@ const model = {
       id: "grid-to-bus",
       name: "Grid to bus",
       from: { componentId: "grid", portId: "electricity" },
-      to: { componentId: "bus", portId: "terminal-1" }
+      to: { componentId: "bus", portId: "terminal" }
     },
     {
       id: "pv-to-bus",
       name: "Solar PV to bus",
       from: { componentId: "pv", portId: "electricity-out" },
-      to: { componentId: "bus", portId: "terminal-2" }
+      to: { componentId: "bus", portId: "terminal" }
     },
     {
       id: "bus-to-load",
       name: "Bus to electrical load",
-      from: { componentId: "bus", portId: "terminal-3" },
+      from: { componentId: "bus", portId: "terminal" },
       to: { componentId: "load", portId: "electricity-in" }
     },
     {
       id: "battery-to-bus",
       name: "Battery to bus",
       from: { componentId: "battery", portId: "electricity" },
-      to: { componentId: "bus", portId: "terminal-4" }
+      to: { componentId: "bus", portId: "terminal" }
     }
   ]
 };

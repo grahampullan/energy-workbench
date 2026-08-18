@@ -11,15 +11,16 @@ introducing refractory, phase, composition, or process-mode models.
 The model in `examples/material-inventory-synthetic` is:
 
 ```text
-Material source -> Heated material inventory -> Material sink
+Material source -> Thermal store named “Heated inventory” -> Material sink
                                   ^
                                   |
 Grid -> Electric heater ---------+
 ```
 
-The source prescribes material flow at 100 kJ/kg. The 120 kg inventory has a
-constant specific heat capacity of 1 kJ/kgK and a 0 °C enthalpy reference. The
-policy requests heater power and inventory outflow. The inventory limits
+The source prescribes material flow at 100 kJ/kg. This `thermal.store` instance
+connects its material ports and has a 120 kg capacity, constant specific heat
+capacity of 1 kJ/kgK, and a 0 °C enthalpy reference. The policy requests heater
+power and inventory outflow. The store limits
 outflow to its start-of-step available mass, determines the outgoing specific
 enthalpy, and accepts the heater's thermal flow. The existing heater then
 determines electrical demand, which the grid balances.

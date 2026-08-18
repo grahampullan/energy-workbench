@@ -35,18 +35,6 @@ function outputSeries(results, componentId, outputId) {
   });
 }
 
-function stateSeries(results, componentId, stateId) {
-  return results.steps.map((step) => {
-    const value = componentAtStep(step, componentId).state[stateId];
-    if (!Number.isFinite(value)) {
-      throw new TypeError(
-        `Component ${componentId} state ${stateId} must be finite`
-      );
-    }
-    return value;
-  });
-}
-
 function kpi(id, label, value, unit, tone = "neutral") {
   return {
     id,
@@ -93,7 +81,7 @@ export function createCoupledThermalRunKpis(results) {
     values,
     results.time.timeStepSeconds
   );
-  const temperaturesC = stateSeries(results, "store", "temperatureC");
+  const temperaturesC = outputSeries(results, "store", "temperatureC");
   const unmetEnergykWh = integrate(
     outputSeries(results, "heat-demand", "unmetHeatFlowkW")
   );
@@ -128,7 +116,7 @@ export function createBatchHeatingRunKpis(results) {
     values,
     results.time.timeStepSeconds
   );
-  const finalTemperatureC = stateSeries(
+  const finalTemperatureC = outputSeries(
     results,
     "batch",
     "temperatureC"
@@ -136,7 +124,7 @@ export function createBatchHeatingRunKpis(results) {
   const finalRequiredTemperatureMarginK = outputSeries(
     results,
     "batch",
-    "requiredTemperatureMarginK"
+    "temperatureMarginK"
   ).at(-1);
 
   return [
@@ -147,7 +135,7 @@ export function createBatchHeatingRunKpis(results) {
       outputSeries(results, "batch", "heatInputkW")
     ), "kWh"),
     kpi("heat-absorbed-energy", "Heat absorbed", integrate(
-      outputSeries(results, "batch", "netHeatFlowkW")
+      outputSeries(results, "batch", "netEnergyFlowkW")
     ), "kWh"),
     kpi("heat-loss-energy", "Heat loss", integrate(
       outputSeries(results, "batch", "heatLosskW")

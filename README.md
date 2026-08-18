@@ -24,13 +24,13 @@ JSON Schemas for the initial study documents live in `src/core/schemas`.
 The executable runtime supports deterministic fixed-timestep runs on an
 electrical bus with a repeatable terminal, fixed load and PV profiles,
 branching, policy-controlled battery storage and generation, and a residual
-grid boundary with import and export limits. It also supports the Push 1B coupled topology:
-an electric heater, hot-water store, heat demand, and ambient heat-loss
-boundary. Push 2 adds a scheduled electric heater and one-node batch thermal
-mass with a required final temperature, plus a material inventory that
+grid boundary with import and export limits. It also supports the Push 1B
+coupled topology: an electric heater, thermal store, heat demand, and ambient
+heat-loss boundary. Push 2 reuses that same `thermal.store` definition for a
+fixed-mass batch with a required final temperature and for an inventory that
 transports mass and enthalpy. All four public examples run headlessly and in
-the browser on the same contracts, with reviewed results recorded by regression
-tests.
+the browser on the same contracts, with reviewed results recorded by
+regression tests.
 
 The browser workbench can load any committed example through the same
 runtime. It presents the saved topology, live electrical, thermal, and material

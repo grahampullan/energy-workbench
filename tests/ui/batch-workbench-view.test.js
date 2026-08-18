@@ -4,8 +4,8 @@ import test from "node:test";
 
 import { electricalGridDefinition } from
   "../../src/components/electrical/grid.js";
-import { batchThermalMassDefinition } from
-  "../../src/components/process/batch-thermal-mass.js";
+import { thermalStoreDefinition } from
+  "../../src/components/thermal/store.js";
 import { ambientBoundaryDefinition } from
   "../../src/components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from
@@ -37,7 +37,7 @@ const [model, scenario, expectedResults] = await Promise.all([
 ]);
 const registry = createComponentRegistry([
   electricalGridDefinition,
-  batchThermalMassDefinition,
+  thermalStoreDefinition,
   ambientBoundaryDefinition,
   electricHeaterDefinition
 ]);
@@ -47,6 +47,13 @@ const policy = createScheduledHeatingPolicy({
   balancingComponentId: "grid"
 });
 const run = runScenario({ model, scenario, registry, policy });
+
+function assertSeriesClose(actual, expected, tolerance = 1e-12) {
+  assert.equal(actual.length, expected.length);
+  actual.forEach((value, index) => {
+    assert.ok(Math.abs(value - expected[index]) <= tolerance);
+  });
+}
 
 test("batch workbench chart exposes flow and required-temperature results", () => {
   assert.equal(run.completed, true, JSON.stringify(run.diagnostics));
@@ -83,10 +90,10 @@ test("batch workbench chart exposes flow and required-temperature results", () =
   assert.equal(temperature.id, "batch:temperature");
   assert.equal(temperature.label, "Batch temperature");
   assert.equal(temperature.thresholdC, 120);
-  assert.equal(temperature.thresholdLabel, "Required");
-  assert.deepEqual(
+  assert.equal(temperature.thresholdLabel, "Minimum useful");
+  assertSeriesClose(
     temperature.values.map((point) => point.temperatureC),
-    [20, ...expectedResults.series.batchTemperatureC]
+    expectedResults.series.batchTemperatureC
   );
   assert.deepEqual(
     chart.prescribedTemperatureSeries.map((series) => ({
@@ -120,11 +127,13 @@ test("batch workbench inspector exposes editable model inputs and live results",
   assert.equal(batch.metric.value, expectedResults.summary.finalBatchTemperatureC);
   assert.equal(batch.metric.unit, "°C");
   assert.deepEqual(Object.keys(parameters), [
-    "massKg",
+    "maximumMassKg",
     "specificHeatCapacityKjPerKgK",
+    "enthalpyReferenceTemperatureC",
     "maximumTemperatureC",
-    "requiredTemperatureC",
+    "minimumUsefulTemperatureC",
     "maximumHeatInputkW",
+    "maximumHeatOutputkW",
     "heatLossCoefficientkWPerK"
   ]);
   assert.ok(Object.values(parameters).every((field) => field.editor !== null));
@@ -142,12 +151,12 @@ test("batch workbench inspector exposes editable model inputs and live results",
   );
   assert.equal(
     batch.outputFields.find(
-      (field) => field.id === "requiredTemperatureMarginK"
+      (field) => field.id === "temperatureMarginK"
     ).value,
     expectedResults.summary.finalRequiredTemperatureMarginK
   );
   assert.equal(
-    batch.stateFields.find((field) => field.id === "temperatureC").value,
+    batch.outputFields.find((field) => field.id === "temperatureC").value,
     expectedResults.summary.finalBatchTemperatureC
   );
 });
@@ -174,7 +183,7 @@ test("batch workbench explains a missed final temperature on the batch", () => {
   const failingModel = structuredClone(model);
   failingModel.components.find(
     (component) => component.id === "batch"
-  ).parameters.requiredTemperatureC = 135;
+  ).parameters.minimumUsefulTemperatureC = 135;
   const failingRun = runScenario({
     model: failingModel,
     scenario,
@@ -196,7 +205,7 @@ test("batch workbench explains a missed final temperature on the batch", () => {
     component: batch
   }), [{
     severity: "warning",
-    code: "process.batch-thermal-mass.required-temperature-missed",
+    code: "thermal.store.minimum-temperature-missed",
     title: "Required temperature missed",
     message: "126.651 °C final · 8.349 K below requirement"
   }]);

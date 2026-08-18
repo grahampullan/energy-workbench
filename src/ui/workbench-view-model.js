@@ -296,11 +296,11 @@ function diagnosticContent(diagnostic, component) {
     }
   }
   if (
-    diagnostic.code === "process.batch-thermal-mass.required-temperature-missed" &&
-    component.type === "process.batch-thermal-mass"
+    diagnostic.code === "thermal.store.minimum-temperature-missed" &&
+    component.type === "thermal.store"
   ) {
     const temperatureC = outputValue(component, "temperatureC");
-    const marginK = outputValue(component, "requiredTemperatureMarginK");
+    const marginK = outputValue(component, "temperatureMarginK");
     if ([temperatureC, marginK].every(Number.isFinite)) {
       return {
         title: "Required temperature missed",

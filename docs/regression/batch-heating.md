@@ -11,7 +11,7 @@ process modes, CSV import, calibration, or optimisation are added.
 The model in `examples/batch-heating-synthetic` has four visible components:
 
 ```text
-Grid -> Electric heater -> Batch thermal mass
+Grid -> Electric heater -> Thermal store named “Batch”
                               |
                               +------------> Ambient
 ```
@@ -27,11 +27,12 @@ at or above 120 °C.
 The scheduled-heating policy publishes the requested electrical input for the
 heater. It does not calculate temperature or heat loss.
 
-The batch component is the source of truth for its governing physics. It
-decides how much offered heat it can accept, calculates heat loss, advances its
-temperature state, and reports the margin to the required final temperature.
-The heater applies its own conversion efficiency and the grid balances the
-resulting electrical flow.
+The `thermal.store` instance named “Batch” is the source of truth for its
+governing physics. Its material ports are unconnected, so mass remains fixed.
+It decides how much offered heat it can accept, calculates heat loss, advances
+contained enthalpy, derives temperature, and reports the margin to the required
+final temperature. The heater applies its own conversion efficiency and the
+grid balances the resulting electrical flow.
 
 ## Engineering contract
 

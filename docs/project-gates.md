@@ -47,14 +47,14 @@ Push 2 keeps the repository boundary explicit:
 The first slice is one deterministic heating cycle:
 
 ```text
-Grid -> Electric heater -> One-node batch thermal mass -> Ambient
+Grid -> Electric heater -> Thermal store (batch instance) -> Ambient
 ```
 
-Add one process component for a lumped thermal mass with temperature state,
-heat input, standing heat loss, and a required final-temperature margin. Reuse
-the existing grid, electric heater, ambient boundary, runtime, and thermal-flow
-contract. Drive it with a small inline synthetic schedule and a fixed
-historical heating policy.
+Reuse `thermal.store` as a fixed-mass lumped body with heat input, standing
+heat loss, derived temperature, and a required final-temperature margin. Its
+material ports remain unconnected. Reuse the existing grid, electric heater,
+ambient boundary, runtime, and thermal-flow contract. Drive it with a small
+inline synthetic schedule and a fixed historical heating policy.
 
 The reviewed fixture and tests show:
 
@@ -70,4 +70,4 @@ temperature line on the temperature chart.
 
 CSV input, multiple thermal nodes, calibration, uncertainty, burner fuel,
 emissions, policy comparison, and the private ladle model follow later. They
-are not prerequisites for proving the first process component.
+are not prerequisites for proving the first process model.

@@ -256,8 +256,8 @@ flow cannot have a delivery temperature above its source temperature. A zero
 flow still carries boundary temperatures, which may be in either order.
 
 Components own temperature constraints. For example, the heater declares its
-supply temperature, the hot-water store requires incoming heat to be hot enough
-to charge it, and the demand reports heat below its minimum delivery temperature
+supply temperature, the thermal store requires incoming heat to be hot enough
+to heat it, and the demand reports heat below its minimum delivery temperature
 as unmet. Thermal connections do not infer mass flow, pressure, mixing, or pipe
 delay.
 
@@ -285,30 +285,40 @@ transported enthalpy rate is
 temperature on this connection or infer composition, pressure, phase, or
 mixing in generic connection execution.
 
-The heated material inventory uses start-of-step mass and specific enthalpy to
-limit and characterise outflow. It then advances contained mass and enthalpy
-from the settled current-step material and thermal flows. An empty inventory
-has zero contained enthalpy and reports its reference temperature.
+`thermal.store` has optional `material-in` and `material-out` ports, a
+repeatable `heat-in` port, and optional `heat-out` and `heat-loss` ports. The
+ports always exist; their connections determine whether an instance is a
+closed fixed-mass thermal body or a flowing material inventory. Do not add an
+equipment-specific mode flag.
 
-The hot-water store has separate `heat-in`, `heat-out`, and `heat-loss` ports.
-Its actual command names charge heat flow and temperatures, discharge heat flow,
-and ambient temperature separately. Its mixed temperature state uses explicit
-integration over `stepContext.durationHours`:
+The store keeps only mass and contained enthalpy as state. It derives
+temperature using constant specific heat capacity and an enthalpy-reference
+temperature. Start-of-step mass and specific enthalpy limit and characterise
+outflow. An empty store has zero contained enthalpy and reports its reference
+temperature. Its explicit update is:
 
 ```text
-C * (Tnext - T) / dt = Qcharge - Qdischarge - Qloss
+massNext = mass + (massIn - massOut) * dtSeconds
+enthalpyNext = enthalpy
+             + (enthalpyIn + heatIn
+                - enthalpyOut - heatOut - heatLoss) * durationHours
 Qloss = UA * max(0, T - Tambient)
 ```
 
 Over a coarse timestep, loss is capped at the energy available above ambient so
-standing loss alone cannot cool the store through the ambient boundary.
+standing loss alone cannot cool the store through the ambient boundary. A
+positive heat-loss coefficient requires a visible heat-loss connection.
+The current definition represents one well-mixed material with constant
+specific heat capacity and no phase change or stratification. An equipment
+name such as “hot-water tank”, “refractory”, or “molten-metal inventory” belongs
+to the component instance when these equations are suitable.
 
 ### Coupled reference model
 
 The Push 1B reference model is:
 
 ```text
-grid -> electric heater -> hot-water store -> heat demand
+grid -> electric heater -> thermal store (hot-water instance) -> heat demand
                            |
                            +-> ambient boundary
 ```

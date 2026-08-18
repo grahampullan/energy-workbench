@@ -143,7 +143,7 @@ thermal storage remain conditional Push 3 scope.
 The public headless proof is:
 
 ```text
-Material source -> Heated inventory -> Material sink
+Material source -> Thermal store (heated inventory) -> Material sink
 ```
 
 The inventory conserves:
@@ -164,22 +164,24 @@ refinement.
 
 ## Ladle component direction
 
-The refractory lining and molten metal should be separate stateful components
-because they have different lifecycles:
+The refractory lining and molten metal should be separate stateful component
+instances because they have different lifecycles:
 
 - The refractory persists and has approximately fixed mass.
 - The molten-metal inventory is filled, held, and emptied.
 
-The refractory component determines metal-to-refractory heat exchange from
-current-time temperatures and capabilities. The direct connection carries the
-settled thermal flow; there is no separate thermal-contact component. The model
-must not hide tapping as an unexplained temperature reset or treat material
-transfer as an ordinary thermal-flow connection.
+Both can use `thermal.store` while the shared constant-property, well-mixed
+equation remains adequate. The refractory instance leaves its material ports
+unconnected; the molten-metal instance connects them for filling and tapping.
+The component that owns metal-to-refractory heat exchange determines that flow
+from current-time temperatures and capabilities. The direct connection carries
+the settled thermal flow; there is no separate thermal-contact component. The
+model must not hide tapping as an unexplained temperature reset or treat
+material transfer as an ordinary thermal-flow connection.
 
-The public repository should contain reusable process, inventory, contact,
-fuel, and burner components with neutral synthetic tests. Private MHI-informed
-data, assumptions, calibration, and the named ladle study remain outside the
-repository.
+The public repository should contain the smallest reusable physical component
+set with neutral synthetic tests. Private MHI-informed data, assumptions,
+calibration, and the named ladle study remain outside the repository.
 
 ## Delivery sequence
 
@@ -190,8 +192,9 @@ repository.
    plan for all existing examples. **Complete.**
 3. Prove material mass and enthalpy conservation headlessly through fill,
    hold, and empty operation. **Complete.**
-4. Add separate refractory and molten-metal inventory behaviour, including
-   their direct heat-transfer connection, with timestep-refinement tests.
+4. Add refractory and molten-metal `thermal.store` instances, including their
+   direct heat-transfer connection, with timestep-refinement tests. Introduce a
+   new component type only if the shared store equation proves insufficient.
 5. Add fuel, burner, process modes, policy comparisons, and the private ladle
    UI required for External Gate 2.
 6. Use the later heat-exchanger, heat-pump, and store topology to test the

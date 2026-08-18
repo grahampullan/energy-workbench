@@ -20,10 +20,11 @@ rather than rewriting its history.
 | [0009](0009-single-port-battery.md) | Single-port battery storage | Accepted |
 | [0010](0010-self-consumption-dispatch.md) | Self-consumption dispatch | Partly superseded by 0015 |
 | [0011](0011-browser-presentation-boundary.md) | Browser presentation boundary | Accepted |
-| [0012](0012-restricted-thermal-flow.md) | Restricted thermal flow and storage | Accepted |
+| [0012](0012-restricted-thermal-flow.md) | Restricted thermal flow and storage | Partly superseded by 0019 |
 | [0013](0013-restricted-coupled-resolver.md) | Restricted coupled resolver | Superseded by 0015 |
 | [0014](0014-flow-type-and-connection-result-contract.md) | Flow type and connection-result contract | Partly superseded by 0015 |
 | [0015](0015-component-owned-resolution.md) | Component-owned resolution | Partly superseded by 0016 |
 | [0016](0016-resolution-dependency-plan.md) | Resolution-dependency plan | Accepted |
-| [0017](0017-material-mass-and-enthalpy-flow.md) | Material mass and enthalpy flow | Accepted |
+| [0017](0017-material-mass-and-enthalpy-flow.md) | Material mass and enthalpy flow | Partly superseded by 0019 |
 | [0018](0018-repeatable-collector-ports.md) | Repeatable collector ports | Accepted |
+| [0019](0019-unified-thermal-store.md) | Unified thermal store | Accepted |

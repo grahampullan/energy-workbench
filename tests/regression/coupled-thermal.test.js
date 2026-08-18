@@ -10,8 +10,8 @@ import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from
   "../../src/components/thermal/heat-demand.js";
-import { hotWaterStoreDefinition } from
-  "../../src/components/thermal/hot-water-store.js";
+import { thermalStoreDefinition } from
+  "../../src/components/thermal/store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
@@ -42,7 +42,7 @@ const registry = createComponentRegistry([
   ambientBoundaryDefinition,
   electricHeaterDefinition,
   heatDemandDefinition,
-  hotWaterStoreDefinition
+  thermalStoreDefinition
 ]);
 const policy = createHeatDemandFollowingPolicy({
   heaterComponentId: "heater",
@@ -54,8 +54,7 @@ const storeModelComponent = model.components.find(
   (component) => component.id === "store"
 );
 const storeThermalCapacitykWhPerK =
-  storeModelComponent.parameters.volumeM3 *
-  storeModelComponent.parameters.waterDensityKgPerM3 *
+  storeModelComponent.initialState.massKg *
   storeModelComponent.parameters.specificHeatCapacityKjPerKgK /
   3600;
 
@@ -89,10 +88,10 @@ function resultSeries() {
       heater.outputs.electricalInputPowerkW
     );
     series.heaterHeatOutputkW.push(heater.outputs.heatOutputkW);
-    series.storeChargeHeatFlowkW.push(store.outputs.chargeHeatFlowkW);
-    series.storeDischargeHeatFlowkW.push(store.outputs.dischargeHeatFlowkW);
+    series.storeChargeHeatFlowkW.push(store.outputs.heatInputkW);
+    series.storeDischargeHeatFlowkW.push(store.outputs.heatOutputkW);
     series.storeHeatLosskW.push(store.outputs.heatLosskW);
-    series.storeTemperatureC.push(store.state.temperatureC);
+    series.storeTemperatureC.push(store.outputs.temperatureC);
     series.demandHeatFlowkW.push(demand.outputs.demandHeatFlowkW);
     series.servedHeatFlowkW.push(demand.outputs.servedHeatFlowkW);
     series.unmetHeatFlowkW.push(demand.outputs.unmetHeatFlowkW);
@@ -103,7 +102,10 @@ function resultSeries() {
 
 function summarise(series) {
   const finalTemperatureC = series.storeTemperatureC.at(-1);
-  const initialTemperatureC = storeModelComponent.initialState.temperatureC;
+  const initialTemperatureC =
+    storeModelComponent.parameters.enthalpyReferenceTemperatureC +
+    storeModelComponent.initialState.containedEnthalpykWh /
+      storeThermalCapacitykWhPerK;
   const integrate = (values) => integrateStepPowerkWh(
     values,
     runResult.results.time.timeStepSeconds
@@ -229,14 +231,14 @@ test("coupled thermal example exposes equipment and stored-energy limits", () =>
 
   assert.equal(peakHeater.requestedCommand.powerkW, -150 / 0.9);
   assert.equal(peakHeater.actualCommand.heatOutputkW, 80);
-  assert.equal(peakStore.actualCommand.dischargeHeatFlowkW, 120);
+  assert.equal(peakStore.actualCommand.heatOutFlow.heatFlowkW, 120);
   assert.equal(peakDemand.outputs.unmetHeatFlowkW, 30);
   assert.ok(
-    energyLimitedStore.operatingLimits.maximumDischargeHeatFlowkW < 120
+    energyLimitedStore.operatingLimits.maximumHeatOutputkW < 120
   );
   assertClose(
-    energyLimitedStore.actualCommand.dischargeHeatFlowkW,
-    energyLimitedStore.operatingLimits.maximumDischargeHeatFlowkW
+    energyLimitedStore.actualCommand.heatOutFlow.heatFlowkW,
+    energyLimitedStore.operatingLimits.maximumHeatOutputkW
   );
   assertClose(componentAtStep(idleStep, "heater").outputs.heatOutputkW, 0);
   assert.ok(componentAtStep(idleStep, "store").outputs.heatLosskW > 0);

@@ -1,6 +1,6 @@
 import { createScheduledHeatingPolicy } from "./scheduled-heating.js";
 
-const INVENTORY_TYPE = "process.heated-material-inventory";
+const INVENTORY_TYPE = "thermal.store";
 
 function requireNonEmptyString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
@@ -31,6 +31,14 @@ export function createScheduledMaterialInventoryPolicy({
       if (!inventory || inventory.type !== INVENTORY_TYPE) {
         throw new Error(
           `Inventory ${inventoryComponentId} must use ${INVENTORY_TYPE}`
+        );
+      }
+      const materialOut = inventory.ports.find(
+        (port) => port.id === "material-out"
+      );
+      if (!materialOut || materialOut.connectionIds.length !== 1) {
+        throw new Error(
+          `Inventory ${inventoryComponentId} must have one material-out connection`
         );
       }
       const series = runtimeModel.series.find(

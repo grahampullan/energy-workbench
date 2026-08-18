@@ -4,8 +4,8 @@ import test from "node:test";
 
 import { electricalGridDefinition } from
   "../../src/components/electrical/grid.js";
-import { batchThermalMassDefinition } from
-  "../../src/components/process/batch-thermal-mass.js";
+import { thermalStoreDefinition } from
+  "../../src/components/thermal/store.js";
 import { ambientBoundaryDefinition } from
   "../../src/components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from
@@ -40,7 +40,7 @@ const [model, scenario, layout, expectedResults] = await Promise.all([
 
 const registry = createComponentRegistry([
   electricalGridDefinition,
-  batchThermalMassDefinition,
+  thermalStoreDefinition,
   ambientBoundaryDefinition,
   electricHeaterDefinition
 ]);
@@ -54,7 +54,7 @@ const batchModelComponent = model.components.find(
   (component) => component.id === "batch"
 );
 const batchThermalCapacitykWhPerK =
-  batchModelComponent.parameters.massKg *
+  batchModelComponent.initialState.massKg *
   batchModelComponent.parameters.specificHeatCapacityKjPerKgK /
   3600;
 
@@ -90,7 +90,7 @@ function resultSeries() {
     series.batchHeatLosskW.push(batch.outputs.heatLosskW);
     series.batchTemperatureC.push(batch.outputs.temperatureC);
     series.requiredTemperatureMarginK.push(
-      batch.outputs.requiredTemperatureMarginK
+      batch.outputs.temperatureMarginK
     );
   }
   return series;
@@ -98,7 +98,10 @@ function resultSeries() {
 
 function summarise(series) {
   const finalTemperatureC = series.batchTemperatureC.at(-1);
-  const initialTemperatureC = batchModelComponent.initialState.temperatureC;
+  const initialTemperatureC =
+    batchModelComponent.parameters.enthalpyReferenceTemperatureC +
+    batchModelComponent.initialState.containedEnthalpykWh /
+      batchThermalCapacitykWhPerK;
   return {
     totalGridImportEnergykWh: integrateStepPowerkWh(
       runResult.results.steps.map((step) =>
@@ -212,7 +215,7 @@ test("batch component warns when the final required temperature is missed", () =
   const failingModel = structuredClone(model);
   failingModel.components.find(
     (component) => component.id === "batch"
-  ).parameters.requiredTemperatureC = 135;
+  ).parameters.minimumUsefulTemperatureC = 135;
   const result = runScenario({ model: failingModel, scenario, policy, registry });
 
   assert.equal(result.completed, true);
@@ -224,7 +227,7 @@ test("batch component warns when the final required temperature is missed", () =
     })),
     [{
       severity: "warning",
-      code: "process.batch-thermal-mass.required-temperature-missed",
+      code: "thermal.store.minimum-temperature-missed",
       path: "/steps/15/components/batch"
     }]
   );

@@ -5,7 +5,7 @@ import { electricalGridDefinition } from "../../src/components/electrical/grid.j
 import { ambientBoundaryDefinition } from "../../src/components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../../src/components/thermal/heat-demand.js";
-import { hotWaterStoreDefinition } from "../../src/components/thermal/hot-water-store.js";
+import { thermalStoreDefinition } from "../../src/components/thermal/store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
 import { createHeatDemandFollowingPolicy } from
   "../../src/policies/heat-demand-following.js";
@@ -61,20 +61,23 @@ function createFixture({
         },
         {
           id: "store",
-          type: hotWaterStoreDefinition.type,
-          definitionVersion: hotWaterStoreDefinition.version,
+          type: thermalStoreDefinition.type,
+          definitionVersion: thermalStoreDefinition.version,
           name: "Hot-water store",
           parameters: {
-            volumeM3: 1,
-            waterDensityKgPerM3: 1000,
+            maximumMassKg: 1000,
             specificHeatCapacityKjPerKgK: 3.6,
+            enthalpyReferenceTemperatureC: 0,
             maximumTemperatureC: storeMaximumTemperatureC,
+            minimumUsefulTemperatureC: storeMinimumUsefulTemperatureC,
             heatLossCoefficientkWPerK: storeHeatLossCoefficientkWPerK,
-            maximumChargeHeatFlowkW: 100,
-            maximumDischargeHeatFlowkW: 100,
-            minimumUsefulTemperatureC: storeMinimumUsefulTemperatureC
+            maximumHeatInputkW: 100,
+            maximumHeatOutputkW: 100
           },
-          initialState: { temperatureC: storeInitialTemperatureC }
+          initialState: {
+            massKg: 1000,
+            containedEnthalpykWh: storeInitialTemperatureC
+          }
         },
         {
           id: "heat-demand",
@@ -150,13 +153,17 @@ function createFixture({
       ambientBoundaryDefinition,
       electricHeaterDefinition,
       demandDefinition,
-      hotWaterStoreDefinition
+      thermalStoreDefinition
     ])
   };
 }
 
 function diagnosticCodes(result) {
   return result.diagnostics.map((diagnostic) => diagnostic.code);
+}
+
+function assertClose(actual, expected, tolerance = 1e-12) {
+  assert.ok(Math.abs(actual - expected) <= tolerance);
 }
 
 test("coupled runtime follows demand and balances electrical and thermal connections", () => {
@@ -191,20 +198,47 @@ test("coupled runtime follows demand and balances electrical and thermal connect
   assert.equal(store.requestedCommand, null);
   assert.equal(store.feasibleCommand, null);
   assert.deepEqual(store.actualCommand, {
-    chargeHeatFlowkW: 10,
-    chargeSourceTemperatureC: 100,
-    chargeDeliveryTemperatureC: 100,
-    dischargeHeatFlowkW: 10,
-    ambientTemperatureC: 20
+    materialInFlow: {
+      massFlowKgPerSecond: 0,
+      specificEnthalpyKjPerKg: 288
+    },
+    materialOutFlow: {
+      massFlowKgPerSecond: 0,
+      specificEnthalpyKjPerKg: 288
+    },
+    heatInFlows: {
+      "heater-to-store": {
+        heatFlowkW: 10,
+        sourceTemperatureC: 100,
+        deliveryTemperatureC: 100
+      }
+    },
+    heatOutFlow: {
+      heatFlowkW: 10,
+      sourceTemperatureC: 80,
+      deliveryTemperatureC: 80
+    },
+    heatLossFlow: {
+      heatFlowkW: 0,
+      sourceTemperatureC: 80,
+      deliveryTemperatureC: 20
+    }
   });
   assert.deepEqual(store.outputs, {
-    chargeHeatFlowkW: 10,
-    dischargeHeatFlowkW: 10,
+    massInflowKgPerSecond: 0,
+    massOutflowKgPerSecond: 0,
+    enthalpyInflowkW: 0,
+    enthalpyOutflowkW: 0,
+    heatInputkW: 10,
+    heatOutputkW: 10,
     heatLosskW: 0,
-    netHeatFlowkW: 0,
+    netEnergyFlowkW: 0,
+    containedMassKg: 1000,
+    containedEnthalpykWh: 80,
+    specificEnthalpyKjPerKg: 288,
     temperatureC: 80,
     usableEnergykWh: 10,
-    deliveryTemperatureMarginK: 10
+    temperatureMarginK: 10
   });
   assert.equal(demand.outputs.servedHeatFlowkW, 10);
   assert.equal(demand.outputs.unmetHeatFlowkW, 0);
@@ -259,11 +293,11 @@ test("coupled runtime reports unmet heat until the store reaches useful temperat
     "thermal.heat-demand.unmet-heat"
   ]);
   const [first, second] = result.results.steps;
-  assert.equal(first.components[2].state.temperatureC, 75);
+  assert.equal(first.components[2].outputs.temperatureC, 75);
   assert.equal(first.components[3].outputs.servedHeatFlowkW, 0);
   assert.equal(first.components[3].outputs.unmetHeatFlowkW, 10);
-  assert.equal(second.components[2].actualCommand.dischargeHeatFlowkW, 5);
-  assert.equal(second.components[2].state.temperatureC, 80);
+  assert.equal(second.components[2].actualCommand.heatOutFlow.heatFlowkW, 5);
+  assert.equal(second.components[2].outputs.temperatureC, 80);
   assert.equal(second.components[3].outputs.servedHeatFlowkW, 5);
   assert.equal(second.components[3].outputs.unmetHeatFlowkW, 5);
 });
@@ -277,11 +311,11 @@ test("coupled runtime allocates standing loss and conserves store energy", () =>
   assert.equal(result.completed, true);
   const step = result.results.steps[0];
   const store = step.components[2];
-  assert.equal(store.actualCommand.chargeHeatFlowkW, 4);
-  assert.equal(store.actualCommand.dischargeHeatFlowkW, 4);
+  assert.equal(store.actualCommand.heatInFlows["heater-to-store"].heatFlowkW, 4);
+  assert.equal(store.actualCommand.heatOutFlow.heatFlowkW, 4);
   assert.equal(store.outputs.heatLosskW, 6);
-  assert.equal(store.outputs.netHeatFlowkW, -6);
-  assert.equal(store.state.temperatureC, 74);
+  assert.equal(store.outputs.netEnergyFlowkW, -6);
+  assertClose(store.outputs.temperatureC, 74);
   assert.equal(step.components[4].outputs.receivedHeatFlowkW, 6);
   assert.equal(step.connections[3].flow.heatFlowkW, 6);
 });
@@ -323,8 +357,22 @@ test("the store clamps heater operation at its supply-temperature boundary", () 
     heatOutputkW: 5
   });
   assert.deepEqual(step.components[0].actualCommand, { powerkW: 6.25 });
-  assert.equal(step.components[2].state.temperatureC, 85);
+  assert.equal(step.components[2].outputs.temperatureC, 85);
   assert.equal(step.connections[1].flow.heatFlowkW, 5);
+});
+
+test("a store at maximum temperature can replace simultaneous heat output", () => {
+  const result = runScenario(createFixture({
+    demandValues: [10],
+    storeInitialTemperatureC: 100,
+    storeMaximumTemperatureC: 100
+  }));
+
+  assert.equal(result.completed, true, JSON.stringify(result.diagnostics));
+  const store = result.results.steps[0].components[2];
+  assert.equal(store.actualCommand.heatInFlows["heater-to-store"].heatFlowkW, 10);
+  assert.equal(store.actualCommand.heatOutFlow.heatFlowkW, 10);
+  assert.equal(store.outputs.temperatureC, 100);
 });
 
 test("coupled runtime preserves electrical grid infeasibility", () => {
@@ -337,15 +385,30 @@ test("coupled runtime preserves electrical grid infeasibility", () => {
   assert.ok(diagnosticCodes(result).includes("runtime.electrical-balance-infeasible"));
 });
 
-test("coupled runtime rejects incomplete thermal topology", () => {
+test("thermal-store material and loss ports are optional", () => {
   const fixture = createFixture();
   fixture.model.connections = fixture.model.connections.filter(
     (connection) => connection.id !== "store-to-ambient"
   );
   const result = runScenario(fixture);
 
+  assert.equal(result.completed, true);
+  assert.ok(result.results.steps.every((step) =>
+    step.components[2].outputs.heatLosskW === 0
+  ));
+});
+
+test("a positive store heat-loss coefficient requires a heat-loss connection", () => {
+  const fixture = createFixture({ storeHeatLossCoefficientkWPerK: 0.1 });
+  fixture.model.connections = fixture.model.connections.filter(
+    (connection) => connection.id !== "store-to-ambient"
+  );
+  const result = runScenario(fixture);
+
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.component-connection-count"));
+  assert.ok(diagnosticCodes(result).includes(
+    "runtime.thermal-store-missing-heat-loss-connection"
+  ));
 });
 
 test("coupled connection balance checks component-evaluated thermal flows", () => {

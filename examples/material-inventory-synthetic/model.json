@@ -39,13 +39,18 @@
     },
     {
       "id": "inventory",
-      "type": "process.heated-material-inventory",
+      "type": "thermal.store",
       "definitionVersion": "0.1.0",
       "name": "Heated inventory",
       "parameters": {
         "maximumMassKg": 120,
         "specificHeatCapacityKjPerKgK": 1,
-        "enthalpyReferenceTemperatureC": 0
+        "enthalpyReferenceTemperatureC": 0,
+        "maximumTemperatureC": 200,
+        "minimumUsefulTemperatureC": 0,
+        "heatLossCoefficientkWPerK": 0,
+        "maximumHeatInputkW": 10,
+        "maximumHeatOutputkW": 0
       },
       "initialState": {
         "massKg": 0,

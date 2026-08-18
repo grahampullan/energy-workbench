@@ -1,6 +1,6 @@
 # ADR 0017: Material mass and enthalpy flow
 
-**Status:** Accepted
+**Status:** Partly superseded by ADR 0019
 
 **Date:** 2026-08-15
 

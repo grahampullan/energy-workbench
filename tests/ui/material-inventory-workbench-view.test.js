@@ -8,8 +8,8 @@ import { materialSinkDefinition } from
   "../../src/components/material/sink.js";
 import { materialSourceDefinition } from
   "../../src/components/material/source.js";
-import { heatedMaterialInventoryDefinition } from
-  "../../src/components/process/heated-material-inventory.js";
+import { thermalStoreDefinition } from
+  "../../src/components/thermal/store.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
@@ -45,7 +45,7 @@ const registry = createComponentRegistry([
   materialSourceDefinition,
   electricalGridDefinition,
   electricHeaterDefinition,
-  heatedMaterialInventoryDefinition,
+  thermalStoreDefinition,
   materialSinkDefinition
 ]);
 const policy = createScheduledMaterialInventoryPolicy({
@@ -118,7 +118,8 @@ test("material-inventory UI documents and chart series are complete", () => {
   const [temperature] = chart.temperatureSeries;
   assert.equal(temperature.id, "inventory:temperature");
   assert.equal(temperature.stepValueOffset, 0);
-  assert.equal(temperature.thresholdC, null);
+  assert.equal(temperature.thresholdC, 0);
+  assert.equal(temperature.thresholdLabel, "Minimum useful");
   assert.equal(temperature.values.length, 160);
   for (const checkpoint of expectedResults.checkpoints) {
     assert.ok(Math.abs(

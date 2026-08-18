@@ -28,19 +28,22 @@
     },
     {
       "id": "batch",
-      "type": "process.batch-thermal-mass",
+      "type": "thermal.store",
       "definitionVersion": "0.1.0",
       "name": "Batch",
       "parameters": {
-        "massKg": 1000,
+        "maximumMassKg": 1000,
         "specificHeatCapacityKjPerKgK": 3.6,
+        "enthalpyReferenceTemperatureC": 0,
         "maximumTemperatureC": 145,
+        "minimumUsefulTemperatureC": 120,
         "heatLossCoefficientkWPerK": 0.1,
         "maximumHeatInputkW": 50,
-        "requiredTemperatureC": 120
+        "maximumHeatOutputkW": 0
       },
       "initialState": {
-        "temperatureC": 20
+        "massKg": 1000,
+        "containedEnthalpykWh": 20
       }
     },
     {

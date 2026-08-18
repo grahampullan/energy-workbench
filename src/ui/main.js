@@ -6,13 +6,10 @@ import { electricalPvDefinition } from "../components/electrical/pv.js";
 import { electricalSourceDefinition } from "../components/electrical/source.js";
 import { materialSinkDefinition } from "../components/material/sink.js";
 import { materialSourceDefinition } from "../components/material/source.js";
-import { batchThermalMassDefinition } from "../components/process/batch-thermal-mass.js";
-import { heatedMaterialInventoryDefinition } from
-  "../components/process/heated-material-inventory.js";
 import { ambientBoundaryDefinition } from "../components/thermal/ambient-boundary.js";
 import { electricHeaterDefinition } from "../components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../components/thermal/heat-demand.js";
-import { hotWaterStoreDefinition } from "../components/thermal/hot-water-store.js";
+import { thermalStoreDefinition } from "../components/thermal/store.js";
 import { createComponentRegistry } from "../core/component-registry.js";
 import { validateVariant } from "../core/validation/validate-documents.js";
 import { createHeatDemandFollowingPolicy } from "../policies/heat-demand-following.js";
@@ -66,7 +63,7 @@ const EXAMPLES = Object.freeze({
     label: "Coupled thermal",
     root: "/examples/coupled-thermal",
     topologyTitle: "Electrical and thermal system",
-    initialComponentType: "thermal.hot-water-store",
+    initialComponentType: "thermal.store",
     createKpis: createCoupledThermalRunKpis,
     createPolicy(model) {
       return createHeatDemandFollowingPolicy({
@@ -80,7 +77,7 @@ const EXAMPLES = Object.freeze({
     label: "Batch heating",
     root: "/examples/batch-heating-synthetic",
     topologyTitle: "Batch-heating process",
-    initialComponentType: "process.batch-thermal-mass",
+    initialComponentType: "thermal.store",
     createKpis: createBatchHeatingRunKpis,
     createPolicy(model) {
       return createScheduledHeatingPolicy({
@@ -94,7 +91,7 @@ const EXAMPLES = Object.freeze({
     label: "Material inventory",
     root: "/examples/material-inventory-synthetic",
     topologyTitle: "Heated material inventory",
-    initialComponentType: "process.heated-material-inventory",
+    initialComponentType: "thermal.store",
     createKpis: createMaterialInventoryRunKpis,
     createPolicy(model) {
       return createScheduledMaterialInventoryPolicy({
@@ -102,7 +99,7 @@ const EXAMPLES = Object.freeze({
         powerSeriesId: "heater-input-power",
         inventoryComponentId: componentIdForType(
           model,
-          "process.heated-material-inventory"
+          "thermal.store"
         ),
         outflowSeriesId: "material-outflow",
         balancingComponentId: componentIdForType(model, "electrical.grid")
@@ -151,12 +148,10 @@ function definitionRegistry() {
     electricalSourceDefinition,
     materialSinkDefinition,
     materialSourceDefinition,
-    batchThermalMassDefinition,
-    heatedMaterialInventoryDefinition,
     ambientBoundaryDefinition,
     electricHeaterDefinition,
     heatDemandDefinition,
-    hotWaterStoreDefinition
+    thermalStoreDefinition
   ]);
 }
 

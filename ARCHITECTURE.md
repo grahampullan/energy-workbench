@@ -237,25 +237,32 @@ Their product is the transported enthalpy rate in kW. The connection carries
 no duplicated temperature, composition, pressure, or phase model; a component
 that needs those properties must own and expose their governing relationship.
 
-The heated material inventory owns `massKg` and `containedEnthalpykWh`. It
-determines outgoing material from its current state, accepts heat through a
-separate thermal port, and advances both states explicitly:
+The `thermal.store` component owns `massKg` and `containedEnthalpykWh`. It can
+represent a fixed-mass thermal body, such as a hot-water tank or refractory,
+or a flowing material inventory. Material transfer is enabled by connecting
+its material ports, not by selecting another component type or setting a mode
+flag. It determines outgoing material from its current state, accepts and
+delivers heat through separate thermal ports, and advances both states
+explicitly:
 
 ```text
 massNext = mass + (massIn - massOut) * dtSeconds
 enthalpyNext = enthalpy
-             + (enthalpyIn + heatIn - enthalpyOut) * dtSeconds / 3600
+             + (enthalpyIn + heatIn
+                - enthalpyOut - heatOut - heatLoss) * dtSeconds / 3600
 ```
 
 Temperature is derived from contained mass, contained enthalpy, specific heat
 capacity, and the component's enthalpy-reference temperature. Cumulative mass
 and energy transfers are result integrations, not component state.
 
-The hot-water store owns the joint feasibility of its charge, discharge,
-ambient-loss, temperature, and capacity constraints. Its resolved actual
-command keeps those boundary conditions explicit, and its temperature state
-advances by explicit integration over `durationHours`. The runtime must not
-repeat or partially reimplement the store equation.
+Temperature is a derived output rather than an independent state. The current
+store assumes one well-mixed material, constant specific heat capacity, no
+phase change, and no stratification. Its instance name describes the equipment;
+the component type describes the governing equation. The store owns the joint
+feasibility of material transfer, heat input and output, ambient loss,
+temperature, and capacity constraints. The runtime must not repeat or
+partially reimplement that equation.
 
 Most ports accept one connection. A physical collector component may instead
 declare a repeatable `many` port. Persisted connections then share that stable
@@ -273,7 +280,7 @@ numbered placeholder ports.
 The Push 1B reference model uses one deliberately fixed thermal topology:
 
 ```text
-grid -> electric heater -> hot-water store -> heat demand
+grid -> electric heater -> thermal store (hot-water instance) -> heat demand
                            |
                            +-> ambient boundary
 ```

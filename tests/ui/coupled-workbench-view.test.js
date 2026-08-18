@@ -9,8 +9,8 @@ import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from
   "../../src/components/thermal/heat-demand.js";
-import { hotWaterStoreDefinition } from
-  "../../src/components/thermal/hot-water-store.js";
+import { thermalStoreDefinition } from
+  "../../src/components/thermal/store.js";
 import { createComponentRegistry } from "../../src/core/component-registry.js";
 import {
   ACTIVE_POWER_FLOW_TYPE,
@@ -42,7 +42,7 @@ const registry = createComponentRegistry([
   ambientBoundaryDefinition,
   electricHeaterDefinition,
   heatDemandDefinition,
-  hotWaterStoreDefinition
+  thermalStoreDefinition
 ]);
 const run = runScenario({
   model,
@@ -54,6 +54,13 @@ const run = runScenario({
     balancingComponentId: "grid"
   })
 });
+
+function assertSeriesClose(actual, expected, tolerance = 1e-12) {
+  assert.equal(actual.length, expected.length);
+  actual.forEach((value, index) => {
+    assert.ok(Math.abs(value - expected[index]) <= tolerance);
+  });
+}
 
 test("coupled chart includes electrical and thermal connection flows", () => {
   assert.equal(run.completed, true, JSON.stringify(run.diagnostics));
@@ -94,17 +101,13 @@ test("coupled chart includes electrical and thermal connection flows", () => {
   assert.equal(storeTemperature.label, "Hot-water store temperature");
   assert.equal(storeTemperature.thresholdC, 70);
   assert.equal(storeTemperature.thresholdLabel, "Minimum useful");
-  assert.equal(storeTemperature.values.length, 13);
+  assert.equal(storeTemperature.values.length, 12);
   assert.deepEqual(
-    storeTemperature.values[0],
-    { stepIndex: -1, elapsedSeconds: 0, temperatureC: 80 }
-  );
-  assert.deepEqual(
-    storeTemperature.values.slice(1).map((point) => point.elapsedSeconds),
+    storeTemperature.values.map((point) => point.elapsedSeconds),
     Array.from({ length: 12 }, (_, index) => (index + 1) * 1800)
   );
-  assert.deepEqual(
-    storeTemperature.values.slice(1).map((point) => point.temperatureC),
+  assertSeriesClose(
+    storeTemperature.values.map((point) => point.temperatureC),
     expectedResults.series.storeTemperatureC
   );
 });

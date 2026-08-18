@@ -1,6 +1,6 @@
 # ADR 0012: Restricted thermal flow and storage
 
-**Status:** Accepted
+**Status:** Partly superseded by ADR 0019
 
 **Date:** 2026-08-13
 

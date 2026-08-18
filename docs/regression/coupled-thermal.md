@@ -15,7 +15,7 @@ process modes, schedule optimisation, CSV import, or industrial calibration.
 The model in `examples/coupled-thermal` has five components:
 
 ```text
-Grid -> Electric heater -> Hot-water store -> Heat demand
+Grid -> Electric heater -> Thermal store named “Hot-water store” -> Heat demand
                            |
                            +----------------> Ambient
 ```
@@ -53,10 +53,11 @@ The reference case exercises:
 
 - Electrical-to-thermal conversion, with heater heat equal to electrical input
   multiplied by efficiency.
-- Store temperature state, updated from charge, discharge, and standing loss.
+- Store mass and contained-enthalpy state, with temperature derived after heat
+  input, output, and standing loss.
 - Positive standing loss during idle timesteps.
-- The store charge-flow limit when requested heat exceeds 80 kW.
-- The store discharge-flow limit at the first 150 kW peak.
+- The store heat-input limit when requested heat exceeds 80 kW.
+- The store heat-output limit at the first 150 kW peak.
 - The stored usable-energy limit as temperature approaches the 70 °C service
   threshold.
 - Served and unmet heat as explicit demand outputs.
@@ -76,7 +77,7 @@ The regression checks three independent balances:
 ```text
 grid import = heater electrical input
 heater heat output = heater electrical input × efficiency
-store energy change = charge - discharge - standing loss
+store energy change = heat input - heat output - standing loss
 ```
 
 It also checks that total demand equals served plus unmet heat. These values are

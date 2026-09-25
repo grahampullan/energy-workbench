@@ -1,5 +1,6 @@
 import { integrateStepPowerkWh } from "../core/energy-integration.js";
-import { formatEngineeringValue } from "./workbench-view-model.js";
+import { materialDischarge } from "../core/material-discharge.js";
+import { formatEngineeringValue } from "./engineering-format.js";
 
 function requireResults(results) {
   if (
@@ -174,17 +175,92 @@ export function createMaterialInventoryRunKpis(results) {
     kpi("material-mass-out", "Material out", integrateMass(
       "massOutflowKgPerSecond"
     ), "kg"),
-    kpi("material-enthalpy-in", "Material energy in", integrateEnergy(
+    kpi("material-enthalpy-in", "Material enthalpy in", integrateEnergy(
       "enthalpyInflowkW"
     ), "kWh"),
     kpi("heat-input-energy", "Heat supplied", integrateEnergy(
       "heatInputkW"
     ), "kWh"),
-    kpi("material-enthalpy-out", "Material energy out", integrateEnergy(
+    kpi("material-enthalpy-out", "Material enthalpy out", integrateEnergy(
       "enthalpyOutflowkW"
     ), "kWh"),
     kpi("peak-inventory-temperature", "Peak inventory temp", Math.max(
       ...temperaturesC
     ), "°C")
+  ];
+}
+
+export function createLadleRunKpis(results) {
+  requireResults(results);
+  const integrate = (componentId, field) => integrateStepPowerkWh(
+    outputSeries(results, componentId, field),
+    results.time.timeStepSeconds
+  );
+  const metalSteps = results.steps.map((step) =>
+    componentAtStep(step, "metal").outputs
+  );
+  const tapSteps = metalSteps.filter(
+    ({ massOutflowKgPerSecond }) => massOutflowKgPerSecond > 0
+  );
+  const discharges = results.steps.map((step) =>
+    materialDischarge(componentAtStep(step, "metal"))
+  );
+  const totalRequestedKg = discharges.reduce(
+    (total, discharge) => total + discharge.requestedKgPerSecond *
+      results.time.timeStepSeconds,
+    0
+  );
+  const totalUnmetKg = discharges.reduce(
+    (total, discharge) => total + discharge.unmetKgPerSecond *
+      results.time.timeStepSeconds,
+    0
+  );
+  const totalMassOutKg = tapSteps.reduce(
+    (total, output) => total + output.massOutflowKgPerSecond *
+      results.time.timeStepSeconds,
+    0
+  );
+  const minimumTapTemperatureC = tapSteps.length === 0 ? null : Math.min(
+    ...tapSteps.map(({ materialOutflowTemperatureC }) => materialOutflowTemperatureC)
+  );
+  const minimumTapTemperatureMarginK = tapSteps.length === 0 ? null : Math.min(
+    ...tapSteps.map(({ materialOutflowTemperatureMarginK }) => materialOutflowTemperatureMarginK)
+  );
+
+  return [
+    kpi("ladle-fuel-input", "Fuel input", integrate(
+      "burner",
+      "fuelInputPowerkW"
+    ), "kWh"),
+    kpi("ladle-burner-heat", "Burner heat", integrate(
+      "burner",
+      "heatOutputkW"
+    ), "kWh"),
+    kpi("ladle-direct-emissions", "Direct emissions", integrate(
+      "burner",
+      "directEmissionsKgCO2PerHour"
+    ), "kgCO2"),
+    kpi("ladle-material-requested", "Discharge requested", totalRequestedKg, "kg"),
+    kpi("ladle-material-out", "Actual discharge", totalMassOutKg, "kg"),
+    kpi("ladle-material-unmet", "Unmet discharge", totalUnmetKg, "kg",
+      totalUnmetKg > 1e-9 ? "warning" : "neutral"),
+    kpi(
+      "ladle-minimum-tap-temperature",
+      "Minimum tap temp",
+      minimumTapTemperatureC,
+      "°C",
+      minimumTapTemperatureMarginK < -1e-9 ? "warning" : "neutral"
+    ),
+    kpi(
+      "ladle-delivery-margin",
+      "Delivery margin",
+      minimumTapTemperatureMarginK,
+      "K",
+      minimumTapTemperatureMarginK < -1e-9 ? "warning" : "neutral"
+    ),
+    kpi("ladle-heat-loss", "Heat loss", (
+      integrate("refractory-loss", "heatFlowkW") +
+      integrate("metal-loss", "heatFlowkW")
+    ), "kWh")
   ];
 }

@@ -3,6 +3,10 @@ import {
   MATERIAL_MASS_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../core/flow-types.js";
+import { formatEngineeringValue } from "./engineering-format.js";
+import { materialDischarge } from "../core/material-discharge.js";
+
+export { formatEngineeringValue };
 
 const WORD_CASE = new Map([
   ["id", "ID"],
@@ -57,6 +61,9 @@ function unitIdentifierSuffix(unit) {
 }
 
 function fieldLabel(id, specification) {
+  if (typeof specification.label === "string") {
+    return specification.label;
+  }
   const unitSuffix = unitIdentifierSuffix(specification.unit);
   const fieldWithoutUnit = unitSuffix &&
     id.toLowerCase().endsWith(unitSuffix.toLowerCase())
@@ -90,27 +97,6 @@ function connectionFlowView(connectionResult) {
     };
   }
   throw new Error(`Run results contain an unsupported flow type: ${connectionResult.flowType}`);
-}
-
-export function formatEngineeringValue(value, unit = "") {
-  const visibleUnit = unit === "1" || unit === "scenario-series-id" ? "" : unit;
-  let formattedValue;
-
-  if (typeof value === "number") {
-    const normalisedValue = Object.is(value, -0) || Math.abs(value) < 1e-12 ? 0 : value;
-    formattedValue = new Intl.NumberFormat("en-GB", {
-      maximumFractionDigits: 3,
-      minimumFractionDigits: 0
-    }).format(normalisedValue);
-  } else if (value === null || value === undefined) {
-    formattedValue = "—";
-  } else if (typeof value === "boolean") {
-    formattedValue = value ? "Yes" : "No";
-  } else {
-    formattedValue = String(value);
-  }
-
-  return visibleUnit ? `${formattedValue} ${visibleUnit}` : formattedValue;
 }
 
 function formatElapsedTime(elapsedSeconds) {
@@ -168,17 +154,27 @@ function parameterGroups(definition, parameterFields) {
   return groups.filter((group) => group.fields.length > 0);
 }
 
-function operationFields(componentResult) {
+function operationFields(componentResult, discharge) {
   const commands = [
     ["Requested power", componentResult.requestedCommand],
     ["Feasible power", componentResult.feasibleCommand],
     ["Actual power", componentResult.actualCommand]
   ];
-  return commands.flatMap(([label, command]) =>
+  const fields = commands.flatMap(([label, command]) =>
     isRecord(command) && typeof command.powerkW === "number"
       ? [{ label, value: command.powerkW, unit: "kW", displayValue: formatEngineeringValue(command.powerkW, "kW") }]
       : []
   );
+  if (discharge !== null) {
+    for (const [label, value] of [
+      ["Requested discharge", discharge.requestedKgPerSecond],
+      ["Actual discharge", discharge.actualKgPerSecond],
+      ["Unmet discharge", discharge.unmetKgPerSecond]
+    ]) {
+      fields.push({ label, value, unit: "kg/s", displayValue: formatEngineeringValue(value, "kg/s") });
+    }
+  }
+  return fields;
 }
 
 function primaryMetric(definition, componentResult) {
@@ -247,6 +243,7 @@ function componentView(
   timestepLabel
 ) {
   const metric = primaryMetric(definition, componentResult);
+  const discharge = materialDischarge(componentResult);
   const parameterFields = fieldViews(definition.parameters, {
     ...component.parameters,
     ...parameterOverrides
@@ -257,11 +254,13 @@ function componentView(
     type: component.type,
     definitionName: definition.name,
     definitionVersion: definition.version,
+    visualRole: definition.editor.visualRole ?? "equipment",
     timestepLabel,
     metric,
     powerTone: powerTone(metric),
     parameterGroups: parameterGroups(definition, parameterFields),
-    operationFields: operationFields(componentResult),
+    discharge,
+    operationFields: operationFields(componentResult, discharge),
     outputFields: fieldViews(definition.outputs, componentResult.outputs),
     stateFields: fieldViews(definition.initialState, componentResult.state)
   };
@@ -309,6 +308,20 @@ function diagnosticContent(diagnostic, component) {
       };
     }
   }
+  if (
+    diagnostic.code === "thermal.store.material-delivery-temperature" &&
+    component.type === "thermal.store"
+  ) {
+    const temperatureC = outputValue(component, "materialOutflowTemperatureC");
+    const marginK = outputValue(component, "materialOutflowTemperatureMarginK");
+    if ([temperatureC, marginK].every(Number.isFinite)) {
+      return {
+        title: "Material delivery temperature missed",
+        message: `${formatEngineeringValue(temperatureC, "°C")} delivered · ` +
+          `${formatEngineeringValue(-marginK, "K")} below requirement`
+      };
+    }
+  }
   return {
     title: diagnostic.severity === "error" ? "Run error" : "Warning",
     message: diagnostic.message
@@ -324,7 +337,7 @@ export function createInspectorDiagnosticViews({
     throw new TypeError("Diagnostics, stepIndex, and component are required");
   }
 
-  return diagnostics.flatMap((diagnostic) => {
+  const views = diagnostics.flatMap((diagnostic) => {
     const location = diagnosticLocation(diagnostic.path);
     if (
       diagnostic.severity !== "error" &&
@@ -342,6 +355,18 @@ export function createInspectorDiagnosticViews({
       ...diagnosticContent(diagnostic, component)
     }];
   });
+  if (component.discharge?.unmetKgPerSecond > 1e-9) {
+    const { requestedKgPerSecond, actualKgPerSecond, unmetKgPerSecond } = component.discharge;
+    views.push({
+      severity: "warning",
+      code: "ui.unmet-material-discharge",
+      title: "Unmet discharge",
+      message: `${formatEngineeringValue(unmetKgPerSecond, "kg/s")} unmet · ` +
+        `${formatEngineeringValue(actualKgPerSecond, "kg/s")} actual of ` +
+        `${formatEngineeringValue(requestedKgPerSecond, "kg/s")} requested`
+    });
+  }
+  return views;
 }
 
 export function createWorkbenchView({

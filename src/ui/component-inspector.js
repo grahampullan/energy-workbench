@@ -1,6 +1,6 @@
 import { bindNumberParameterControls } from "./board-box-adapter.js";
+import { formatEngineeringValue } from "./engineering-format.js";
 import { parameterOverrideKey } from "./preview-model.js";
-import { formatEngineeringValue } from "./workbench-view-model.js";
 
 function descriptionList(fields) {
   const list = document.createElement("dl");
@@ -151,13 +151,14 @@ export function createComponentInspector({
     disposeBindings();
     parameterRowsByKey = new Map();
     target.className = "inspector-content";
+    target.dataset.visualRole = component.visualRole;
     target.replaceChildren();
 
     const eyebrow = document.createElement("p");
     eyebrow.className = "eyebrow";
     eyebrow.textContent = `${component.type} · v${component.definitionVersion}`;
-    const heading = document.createElement("h2");
-    heading.id = "inspector-title";
+    const heading = document.createElement("h3");
+    heading.className = "inspector-component-title";
     heading.textContent = component.name;
     const definitionName = document.createElement("p");
     definitionName.className = "inspector-definition";

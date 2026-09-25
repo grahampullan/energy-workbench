@@ -4,6 +4,10 @@ import {
   MATERIAL_MASS_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../core/flow-types.js";
+import {
+  createConnectionColourScale,
+  tableauColour
+} from "./connection-colours.js";
 
 function definitionFor(registry, component) {
   const definition = registry.get(component.type, component.definitionVersion);
@@ -41,6 +45,7 @@ function flowSeries({
   toComponent,
   direction,
   flowType,
+  colour,
   values,
   elapsedSeconds,
   timeStepSeconds
@@ -54,6 +59,7 @@ function flowSeries({
     componentIds: [fromComponent.id, toComponent.id],
     direction,
     flowType,
+    colour,
     kind: "calculated",
     label: `${source.name} → ${destination.name}`,
     values: values.map((powerkW, stepIndex) => ({
@@ -73,6 +79,7 @@ function materialMassSeries({
   fromComponent,
   toComponent,
   flows,
+  colour,
   elapsedSeconds,
   timeStepSeconds
 }) {
@@ -95,6 +102,7 @@ function materialMassSeries({
     componentIds: [fromComponent.id, toComponent.id],
     direction: "forward",
     flowType: MATERIAL_MASS_FLOW_TYPE,
+    colour,
     kind: "calculated",
     label: `${fromComponent.name} → ${toComponent.name}`,
     values,
@@ -154,7 +162,7 @@ function createPrescribedPowerSeries({ scenario, stepCount, timeStepSeconds }) {
       direction: null,
       flowType: null,
       kind: "prescribed",
-      label: `${series.name} · prescribed`,
+      label: `${series.name} · scenario input`,
       values: series.data.values.map((powerkW, stepIndex) => ({
         stepIndex,
         elapsedSeconds: stepIndex * timeStepSeconds,
@@ -178,7 +186,7 @@ function createPrescribedMassSeries({ scenario, stepCount, timeStepSeconds }) {
       direction: null,
       flowType: MATERIAL_MASS_FLOW_TYPE,
       kind: "prescribed",
-      label: `${series.name} · prescribed`,
+      label: `${series.name} · scenario input`,
       values: series.data.values.map((massFlowKgPerSecond, stepIndex) => ({
         stepIndex,
         elapsedSeconds: stepIndex * timeStepSeconds,
@@ -204,7 +212,7 @@ function createPrescribedTemperatureSeries({
       connectionId: null,
       componentIds: [],
       kind: "prescribed",
-      label: `${series.name} · prescribed`,
+      label: `${series.name} · scenario input`,
       thresholdC: null,
       thresholdLabel: null,
       stepValueOffset: 0,
@@ -345,6 +353,9 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
     component.id,
     component
   ]));
+  const connectionColours = createConnectionColourScale(
+    model.connections.map(({ id }) => id)
+  );
   const elapsedSeconds = results.steps.map((step) => step.elapsedSeconds);
   const endElapsedSeconds = elapsedSeconds.at(-1) + timeStepSeconds;
   const connectionResultsByStep = results.steps.map((step) => new Map(
@@ -396,45 +407,57 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
       fromPort,
       toPort,
       flowType,
+      colour: connectionColours.colourFor(connection.id),
       flows,
       visibleInFlowChart
     };
   });
 
-  const series = connectionEntries
-    .filter(({ visibleInFlowChart }) => visibleInFlowChart)
-    .flatMap((entry) => {
-    const { connection, fromComponent, toComponent, fromPort, toPort, flowType, flows } = entry;
-    const values = flows.map((flow, stepIndex) => {
-      const powerkW = flowType === ACTIVE_POWER_FLOW_TYPE
-        ? flow?.powerkW
-        : flowType === THERMAL_HEAT_FLOW_TYPE
-          ? flow?.heatFlowkW
-          : flow?.massFlowKgPerSecond * flow?.specificEnthalpyKjPerKg;
-      if (!Number.isFinite(powerkW)) {
-        throw new TypeError(
-          `Connection ${connection.id} energy flow must be finite at step ${stepIndex}`
-        );
-      }
-      return powerkW;
-    });
-    const directions = flowType === ACTIVE_POWER_FLOW_TYPE &&
-      fromPort.direction === "bidirectional" &&
-      toPort.direction === "bidirectional"
-      ? ["forward", "reverse"]
-      : ["forward"];
+  const series = [];
+  const hiddenSeries = [];
+  connectionEntries
+    .filter(({ flowType }) => flowType !== MATERIAL_MASS_FLOW_TYPE)
+    .forEach((entry) => {
+      const {
+        connection,
+        fromComponent,
+        toComponent,
+        fromPort,
+        toPort,
+        flowType,
+        colour,
+        flows
+      } = entry;
+      const values = flows.map((flow, stepIndex) => {
+        const powerkW = flowType === ACTIVE_POWER_FLOW_TYPE
+          ? flow?.powerkW
+          : flow?.heatFlowkW;
+        if (!Number.isFinite(powerkW)) {
+          throw new TypeError(
+            `Connection ${connection.id} energy flow must be finite at step ${stepIndex}`
+          );
+        }
+        return powerkW;
+      });
+      const directions = flowType === ACTIVE_POWER_FLOW_TYPE &&
+        fromPort.direction === "bidirectional" &&
+        toPort.direction === "bidirectional"
+        ? ["forward", "reverse"]
+        : ["forward"];
 
-    return directions.map((direction) => flowSeries({
-      connection,
-      fromComponent,
-      toComponent,
-      direction,
-      flowType,
-      values,
-      elapsedSeconds,
-      timeStepSeconds
-    }));
-  });
+      const destination = entry.visibleInFlowChart ? series : hiddenSeries;
+      destination.push(...directions.map((direction) => flowSeries({
+        connection,
+        fromComponent,
+        toComponent,
+        direction,
+        flowType,
+        colour,
+        values,
+        elapsedSeconds,
+        timeStepSeconds
+      })));
+    });
   const materialSeries = connectionEntries
     .filter(({ flowType, visibleInFlowChart }) =>
       visibleInFlowChart && flowType === MATERIAL_MASS_FLOW_TYPE
@@ -445,33 +468,51 @@ export function createResultsChartModel({ model, registry, results, scenario }) 
       timeStepSeconds
     }));
 
+  const uncolouredStandaloneSeries = [
+    createPrescribedPowerSeries({
+      scenario,
+      stepCount: results.steps.length,
+      timeStepSeconds
+    }),
+    createPrescribedMassSeries({
+      scenario,
+      stepCount: results.steps.length,
+      timeStepSeconds
+    }),
+    createTemperatureSeries({
+      model,
+      registry,
+      results,
+      timeStepSeconds
+    }),
+    createPrescribedTemperatureSeries({
+      scenario,
+      stepCount: results.steps.length,
+      timeStepSeconds
+    })
+  ];
+  let standaloneColourIndex = connectionColours.size;
+  const [
+    prescribedPowerSeries,
+    prescribedMassSeries,
+    temperatureSeries,
+    prescribedTemperatureSeries
+  ] = uncolouredStandaloneSeries.map((group) => group.map((candidate) => ({
+    ...candidate,
+    colour: tableauColour(standaloneColourIndex++)
+  })));
+
   return {
     timeStepSeconds,
     stepCount: results.steps.length,
     elapsedSeconds,
     endElapsedSeconds,
     series,
+    hiddenSeries,
     materialSeries,
-    prescribedPowerSeries: createPrescribedPowerSeries({
-      scenario,
-      stepCount: results.steps.length,
-      timeStepSeconds
-    }),
-    prescribedMassSeries: createPrescribedMassSeries({
-      scenario,
-      stepCount: results.steps.length,
-      timeStepSeconds
-    }),
-    temperatureSeries: createTemperatureSeries({
-      model,
-      registry,
-      results,
-      timeStepSeconds
-    }),
-    prescribedTemperatureSeries: createPrescribedTemperatureSeries({
-      scenario,
-      stepCount: results.steps.length,
-      timeStepSeconds
-    })
+    prescribedPowerSeries,
+    prescribedMassSeries,
+    temperatureSeries,
+    prescribedTemperatureSeries
   };
 }

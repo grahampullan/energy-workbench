@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   chartStepIndexAtElapsedSeconds,
-  nextChartStepIndex
+  nextChartStepIndex,
+  resultsHoverHighlight,
+  resultsSeriesIsEmphasised
 } from "../../src/ui/results-chart.js";
 
 function next(key, stepIndex = 100) {
@@ -49,4 +51,58 @@ test("rate intervals and end-of-step states select the intended timestep", () =>
   assert.equal(selected("temperature", 60), 0);
   assert.equal(selected("temperature", 60.001), 1);
   assert.equal(selected("temperature", 120), 1);
+});
+
+test("connection hover identity is shared while chart-only series remain local", () => {
+  const connectionSeries = {
+    id: "grid-to-bus:forward",
+    connectionId: "grid-to-bus"
+  };
+  const prescribedSeries = {
+    id: "scenario:demand",
+    connectionId: null
+  };
+
+  assert.deepEqual(resultsHoverHighlight(connectionSeries), {
+    connectionId: "grid-to-bus",
+    seriesId: null
+  });
+  assert.deepEqual(resultsHoverHighlight(prescribedSeries), {
+    connectionId: null,
+    seriesId: "scenario:demand"
+  });
+  assert.deepEqual(resultsHoverHighlight(null), {
+    connectionId: null,
+    seriesId: null
+  });
+});
+
+test("an external Model hover emphasises every series for that connection", () => {
+  const forward = {
+    id: "grid-to-bus:forward",
+    connectionId: "grid-to-bus",
+    componentIds: ["grid", "bus"]
+  };
+  const reverse = { ...forward, id: "grid-to-bus:reverse" };
+  const unrelated = {
+    id: "pv-to-bus:forward",
+    connectionId: "pv-to-bus",
+    componentIds: ["pv", "bus"]
+  };
+  const prescribed = {
+    id: "scenario:demand",
+    connectionId: null,
+    componentIds: []
+  };
+  const emphasised = (series) => resultsSeriesIsEmphasised(
+    series,
+    null,
+    "grid-to-bus",
+    null
+  );
+
+  assert.equal(emphasised(forward), true);
+  assert.equal(emphasised(reverse), true);
+  assert.equal(emphasised(unrelated), false);
+  assert.equal(emphasised(prescribed), false);
 });

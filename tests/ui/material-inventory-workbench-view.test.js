@@ -82,10 +82,8 @@ test("material-inventory UI documents and chart series are complete", () => {
   });
 
   assert.deepEqual(chart.series.map(({ id }) => id), [
-    "source-to-inventory:forward",
     "grid-to-heater:forward",
-    "heater-to-inventory:forward",
-    "inventory-to-sink:forward"
+    "heater-to-inventory:forward"
   ]);
   assert.deepEqual(chart.materialSeries.map(({ id }) => id), [
     "source-to-inventory:mass-forward",
@@ -153,6 +151,18 @@ test("material topology and inspector expose mass, enthalpy, and temperature", (
       ({ id }) => id === "specificEnthalpyKjPerKg"
     ).value,
     110
+  );
+  assert.equal(
+    inventory.outputFields.find(({ id }) => id === "enthalpyInflowkW").label,
+    "Material enthalpy rate in"
+  );
+  assert.equal(
+    inventory.outputFields.find(({ id }) => id === "heatInputkW").label,
+    "Heat-transfer input"
+  );
+  assert.equal(
+    inventory.outputFields.find(({ id }) => id === "netEnergyFlowkW").label,
+    "Stored enthalpy change rate"
   );
   assert.ok(inventory.parameterGroups.flatMap(({ fields }) => fields)
     .every(({ editor }) => editor !== null));

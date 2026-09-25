@@ -77,6 +77,9 @@ test("chart model derives directional power series from canonical connection res
       "Electrical bus → Battery"
     ]
   );
+  assert.equal(chart.series[0].colour, "#4e79a7");
+  assert.equal(chart.series[1].colour, chart.series[0].colour);
+  assert.equal(chart.series[2].colour, "#f28e2c");
   assert.ok(chart.series.every((series) =>
     series.values.every((point) => point.powerkW >= 0)
   ));

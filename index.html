@@ -26,6 +26,8 @@
                 <option value="coupled-thermal">Coupled thermal</option>
                 <option value="batch-heating-synthetic">Batch heating</option>
                 <option value="material-inventory-synthetic">Material inventory</option>
+                <option value="ladle-cycle-historical">Ladle · historical</option>
+                <option value="ladle-cycle-minimum-fuel">Ladle · temperature-led</option>
               </select>
             </label>
             <input
@@ -48,31 +50,29 @@
 
       <section id="run-kpis" class="run-kpis" aria-label="Run KPIs"></section>
 
-      <section class="workspace">
+      <section id="workspace" class="workspace">
         <section class="topology-panel" aria-labelledby="topology-title">
           <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Live topology</p>
-              <h2 id="topology-title">Energy system</h2>
-            </div>
-            <p class="panel-hint">Drag or resize components · drag the background to pan · scroll to zoom</p>
+            <h2 id="topology-title">Model</h2>
+            <button
+              id="toggle-model-view"
+              class="panel-action"
+              type="button"
+              aria-label="Expand Model panel"
+              aria-pressed="false"
+            >Expand</button>
           </div>
           <div class="topology-frame">
-            <div id="topology-board" aria-label="Energy system topology"></div>
-          </div>
-          <div class="flow-legend" aria-label="Flow legend">
-            <span><i class="legend-line" aria-hidden="true"></i> Electrical flow</span>
-            <span><i class="legend-line legend-line--thermal" aria-hidden="true"></i> Thermal flow</span>
-            <span><i class="legend-line legend-line--material" aria-hidden="true"></i> Material flow</span>
-            <span>Layout changes reset on reload</span>
+            <div class="topology-board-host">
+              <div id="topology-board" aria-label="Energy system topology"></div>
+            </div>
           </div>
         </section>
 
-        <section class="results-panel" aria-labelledby="results-chart-title">
+        <section class="results-panel" aria-labelledby="results-title">
           <div class="results-heading">
             <div>
-              <p class="eyebrow">Run results</p>
-              <h2 id="results-chart-title">Power over time</h2>
+              <h2 id="results-title">Results</h2>
             </div>
             <div class="results-view-controls" aria-label="Results chart view">
               <button id="show-power-chart" type="button" aria-pressed="true">Power</button>
@@ -86,6 +86,10 @@
               >Temperature</button>
             </div>
           </div>
+          <label class="results-input-toggle">
+            <input id="show-scenario-inputs" type="checkbox">
+            Show scenario inputs
+          </label>
           <div id="results-chart" class="results-chart"></div>
           <div
             id="results-chart-legend"
@@ -95,9 +99,11 @@
         </section>
 
         <aside class="inspector-panel" aria-labelledby="inspector-title">
+          <div class="panel-heading">
+            <h2 id="inspector-title">Inspector</h2>
+          </div>
           <div id="inspector" class="inspector-empty">
-            <p class="eyebrow">Component inspector</p>
-            <h2 id="inspector-title">Select a component</h2>
+            <h3 class="inspector-component-title">Select a component</h3>
             <p>Choose a component on the board to inspect its definition and current results.</p>
           </div>
         </aside>

@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { connectionGeometry } from "../../src/ui/topology-geometry.js";
+import { topologyDetailLevel } from "../../src/ui/topology-detail-level.js";
+
+test("topology detail responds to board zoom scale", () => {
+  assert.equal(topologyDetailLevel(1), "detailed");
+  assert.equal(topologyDetailLevel(0.85), "detailed");
+  assert.equal(topologyDetailLevel(0.84), "compact");
+  assert.equal(topologyDetailLevel(0.6), "compact");
+  assert.equal(topologyDetailLevel(0.59), "overview");
+  assert.throws(() => topologyDetailLevel(0), /finite and positive/u);
+});
 
 test("heat-loss connections enter a wide lower temperature boundary vertically", () => {
   const boxes = new Map([

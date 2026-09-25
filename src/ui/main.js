@@ -9,6 +9,7 @@ import { materialSourceDefinition } from "../components/material/source.js";
 import { constantTemperatureDefinition } from
   "../components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from "../components/thermal/electric-heater.js";
+import { fuelBurnerDefinition } from "../components/thermal/fuel-burner.js";
 import { heatDemandDefinition } from "../components/thermal/heat-demand.js";
 import { heatTransferDefinition } from "../components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from "../components/thermal/store.js";
@@ -19,6 +20,7 @@ import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-sel
 import { createScheduledHeatingPolicy } from "../policies/scheduled-heating.js";
 import { createScheduledMaterialInventoryPolicy } from
   "../policies/scheduled-material-inventory.js";
+import { createLadleCyclePolicy } from "../policies/ladle-cycle.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
 import { createComponentInspector } from "./component-inspector.js";
@@ -34,6 +36,7 @@ import {
   createBatchHeatingRunKpis,
   createCoupledThermalRunKpis,
   createElectricalRunKpis,
+  createLadleRunKpis,
   createMaterialInventoryRunKpis
 } from "./run-kpi-model.js";
 import {
@@ -51,7 +54,6 @@ const EXAMPLES = Object.freeze({
   "blog-electrical": Object.freeze({
     label: "PV and battery",
     root: "/examples/blog-electrical",
-    topologyTitle: "Electrical system",
     initialComponentType: "electrical.battery",
     createKpis: createElectricalRunKpis,
     createPolicy(model) {
@@ -64,7 +66,6 @@ const EXAMPLES = Object.freeze({
   "coupled-thermal": Object.freeze({
     label: "Coupled thermal",
     root: "/examples/coupled-thermal",
-    topologyTitle: "Electrical and thermal system",
     initialComponentType: "thermal.store",
     createKpis: createCoupledThermalRunKpis,
     createPolicy(model) {
@@ -78,7 +79,6 @@ const EXAMPLES = Object.freeze({
   "batch-heating-synthetic": Object.freeze({
     label: "Batch heating",
     root: "/examples/batch-heating-synthetic",
-    topologyTitle: "Batch-heating process",
     initialComponentType: "thermal.store",
     createKpis: createBatchHeatingRunKpis,
     createPolicy(model) {
@@ -92,7 +92,6 @@ const EXAMPLES = Object.freeze({
   "material-inventory-synthetic": Object.freeze({
     label: "Material inventory",
     root: "/examples/material-inventory-synthetic",
-    topologyTitle: "Heated material inventory",
     initialComponentType: "thermal.store",
     createKpis: createMaterialInventoryRunKpis,
     createPolicy(model) {
@@ -105,6 +104,42 @@ const EXAMPLES = Object.freeze({
         ),
         outflowSeriesId: "material-outflow",
         balancingComponentId: componentIdForType(model, "electrical.grid")
+      });
+    }
+  }),
+  "ladle-cycle-historical": Object.freeze({
+    label: "Ladle · historical",
+    root: "/examples/ladle-cycle-synthetic",
+    initialComponentId: "refractory",
+    createKpis: createLadleRunKpis,
+    createPolicy() {
+      return createLadleCyclePolicy({
+        burnerComponentId: "burner",
+        refractoryComponentId: "refractory",
+        inventoryComponentId: "metal",
+        modeSeriesId: "process-mode",
+        historicalHeatOutputSeriesId: "historical-burner-output",
+        outflowSeriesId: "material-outflow",
+        strategy: "historical",
+        operatingMarginK: 10
+      });
+    }
+  }),
+  "ladle-cycle-minimum-fuel": Object.freeze({
+    label: "Ladle · temperature-led",
+    root: "/examples/ladle-cycle-synthetic",
+    initialComponentId: "refractory",
+    createKpis: createLadleRunKpis,
+    createPolicy() {
+      return createLadleCyclePolicy({
+        burnerComponentId: "burner",
+        refractoryComponentId: "refractory",
+        inventoryComponentId: "metal",
+        modeSeriesId: "process-mode",
+        historicalHeatOutputSeriesId: "historical-burner-output",
+        outflowSeriesId: "material-outflow",
+        strategy: "minimum-fuel",
+        operatingMarginK: 10
       });
     }
   })
@@ -152,6 +187,7 @@ function definitionRegistry() {
     materialSourceDefinition,
     constantTemperatureDefinition,
     electricHeaterDefinition,
+    fuelBurnerDefinition,
     heatDemandDefinition,
     heatTransferDefinition,
     thermalStoreDefinition
@@ -216,7 +252,7 @@ async function startWorkbench() {
 
   const registry = definitionRegistry();
   const policy = example.createPolicy(loadedModel);
-  const initialComponentId = componentIdForType(
+  const initialComponentId = example.initialComponentId ?? componentIdForType(
     loadedModel,
     example.initialComponentType
   );
@@ -652,7 +688,7 @@ async function startWorkbench() {
     energyButton: element("show-energy-chart"),
     massButton: element("show-mass-chart"),
     temperatureButton: element("show-temperature-chart"),
-    headingTarget: element("results-chart-title"),
+    scenarioInputsToggle: element("show-scenario-inputs"),
     onStepChange: selectStep,
     onHighlightConnection: highlightConnection
   });
@@ -692,6 +728,8 @@ async function startWorkbench() {
 
   const modelFileInput = element("open-model-file");
   const exampleSelect = element("example-select");
+  const workspace = element("workspace");
+  const toggleModelView = element("toggle-model-view");
   exampleSelect.value = example.id;
   exampleSelect.addEventListener("change", () => {
     const url = new URL(window.location.href);
@@ -707,9 +745,18 @@ async function startWorkbench() {
     modelFileInput.value = "";
   });
   element("save-model").addEventListener("click", saveWorkingModel);
+  toggleModelView.addEventListener("click", () => {
+    const expanded = !workspace.classList.contains("workspace--model-expanded");
+    workspace.classList.toggle("workspace--model-expanded", expanded);
+    toggleModelView.setAttribute("aria-pressed", String(expanded));
+    toggleModelView.setAttribute(
+      "aria-label",
+      expanded ? "Restore workspace panels" : "Expand Model panel"
+    );
+    toggleModelView.textContent = expanded ? "Restore" : "Expand";
+  });
 
   element("model-name").textContent = workingModel.name;
-  element("topology-title").textContent = example.topologyTitle;
   previewDiagnostics = baselineRun.diagnostics;
   updateResultViews({ rebuildParameters: true });
   setDocumentStatus(`${example.label} example loaded; layout changes remain temporary`);

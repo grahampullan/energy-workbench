@@ -12,23 +12,16 @@ import {
 } from "d3";
 
 import { createFrameRenderer } from "./animation-frame.js";
-import { formatEngineeringValue } from "./workbench-view-model.js";
+import {
+  createEngineeringDisplayScale,
+  formatEngineeringValue
+} from "./engineering-format.js";
 
 const WIDTH = 1200;
 const HEIGHT = 230;
 const POWER_MARGIN = { top: 16, right: 24, bottom: 40, left: 62 };
 const ENERGY_MARGIN = { top: 16, right: 24, bottom: 78, left: 62 };
 const TEMPERATURE_MARGIN = POWER_MARGIN;
-const SERIES_COLOURS = [
-  "#2e6285",
-  "#8b5a3c",
-  "#1c7258",
-  "#b96c25",
-  "#76579b",
-  "#b84f63",
-  "#49736a",
-  "#8b6c28"
-];
 
 function formatChartTime(elapsedSeconds) {
   const wholeMinutes = Math.round(elapsedSeconds / 60);
@@ -109,7 +102,7 @@ export function nextChartStepIndex({
   return Math.max(0, Math.min(stepCount - 1, stepIndex + offsetByKey.get(key)));
 }
 
-function seriesIsEmphasised(
+export function resultsSeriesIsEmphasised(
   series,
   selectedComponentId,
   highlightedConnectionId,
@@ -118,13 +111,28 @@ function seriesIsEmphasised(
   if (highlightedSeriesId !== null) {
     return series.id === highlightedSeriesId;
   }
+  if (highlightedConnectionId !== null) {
+    return series.connectionId === highlightedConnectionId;
+  }
   if (series.connectionId === null) {
     return true;
   }
-  if (highlightedConnectionId !== null && series.connectionId !== null) {
-    return series.connectionId === highlightedConnectionId;
-  }
   return selectedComponentId === null || series.componentIds.includes(selectedComponentId);
+}
+
+export function resultsHoverHighlight(series) {
+  const connectionId = series?.connectionId ?? null;
+  return Object.freeze({
+    connectionId,
+    seriesId: connectionId === null ? series?.id ?? null : null
+  });
+}
+
+export function resultsFlowSeries(model, highlightedConnectionId = null) {
+  const revealed = model.hiddenSeries.filter(
+    (series) => series.connectionId === highlightedConnectionId
+  );
+  return revealed.length === 0 ? model.series : [...model.series, ...revealed];
 }
 
 function makeLegendButton(series, colour, onHighlightSeries) {
@@ -160,7 +168,7 @@ export function createResultsChart({
   energyButton,
   massButton,
   temperatureButton,
-  headingTarget,
+  scenarioInputsToggle,
   onStepChange,
   onHighlightConnection
 }) {
@@ -171,7 +179,7 @@ export function createResultsChart({
     !energyButton ||
     !massButton ||
     !temperatureButton ||
-    !headingTarget
+    !scenarioInputsToggle
   ) {
     throw new TypeError("Results chart targets are required");
   }
@@ -184,7 +192,6 @@ export function createResultsChart({
     .attr("class", "results-chart-svg")
     .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
     .attr("preserveAspectRatio", "xMidYMid meet");
-  const title = svg.append("title");
   const gridLayer = svg.append("g").attr("class", "results-chart-grid");
   const xAxisLayer = svg.append("g").attr("class", "results-chart-axis");
   const yAxisLayer = svg.append("g").attr("class", "results-chart-axis");
@@ -210,40 +217,42 @@ export function createResultsChart({
   const cursorPoints = cursorLayer.append("g");
 
   let mode = "power";
+  let showScenarioInputs = false;
   let state = null;
   let renderedModel = null;
   let renderedMode = null;
+  let renderedScenarioInputs = null;
+  let renderedHiddenConnectionId = null;
   let xScale = null;
   let yScale = null;
-  let coloursBySeriesId = new Map();
   let legendBySeriesId = new Map();
   let highlightedSeriesId = null;
 
-  function colourFor(seriesId) {
-    return coloursBySeriesId.get(seriesId) ?? SERIES_COLOURS[0];
+  function scenarioInputSeries(model) {
+    if (mode === "mass") {
+      return model.prescribedMassSeries;
+    }
+    if (mode === "temperature") {
+      return model.prescribedTemperatureSeries;
+    }
+    return mode === "power" ? model.prescribedPowerSeries : [];
   }
 
   function visibleSeries(model) {
-    if (mode === "mass") {
-      return [
-        ...model.materialSeries,
-        ...model.prescribedMassSeries
-      ];
-    }
-    if (mode === "temperature") {
-      return [
-        ...model.temperatureSeries,
-        ...model.prescribedTemperatureSeries
-      ];
-    }
-    return mode === "energy"
-      ? model.series
-      : [...model.series, ...model.prescribedPowerSeries];
+    const calculated = mode === "mass"
+      ? model.materialSeries
+      : mode === "temperature"
+        ? model.temperatureSeries
+        : resultsFlowSeries(model, state.highlightedConnectionId);
+    return showScenarioInputs
+      ? [...calculated, ...scenarioInputSeries(model)]
+      : calculated;
   }
 
   function setSeriesHighlight(series) {
-    highlightedSeriesId = series?.id ?? null;
-    onHighlightConnection(series?.connectionId ?? null);
+    const highlight = resultsHoverHighlight(series);
+    highlightedSeriesId = highlight.seriesId;
+    onHighlightConnection(highlight.connectionId);
     if (state) {
       frameRenderer.request();
     }
@@ -251,18 +260,11 @@ export function createResultsChart({
 
   function rebuildLegend(model) {
     const series = visibleSeries(model);
-    const palette = mode === "temperature"
-      ? ["#1c7258", "#2e6285", "#76579b", "#b96c25"]
-      : SERIES_COLOURS;
     legendTarget.replaceChildren();
-    coloursBySeriesId = new Map(series.map((candidate, index) => [
-      candidate.id,
-      palette[index % palette.length]
-    ]));
     legendBySeriesId = new Map(series.map((candidate) => {
       const entry = makeLegendButton(
         candidate,
-        colourFor(candidate.id),
+        candidate.colour,
         setSeriesHighlight
       );
       legendTarget.append(entry.button);
@@ -312,6 +314,10 @@ export function createResultsChart({
     const maximumPowerkW = max(series, (candidate) =>
       max(candidate.values, (point) => point[valueField])
     ) ?? 0;
+    const displayScale = createEngineeringDisplayScale(
+      maximumPowerkW,
+      mode === "mass" ? "kg/s" : "kW"
+    );
     const firstElapsedSeconds = model.elapsedSeconds[0];
     xScale = scaleLinear()
       .domain([firstElapsedSeconds, model.endElapsedSeconds])
@@ -340,14 +346,15 @@ export function createResultsChart({
       .attr("dy", "0.71em");
     yAxisLayer
       .attr("transform", `translate(${margin.left} 0)`)
-      .call(axisLeft(yScale).ticks(6));
+      .call(axisLeft(yScale).ticks(6).tickFormat((value) =>
+        displayScale.format(value)
+      ));
     gridLayer
       .attr("transform", `translate(${margin.left} 0)`)
       .call(axisLeft(yScale).ticks(6).tickSize(-plotWidth).tickFormat(""));
-    yLabel.text(mode === "mass" ? "Mass flow (kg/s)" : "Power (kW)");
-    title.text(mode === "mass"
-      ? "Material mass flow rate over time"
-      : "Power over time");
+    yLabel.text(mode === "mass"
+      ? `Mass flow (${displayScale.unit})`
+      : `Power (${displayScale.unit})`);
 
     barLayer.selectAll("rect.results-energy-bar").remove();
     lineLayer.selectAll("path.results-temperature-line").remove();
@@ -362,7 +369,7 @@ export function createResultsChart({
       .attr("data-series-id", (candidate) => candidate.id)
       .attr("data-kind", (candidate) => candidate.kind)
       .attr("fill", "none")
-      .attr("stroke", (candidate) => colourFor(candidate.id))
+      .attr("stroke", (candidate) => candidate.colour)
       .attr("d", pathFor);
 
     const hitLines = interactionLayer
@@ -389,19 +396,24 @@ export function createResultsChart({
   function renderEnergy(model) {
     const margin = ENERGY_MARGIN;
     const plotWidth = WIDTH - margin.left - margin.right;
+    const series = visibleSeries(model);
     const x = scaleBand()
-      .domain(model.series.map((series) => series.id))
+      .domain(series.map((series) => series.id))
       .range([margin.left, WIDTH - margin.right])
       .padding(0.22);
     const maximumEnergykWh = max(
-      model.series,
+      series,
       (series) => series.integratedEnergykWh
     ) ?? 0;
+    const displayScale = createEngineeringDisplayScale(
+      maximumEnergykWh,
+      "kWh"
+    );
     const y = scaleLinear()
       .domain([0, maximumEnergykWh || 1])
       .nice()
       .range([HEIGHT - margin.bottom, margin.top]);
-    const labelsBySeriesId = new Map(model.series.map((series) => [
+    const labelsBySeriesId = new Map(series.map((series) => [
       series.id,
       series.label
     ]));
@@ -417,12 +429,13 @@ export function createResultsChart({
       .attr("dy", "0.15em");
     yAxisLayer
       .attr("transform", `translate(${margin.left} 0)`)
-      .call(axisLeft(y).ticks(6));
+      .call(axisLeft(y).ticks(6).tickFormat((value) =>
+        displayScale.format(value)
+      ));
     gridLayer
       .attr("transform", `translate(${margin.left} 0)`)
       .call(axisLeft(y).ticks(6).tickSize(-plotWidth).tickFormat(""));
-    yLabel.text("Energy (kWh)");
-    title.text("Integrated transferred energy");
+    yLabel.text(`Energy (${displayScale.unit})`);
 
     lineLayer.selectAll("path.results-power-line").remove();
     lineLayer.selectAll("path.results-temperature-line").remove();
@@ -435,7 +448,7 @@ export function createResultsChart({
 
     const bars = barLayer
       .selectAll("rect.results-energy-bar")
-      .data(model.series, (series) => series.id)
+      .data(series, (series) => series.id)
       .join("rect")
       .attr("class", "results-energy-bar")
       .attr("data-series-id", (series) => series.id)
@@ -443,7 +456,7 @@ export function createResultsChart({
       .attr("y", (series) => y(series.integratedEnergykWh))
       .attr("width", x.bandwidth())
       .attr("height", (series) => y(0) - y(series.integratedEnergykWh))
-      .attr("fill", (series) => colourFor(series.id));
+      .attr("fill", (series) => series.colour);
     bars
       .on("pointerenter", (event, series) => setSeriesHighlight(series))
       .on("pointerleave", () => setSeriesHighlight(null));
@@ -463,13 +476,17 @@ export function createResultsChart({
       return Number.isFinite(candidate.thresholdC)
         ? Math.min(candidate.thresholdC, seriesMinimumC)
         : seriesMinimumC;
-    });
+    }) ?? 0;
     const maximumTemperatureC = max(series, (candidate) => Math.max(
       Number.isFinite(candidate.thresholdC)
         ? candidate.thresholdC
         : Number.NEGATIVE_INFINITY,
       max(candidate.values, (point) => point.temperatureC)
-    ));
+    )) ?? minimumTemperatureC;
+    const displayScale = createEngineeringDisplayScale(
+      Math.max(Math.abs(minimumTemperatureC), Math.abs(maximumTemperatureC)),
+      "°C"
+    );
     const temperatureRangeC = maximumTemperatureC - minimumTemperatureC;
     const temperaturePaddingC = Math.max(1, temperatureRangeC * 0.12);
     xScale = scaleLinear()
@@ -509,12 +526,13 @@ export function createResultsChart({
       .attr("dy", "0.71em");
     yAxisLayer
       .attr("transform", `translate(${margin.left} 0)`)
-      .call(axisLeft(yScale).ticks(6));
+      .call(axisLeft(yScale).ticks(6).tickFormat((value) =>
+        displayScale.format(value)
+      ));
     gridLayer
       .attr("transform", `translate(${margin.left} 0)`)
       .call(axisLeft(yScale).ticks(6).tickSize(-plotWidth).tickFormat(""));
-    yLabel.text("Temperature (°C)");
-    title.text("Component temperature over time");
+    yLabel.text(`Temperature (${displayScale.unit})`);
 
     barLayer.selectAll("rect.results-energy-bar").remove();
     lineLayer.selectAll("path.results-power-line").remove();
@@ -527,7 +545,7 @@ export function createResultsChart({
       .attr("data-series-id", (candidate) => candidate.id)
       .attr("data-kind", (candidate) => candidate.kind)
       .attr("fill", "none")
-      .attr("stroke", (candidate) => colourFor(candidate.id))
+      .attr("stroke", (candidate) => candidate.colour)
       .attr("d", pathFor);
     const thresholdSeries = series.filter((candidate) =>
       Number.isFinite(candidate.thresholdC)
@@ -582,7 +600,7 @@ export function createResultsChart({
       ? selectedComponentId
       : null;
     const setEmphasis = (selection) => selection
-      .attr("data-emphasised", (series) => String(seriesIsEmphasised(
+      .attr("data-emphasised", (series) => String(resultsSeriesIsEmphasised(
         series,
         effectiveSelectedComponentId,
         highlightedConnectionId,
@@ -598,9 +616,26 @@ export function createResultsChart({
     setEmphasis(lineLayer.selectAll("path.results-power-line"));
     setEmphasis(lineLayer.selectAll("path.results-temperature-line"));
     setEmphasis(barLayer.selectAll("rect.results-energy-bar"));
+    lineLayer
+      .selectAll("path.results-power-line, path.results-temperature-line")
+      .filter((series) =>
+        series.id === highlightedSeriesId ||
+        (
+          series.connectionId !== null &&
+          series.connectionId === highlightedConnectionId
+        )
+      )
+      .raise();
+    barLayer
+      .selectAll("rect.results-energy-bar")
+      .filter((series) =>
+        series.connectionId !== null &&
+        series.connectionId === highlightedConnectionId
+      )
+      .raise();
     for (const candidate of series) {
       const entry = legendBySeriesId.get(candidate.id);
-      entry.button.dataset.emphasised = String(seriesIsEmphasised(
+      entry.button.dataset.emphasised = String(resultsSeriesIsEmphasised(
         candidate,
         effectiveSelectedComponentId,
         highlightedConnectionId,
@@ -650,7 +685,7 @@ export function createResultsChart({
               mode === "mass" ? "massFlowKgPerSecond" : "powerkW"
             ]
       ))
-      .attr("fill", (candidate) => colourFor(candidate.id));
+      .attr("fill", (candidate) => candidate.colour);
   }
 
   function updateLegend() {
@@ -718,9 +753,7 @@ export function createResultsChart({
   }
 
   function renderChart() {
-    if (state.model !== renderedModel || mode !== renderedMode) {
-      rebuildLegend(state.model);
-    }
+    rebuildLegend(state.model);
     if (mode === "power" || mode === "mass") {
       renderPower(state.model);
     } else if (mode === "energy") {
@@ -730,24 +763,32 @@ export function createResultsChart({
     }
     renderedModel = state.model;
     renderedMode = mode;
+    renderedScenarioInputs = showScenarioInputs;
   }
 
   const frameRenderer = createFrameRenderer({
     render() {
-      if (state.model !== renderedModel || mode !== renderedMode) {
+      const hiddenConnectionId = (mode === "power" || mode === "energy") &&
+        state.model.hiddenSeries.some(
+          (series) => series.connectionId === state.highlightedConnectionId
+        )
+        ? state.highlightedConnectionId
+        : null;
+      if (
+        state.model !== renderedModel ||
+        mode !== renderedMode ||
+        showScenarioInputs !== renderedScenarioInputs ||
+        hiddenConnectionId !== renderedHiddenConnectionId
+      ) {
         renderChart();
+        renderedHiddenConnectionId = hiddenConnectionId;
       }
       powerButton.setAttribute("aria-pressed", String(mode === "power"));
       energyButton.setAttribute("aria-pressed", String(mode === "energy"));
       massButton.setAttribute("aria-pressed", String(mode === "mass"));
       temperatureButton.setAttribute("aria-pressed", String(mode === "temperature"));
-      headingTarget.textContent = mode === "power"
-        ? "Power over time"
-        : mode === "mass"
-          ? "Mass flow over time"
-        : mode === "energy"
-          ? "Integrated energy"
-          : "Temperature over time";
+      scenarioInputsToggle.checked = showScenarioInputs;
+      scenarioInputsToggle.disabled = scenarioInputSeries(state.model).length === 0;
       updateEmphasis();
       updateCursor();
       updateLegend();
@@ -822,6 +863,10 @@ export function createResultsChart({
   const showEnergy = () => setMode("energy");
   const showMass = () => setMode("mass");
   const showTemperature = () => setMode("temperature");
+  const toggleScenarioInputs = () => {
+    showScenarioInputs = scenarioInputsToggle.checked;
+    setSeriesHighlight(null);
+  };
   const handleKeyDown = (event) => {
     if (mode === "energy" || !state) {
       return;
@@ -844,6 +889,8 @@ export function createResultsChart({
   energyButton.addEventListener("click", showEnergy);
   massButton.addEventListener("click", showMass);
   temperatureButton.addEventListener("click", showTemperature);
+  scenarioInputsToggle.checked = showScenarioInputs;
+  scenarioInputsToggle.addEventListener("change", toggleScenarioInputs);
   svg.on("keydown", handleKeyDown);
 
   return Object.freeze({
@@ -855,6 +902,7 @@ export function createResultsChart({
       energyButton.removeEventListener("click", showEnergy);
       massButton.removeEventListener("click", showMass);
       temperatureButton.removeEventListener("click", showTemperature);
+      scenarioInputsToggle.removeEventListener("change", toggleScenarioInputs);
       svg.on("keydown", null);
       legendTarget.replaceChildren();
       svg.remove();

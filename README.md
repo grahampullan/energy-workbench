@@ -3,8 +3,8 @@
 An interactive engineering environment for approximate, time-resolved energy
 models.
 
-The project has passed its Push 1 gate and is building Push 2 batch-heating
-models on the validated electrical–thermal foundation.
+The project has passed its Push 1 gate and now has a public Push 2 synthetic
+ladle cycle on the validated electrical–thermal–material foundation.
 
 ## Project contracts
 
@@ -18,6 +18,7 @@ models on the validated electrical–thermal foundation.
 - [Coupled thermal reference](docs/regression/coupled-thermal.md)
 - [Batch-heating reference](docs/regression/batch-heating.md)
 - [Material-inventory reference](docs/regression/material-inventory.md)
+- [Synthetic ladle-cycle reference](docs/regression/ladle-cycle.md)
 
 JSON Schemas for the initial study documents live in `src/core/schemas`.
 
@@ -28,16 +29,20 @@ grid boundary with import and export limits. It also supports the Push 1B
 coupled topology: an electric heater, thermal store, heat demand, and ambient
 boundary, with standing loss owned by an explicit `thermal.heat-transfer`
 component. Push 2 reuses that same `thermal.store` definition for a fixed-mass
-batch with a required final temperature and for an inventory that transports
-mass and enthalpy. All four public examples run headlessly and in the browser
-on the same contracts, with reviewed results recorded by regression tests.
+batch, a material inventory, and separate refractory and molten-metal bodies.
+The synthetic ladle cycle adds a fuel burner, explicit thermal contacts and
+losses, process modes, and historical and temperature-led policies. All five
+public model examples run headlessly and in the browser on the same contracts,
+with reviewed results recorded by regression tests.
 
 The browser workbench can load any committed example through the same
 runtime. It presents the saved topology, live electrical, thermal, and material
 flows, a definition-driven component inspector, run KPIs, linked power- and
 mass-flow charts, integrated-energy results, component temperature charts, and
-timestep scrubbing. Numeric parameter controls create temporary preview runs
-which can be reset or applied to the in-memory working model.
+timestep scrubbing. Scenario inputs are hidden by default and can be overlaid
+with **Show scenario inputs**; temperature requirement lines remain visible.
+Numeric parameter controls create temporary preview runs which can be reset or
+applied to the in-memory working model.
 Components can also be moved and resized as temporary layout changes;
 reloading restores the saved layout. The applied working model can be
 downloaded and opened again as JSON, while a completed preview can be

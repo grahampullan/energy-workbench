@@ -60,5 +60,7 @@ refinement.
 Select **Material inventory** in the browser workbench to inspect the same run.
 The topology distinguishes material connections and labels mass flow with
 specific enthalpy. The results panel compares prescribed and actual mass flow,
-plots transported enthalpy with the other energy flows, and plots the derived
-inventory temperature without adding temperature as stored state.
+keeps electrical and thermal power separate from transported material
+enthalpy, and plots the derived inventory temperature without adding
+temperature as stored state. A later balance view can compare net material
+enthalpy transfer with stored-enthalpy change explicitly.

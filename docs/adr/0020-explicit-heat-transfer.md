@@ -49,5 +49,7 @@ extension to this component and flow contract rather than a negative heat rate.
 
 The batch and coupled examples gain one visible heat-transfer component each.
 Their reviewed numerical results remain unchanged. The results chart hides the
-component's upstream connection through editor metadata so the same physical
-transfer is not plotted twice.
+component's upstream connection by default through editor metadata so the same
+physical transfer is not plotted twice. Hovering that connection in the Model
+temporarily reveals its own Power or Energy series and legend entry, using the
+connection's identity colour. Leaving the connection restores the default view.

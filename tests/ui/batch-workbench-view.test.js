@@ -82,7 +82,7 @@ test("batch workbench chart exposes flow and required-temperature results", () =
     [{
       id: "scenario:heater-input-power",
       kind: "prescribed",
-      label: "Scheduled heater input · prescribed",
+      label: "Scheduled heater input · scenario input",
       values: scenario.series.find(
         (series) => series.id === "heater-input-power"
       ).data.values
@@ -108,7 +108,7 @@ test("batch workbench chart exposes flow and required-temperature results", () =
     [{
       id: "scenario:ambient-temperature",
       kind: "prescribed",
-      label: "Ambient temperature · prescribed",
+      label: "Ambient temperature · scenario input",
       values: Array.from({ length: 16 }, () => 20)
     }]
   );
@@ -209,7 +209,7 @@ test("batch workbench explains a missed final temperature on the batch", () => {
     severity: "warning",
     code: "thermal.store.minimum-temperature-missed",
     title: "Required temperature missed",
-    message: "126.651 °C final · 8.349 K below requirement"
+    message: "126.7 °C final · 8.349 K below requirement"
   }]);
   assert.equal(
     createBatchHeatingRunKpis(failingRun.results).find(

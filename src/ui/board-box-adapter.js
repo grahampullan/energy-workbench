@@ -7,12 +7,10 @@ import {
 } from "board-box";
 import { select } from "d3";
 
-import {
-  MATERIAL_MASS_FLOW_TYPE,
-  THERMAL_HEAT_FLOW_TYPE
-} from "../core/flow-types.js";
 import { createFrameRenderer } from "./animation-frame.js";
+import { createConnectionColourScale } from "./connection-colours.js";
 import { connectionGeometry } from "./topology-geometry.js";
+import { topologyDetailLevel } from "./topology-detail-level.js";
 
 const BOX_WIDTH = 164;
 const BOX_HEIGHT = 104;
@@ -126,16 +124,21 @@ class WorkbenchComponent extends BoardBoxComponent {
     this.metricElement.textContent = component.metric.label;
     this.button.dataset.powerTone = component.powerTone;
     this.button.dataset.highlighted = String(highlighted);
+    this.button.dataset.visualRole = component.visualRole;
     this.button.setAttribute("aria-label", `${component.name}, ${component.metric.label}: ${component.metric.displayValue}`);
     this.button.setAttribute("aria-pressed", String(selected));
   }
 }
 
-function addArrowMarkers(svg) {
+function addArrowMarkers(svg, connectionIds, connectionColours) {
   svg
     .append("defs")
-    .append("marker")
-    .attr("id", "flow-arrow")
+    .selectAll("marker")
+    .data(connectionIds)
+    .join("marker")
+    .attr("id", (connectionId) =>
+      `flow-arrow-${connectionColours.indexFor(connectionId)}`
+    )
     .attr("viewBox", "0 0 10 10")
     .attr("refX", 8)
     .attr("refY", 5)
@@ -143,7 +146,10 @@ function addArrowMarkers(svg) {
     .attr("markerHeight", 7)
     .attr("orient", "auto-start-reverse")
     .append("path")
-    .attr("d", "M 0 0 L 10 5 L 0 10 z");
+    .attr("d", "M 0 0 L 10 5 L 0 10 z")
+    .attr("fill", (connectionId) =>
+      connectionColours.colourFor(connectionId)
+    );
 }
 
 function renderConnections(
@@ -151,6 +157,7 @@ function renderConnections(
   boxesByComponentId,
   view,
   verticalBoundaryComponentIds,
+  connectionColours,
   onConnectionHighlight
 ) {
   const connections = connectionGeometry(
@@ -164,30 +171,26 @@ function renderConnections(
     .data(connections, (connection) => connection.id)
     .join("line")
     .attr("class", "connection-line")
+    .attr("data-connection-id", (connection) => connection.id)
     .attr("x1", (connection) => connection.x1)
     .attr("y1", (connection) => connection.y1)
     .attr("x2", (connection) => connection.x2)
     .attr("y2", (connection) => connection.y2)
-    .classed(
-      "connection-line--thermal",
-      (connection) => connection.flowType === THERMAL_HEAT_FLOW_TYPE
-    )
-    .classed(
-      "connection-line--material",
-      (connection) => connection.flowType === MATERIAL_MASS_FLOW_TYPE
-    )
+    .style("stroke", (connection) => connectionColours.colourFor(connection.id))
     .classed(
       "connection-line--highlighted",
       (connection) => connection.id === view.highlightedConnectionId
     )
     .attr("marker-start", (connection) =>
-      connection.signedFlow < -1e-9 ? "url(#flow-arrow)" : null
+      connection.signedFlow < -1e-9
+        ? `url(#flow-arrow-${connectionColours.indexFor(connection.id)})`
+        : null
     )
     .attr("marker-end", (connection) =>
-      connection.signedFlow > 1e-9 ? "url(#flow-arrow)" : null
-    )
-    .on("pointerenter", (event, connection) => onConnectionHighlight(connection.id))
-    .on("pointerleave", () => onConnectionHighlight(null));
+      connection.signedFlow > 1e-9
+        ? `url(#flow-arrow-${connectionColours.indexFor(connection.id)})`
+        : null
+    );
 
   const labels = content
     .selectAll("g.connection-label")
@@ -197,6 +200,7 @@ function renderConnections(
       label.append("text").attr("x", 0).attr("y", 0).attr("dy", "0.35em");
       return label;
     })
+    .attr("data-connection-id", (connection) => connection.id)
     .classed(
       "connection-label--highlighted",
       (connection) => connection.id === view.highlightedConnectionId
@@ -208,6 +212,21 @@ function renderConnections(
   labels
     .select("text")
     .text((connection) => connection.displayFlow);
+
+  content
+    .selectAll("line.connection-hit")
+    .data(connections, (connection) => connection.id)
+    .join("line")
+    .attr("class", "connection-hit")
+    .attr("data-connection-id", (connection) => connection.id)
+    .attr("x1", (connection) => connection.x1)
+    .attr("y1", (connection) => connection.y1)
+    .attr("x2", (connection) => connection.x2)
+    .attr("y2", (connection) => connection.y2)
+    .on("pointerenter", (event, connection) =>
+      onConnectionHighlight(connection.id)
+    )
+    .on("pointerleave", () => onConnectionHighlight(null));
 }
 
 export function createTopologyBoard({
@@ -226,6 +245,9 @@ export function createTopologyBoard({
   const positionsByComponentId = new Map(
     layout.components.map((position) => [position.componentId, position])
   );
+  const connectionColours = createConnectionColourScale(
+    model.connections.map(({ id }) => id)
+  );
   const context = new Context();
   const board = new Board({
     targetId,
@@ -239,7 +261,11 @@ export function createTopologyBoard({
     .append("svg")
     .attr("class", "connection-layer")
     .attr("aria-hidden", "true");
-  addArrowMarkers(svg);
+  addArrowMarkers(
+    svg,
+    model.connections.map(({ id }) => id),
+    connectionColours
+  );
   const connectionContent = svg
     .append("g")
     .attr("class", "connection-content");
@@ -255,11 +281,15 @@ export function createTopologyBoard({
         boxesByComponentId,
         getView(),
         verticalBoundaryComponentIds,
+        connectionColours,
         onConnectionHighlight
       );
     }
   });
-  const updateConnections = () => connectionRenderer.request();
+  const updateConnections = () => {
+    target.dataset.detail = topologyDetailLevel(board.sharedState.transform.k);
+    connectionRenderer.request();
+  };
   for (const component of model.components) {
     const position = positionsByComponentId.get(component.id);
     if (!position) {
@@ -290,11 +320,24 @@ export function createTopologyBoard({
   board.make();
   updateConnections();
 
+  const boardHost = target.parentElement;
+  if (!boardHost) {
+    throw new Error(`Board target does not have a host: ${targetId}`);
+  }
+  const resizeObserver = new ResizeObserver(() => {
+    board.setSize();
+    target.style.width = `${board.width}px`;
+    target.style.height = `${board.height}px`;
+    board.update();
+  });
+  resizeObserver.observe(boardHost);
+
   return Object.freeze({
     update() {
       board.update();
     },
     dispose() {
+      resizeObserver.disconnect();
       connectionRenderer.dispose();
       svg.remove();
     }

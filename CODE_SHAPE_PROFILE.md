@@ -66,9 +66,22 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 - Dispose subscriptions explicitly.
 - Do not duplicate component metadata or equations in inspectors; generate
   controls from the component definition where practical.
+- Keep canonical values and units unchanged in models and runtime results. Use
+  the shared UI engineering formatter for significant figures, readable SI
+  units, chart axes, and accessible value text; never round a non-zero value to
+  zero. Editable controls retain their underlying numeric value.
 - Use D3 selections, keyed data joins, scales, axes, and shape generators for
   SVG charts and graphical overlays. Keep D3 within `src/ui` and derive its
   input data from canonical run results.
+- Draw topology connections as solid lines. Assign connection identity from
+  Tableau 10 in stable model order, and reuse that exact colour for the
+  connection's Results series. Hover emphasis is shared between Model and
+  Results and changes weight or background, not the identity colour.
+- Keep Results quantities conceptually separate: Power and integrated Energy
+  contain electrical and thermal connections; Mass contains material
+  connections. Do not present transported material enthalpy as ordinary power.
+  A future enthalpy-balance view must show its relationship to stored-enthalpy
+  change explicitly.
 - Continue to use board-box for topology mechanics. Use ordinary DOM APIs for
   semantic interface elements such as forms, buttons, and inspectors.
 - Lay out topology inputs such as power, fuel, and material towards the left

@@ -35,8 +35,8 @@ project is now working **towards Gate 2**; Gate 2 has not passed.
 
 Push 2 keeps the repository boundary explicit:
 
-- Public repository: reusable process-energy components and a neutral
-  synthetic batch-heating example.
+- Public repository: reusable process-energy components and neutral synthetic
+  batch-heating, material-inventory, and ladle-cycle examples.
 - Private study: the MHI-informed casting and ladle data, assumptions, and
   study model.
 
@@ -71,6 +71,22 @@ The browser uses the same runtime result and adds editable component
 parameters, batch KPIs, selected-timestep diagnostics, and the required
 temperature line on the temperature chart.
 
-CSV input, multiple thermal nodes, calibration, uncertainty, burner fuel,
-emissions, policy comparison, and the private ladle model follow later. They
-are not prerequisites for proving the first process model.
+CSV input, calibration, uncertainty, and the private ladle model follow later.
+They are not prerequisites for proving the first process model.
+
+## Synthetic ladle slice
+
+**Status:** Implemented headlessly and in the browser workbench.
+
+The public neutral cycle combines molten-metal inflow and outflow, separate
+refractory and metal thermal states, explicit metal-to-refractory contact,
+separate environmental losses, a fuel burner, process modes, and two policies.
+The temperature-led policy reduces synthetic fuel use while preserving the
+tapped-metal temperature requirement. Regression tests retain the reviewed
+trajectories, mass and enthalpy balance, dependency stages, and timestep
+refinement behaviour.
+
+This is generic capability evidence, not the MHI-informed study and not Gate 2.
+The next Gate 2 work is to map private evidence and assumptions into these
+contracts, add calibration/uncertainty where the evidence supports them, and
+put the resulting study in front of practising factory heat engineers.

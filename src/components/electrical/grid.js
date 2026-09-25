@@ -41,6 +41,7 @@ export const electricalGridDefinition = {
   },
 
   editor: {
+    visualRole: "boundary",
     groups: [
       {
         id: "limits",

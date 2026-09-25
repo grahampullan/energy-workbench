@@ -118,6 +118,60 @@ test("resolution plan orders a determiner before a flow consumer", () => {
   assert.deepEqual(preparation.plan.stages, [["source"], ["load"]]);
 });
 
+test("later ladle heat recovery topology has an acyclic resolution order", () => {
+  const runtimeModel = prepareFixture({
+    descriptions: {
+      ladle: description({ requires: ["ladle-to-exchanger"] }),
+      "heat-exchanger": description({
+        requires: ["exchanger-to-pump"],
+        determines: ["ladle-to-exchanger"]
+      }),
+      "heat-pump": description({
+        targets: ["heat-pump"],
+        determines: [
+          "exchanger-to-pump",
+          "supply-to-pump",
+          "pump-to-store"
+        ]
+      }),
+      "electrical-supply": description({ requires: ["supply-to-pump"] }),
+      "thermal-store": description({ requires: ["pump-to-store"] })
+    },
+    connections: [
+      {
+        id: "ladle-to-exchanger",
+        from: "ladle",
+        to: "heat-exchanger"
+      },
+      {
+        id: "exchanger-to-pump",
+        from: "heat-exchanger",
+        to: "heat-pump"
+      },
+      {
+        id: "supply-to-pump",
+        from: "electrical-supply",
+        to: "heat-pump"
+      },
+      {
+        id: "pump-to-store",
+        from: "heat-pump",
+        to: "thermal-store"
+      }
+    ]
+  });
+  const preparation = preparePlan(runtimeModel, {
+    "heat-pump": { heatOutputkW: 100 }
+  });
+
+  assert.equal(preparation.prepared, true, JSON.stringify(preparation.diagnostics));
+  assert.deepEqual(preparation.plan.stages, [
+    ["heat-pump"],
+    ["heat-exchanger", "electrical-supply", "thermal-store"],
+    ["ladle"]
+  ]);
+});
+
 test("component execution rejects settled flows that disagree with the plan", () => {
   const runtimeModel = twoComponentFixture(
     description({ determines: ["source-to-load"] }),

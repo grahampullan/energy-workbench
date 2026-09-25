@@ -104,7 +104,7 @@ export const electricalBusDefinition = {
     powerBalanceErrorkW: { unit: "kW" }
   },
 
-  editor: {},
+  editor: { visualRole: "interaction" },
 
   validate() {
     return [];

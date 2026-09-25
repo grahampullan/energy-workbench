@@ -1,0 +1,168 @@
+{
+  "numericContract": {
+    "timeStepSeconds": 60,
+    "stepCount": 120
+  },
+  "policies": {
+    "historical": {
+      "summary": {
+        "totalMassInKg": 6000,
+        "totalMassOutKg": 5700,
+        "fuelInputEnergykWh": 333.3333333333332,
+        "burnerHeatEnergykWh": 199.99999999999994,
+        "directEmissionsKgCO2": 61.333333333333336,
+        "metalRefractoryTransferEnergykWh": 104.40706530661912,
+        "refractoryLossEnergykWh": 34.25301288606636,
+        "metalLossEnergykWh": 19.513646722698326,
+        "minimumTapTemperatureC": 1508.3020788220622,
+        "minimumTapTemperatureMarginK": 58.302078822062185,
+        "finalMetalMassKg": 300
+      },
+      "checkpoints": [
+        {
+          "stepIndex": 0,
+          "refractoryTemperatureC": 415.6959999999999,
+          "metalMassKg": 0,
+          "metalTemperatureC": 0,
+          "burnerHeatOutputkW": 400
+        },
+        {
+          "stepIndex": 29,
+          "refractoryTemperatureC": 865.4583571633103,
+          "metalMassKg": 0,
+          "metalTemperatureC": 0,
+          "burnerHeatOutputkW": 400
+        },
+        {
+          "stepIndex": 39,
+          "refractoryTemperatureC": 858.7189876343821,
+          "metalMassKg": 0,
+          "metalTemperatureC": 0,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 40,
+          "refractoryTemperatureC": 858.0480124442745,
+          "metalMassKg": 600,
+          "metalTemperatureC": 1600,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 49,
+          "refractoryTemperatureC": 890.6166314314079,
+          "metalMassKg": 6000,
+          "metalTemperatureC": 1586.475990472281,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 89,
+          "refractoryTemperatureC": 1006.9855308307455,
+          "metalMassKg": 6000,
+          "metalTemperatureC": 1534.4020392904167,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 90,
+          "refractoryTemperatureC": 1009.3604414568388,
+          "metalMassKg": 5430,
+          "metalTemperatureC": 1533.1319072777248,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 99,
+          "refractoryTemperatureC": 1029.475711303821,
+          "metalMassKg": 300,
+          "metalTemperatureC": 1487.0779559756973,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 119,
+          "refractoryTemperatureC": 1048.3697258093268,
+          "metalMassKg": 300,
+          "metalTemperatureC": 1208.0622529515647,
+          "burnerHeatOutputkW": 0
+        }
+      ]
+    },
+    "minimum-fuel": {
+      "summary": {
+        "totalMassInKg": 6000,
+        "totalMassOutKg": 5700,
+        "fuelInputEnergykWh": 293.87573463637005,
+        "burnerHeatEnergykWh": 176.32544078182198,
+        "directEmissionsKgCO2": 54.07313517309209,
+        "metalRefractoryTransferEnergykWh": 111.90627672703233,
+        "refractoryLossEnergykWh": 32.58886065139172,
+        "metalLossEnergykWh": 19.438338546052524,
+        "minimumTapTemperatureC": 1502.7727640128103,
+        "minimumTapTemperatureMarginK": 52.772764012810285,
+        "finalMetalMassKg": 300
+      },
+      "checkpoints": [
+        {
+          "stepIndex": 0,
+          "refractoryTemperatureC": 413.3626666666666,
+          "metalMassKg": 0,
+          "metalTemperatureC": 0,
+          "burnerHeatOutputkW": 341.6666666666667
+        },
+        {
+          "stepIndex": 29,
+          "refractoryTemperatureC": 809.38063878455,
+          "metalMassKg": 0,
+          "metalTemperatureC": 0,
+          "burnerHeatOutputkW": 394.9620171888455
+        },
+        {
+          "stepIndex": 39,
+          "refractoryTemperatureC": 803.0882794049583,
+          "metalMassKg": 0,
+          "metalTemperatureC": 0,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 40,
+          "refractoryTemperatureC": 802.4618087814343,
+          "metalMassKg": 600,
+          "metalTemperatureC": 1600,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 49,
+          "refractoryTemperatureC": 838.3051938940708,
+          "metalMassKg": 6000,
+          "metalTemperatureC": 1585.5971145626825,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 89,
+          "refractoryTemperatureC": 966.6219215802554,
+          "metalMassKg": 6000,
+          "metalTemperatureC": 1530.3431016837585,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 90,
+          "refractoryTemperatureC": 969.2469511236123,
+          "metalMassKg": 5430,
+          "metalTemperatureC": 1529.0001343204335,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 99,
+          "refractoryTemperatureC": 991.5072360339516,
+          "metalMassKg": 300,
+          "metalTemperatureC": 1480.3670403216308,
+          "burnerHeatOutputkW": 0
+        },
+        {
+          "stepIndex": 119,
+          "refractoryTemperatureC": 1013.5428564579097,
+          "metalMassKg": 300,
+          "metalTemperatureC": 1186.4649774891504,
+          "burnerHeatOutputkW": 0
+        }
+      ]
+    }
+  }
+}

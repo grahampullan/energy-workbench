@@ -177,6 +177,19 @@ test("the same thermal store conserves mass and enthalpy with material flow", ()
   assert.equal(evaluation.outputs.heatInputkW, 10);
 });
 
+test("thermal capacity excludes material reserved for the current discharge target", () => {
+  const component = prepare().runtimeModel.components[0];
+  const context = stepContext(component);
+  const limits = (massOutflowKgPerSecond) => component.definition.model.getOperatingLimits(
+    component, context, { massOutflowKgPerSecond }
+  );
+  assert.equal(limits(500 / 3600).thermalCapacitykWhPerK, 0.5);
+  assert.equal(limits(1000 / 3600).thermalCapacitykWhPerK, 0);
+  assert.equal(limits(2000 / 3600).thermalCapacitykWhPerK, 0);
+  assert.equal(limits(2000 / 3600).maximumMassOutflowKgPerSecond, 1000 / 3600);
+  assert.equal(context.state.massKg, 1000);
+});
+
 test("an empty thermal store can accept material and heat in the same step", () => {
   const preparation = prepare(modelComponent({
     parameters: {

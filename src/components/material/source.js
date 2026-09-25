@@ -14,7 +14,11 @@ function massFlowKgPerSecond(runtimeComponent, stepContext) {
   if (!Number.isFinite(value) || value < 0) {
     throw new RangeError("Material-source mass flow must be finite and non-negative");
   }
-  return value;
+  const scaledValue = value * runtimeComponent.parameters.profileMultiplier;
+  if (!Number.isFinite(scaledValue) || scaledValue < 0) {
+    throw new RangeError("Scaled material-source mass flow must be finite and non-negative");
+  }
+  return scaledValue;
 }
 
 export const materialSourceDefinition = {
@@ -27,10 +31,17 @@ export const materialSourceDefinition = {
       unit: "scenario-series-id",
       default: "material-inflow"
     },
+    profileMultiplier: {
+      label: "Inflow profile multiplier",
+      unit: "1",
+      default: 1,
+      hardBounds: { minimum: 0 },
+      editor: { minimum: 0, maximum: 2, step: 0.05 }
+    },
     specificEnthalpyKjPerKg: {
       unit: "kJ/kg",
       default: 100,
-      editor: { minimum: 0, maximum: 500, step: 5 }
+      editor: { minimum: 0, maximum: 2500, step: 5 }
     }
   },
   initialState: {},
@@ -44,7 +55,10 @@ export const materialSourceDefinition = {
     specificEnthalpyKjPerKg: { unit: "kJ/kg" },
     enthalpyFlowkW: { unit: "kW" }
   },
-  editor: { summaryOutput: "massFlowKgPerSecond" },
+  editor: {
+    visualRole: "boundary",
+    summaryOutput: "massFlowKgPerSecond"
+  },
 
   validate(modelComponent) {
     const seriesId = modelComponent.parameters.massFlowSeriesId ??

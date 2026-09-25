@@ -83,6 +83,7 @@ A component step follows one direction:
 ```text
 component constraints and capabilities
 -> policy targets, priorities, and operating roles
+-> component capabilities refined for those targets
 -> checked resolution-dependency plan
 -> component resolution of feasible and actual operation
 -> typed connection transfer and consistency checks
@@ -98,7 +99,14 @@ coordinates these calls but does not clamp operation using knowledge of a
 component's physics.
 
 Every component publishes its current capabilities through
-`getOperatingLimits`. Its `resolution.describe` function identifies the policy
+`getOperatingLimits`. The runtime calls it once for the policy's read-only
+snapshot and again with the component's chosen target as a third argument,
+before preparing the resolution plan. This is one deterministic refinement,
+not an iterative solve. The component owns how its target affects its coupled
+capabilities. A material store reserves the feasible current-step withdrawal
+before publishing the thermal capacity available for heat exchange; withdrawn
+mass cannot also supply heat during the same explicit step.
+Its `resolution.describe` function identifies the policy
 targets and settled connection flows required before resolution, plus the
 connection flows it alone determines. This is dependency metadata, not a
 second implementation of the component equation.
@@ -278,8 +286,8 @@ boundary instead publishes `fixedTemperatureBoundary: true`. The transfer is
 capped so one explicit step cannot cross finite-body thermal equilibrium or
 raise the sink above its maximum temperature. The source store accounts for
 the settled flow on `passive-heat-out`; a finite sink accounts for it on
-`passive-heat-in`; a constant-temperature boundary absorbs it without state. The runtime
-must not repeat or partially reimplement either component equation.
+`passive-heat-in`; a constant-temperature boundary absorbs it without state.
+The runtime must not repeat or partially reimplement either component equation.
 
 Most ports accept one connection. A physical collector component may instead
 declare a repeatable `many` port. Persisted connections then share that stable
@@ -305,8 +313,8 @@ grid -> electric heater -> thermal store (hot-water instance) -> heat demand
                            +-> heat transfer -> constant temperature (“Ambient”)
 ```
 
-The grid, heater, store, heat-transfer, demand, and constant-temperature components
-own their respective equations. The policy chooses operational targets and
+The grid, heater, store, heat-transfer, demand, and constant-temperature
+components own their respective equations. The policy chooses operational targets and
 explicitly identifies the grid as the balancing component. The runtime orders
 the component
 calculations and transfers their typed port flows; it must not use a whole-model
@@ -316,13 +324,35 @@ from component order.
 
 A fixed component reports equal minimum and maximum operating power and needs
 no policy target. A component with variable limits requires an explicit policy
-target unless the policy nominates it as the balancing component. A balancing
-component must be visible, connected to the operation it balances, and
-physically able to accept the residual. Where a branching electrical bus is
+target unless the policy nominates it as the balancing component. A topology
+with no residual balancing operation explicitly uses
+`balancingComponentId: null`; it does not nominate an unrelated component.
+Where residual balancing is required, the balancing component must be visible,
+connected to the operation it balances, and physically able to accept it.
+Where a branching electrical bus is
 present, the bus owns only its terminal power-conservation equation; it does
 not intrinsically select a grid or any other component to balance. A grid is
 one possible balancing component. Positive grid power imports energy into the
 model; negative grid power exports it.
+
+The public Push 2 ladle cycle uses the same component contracts:
+
+```text
+Fuel burner -> Refractory lining
+Molten-metal arrival -> Molten metal -> Casting process
+                         |       |
+                         |       +-> Heat transfer -> Ambient
+                         +-> Heat transfer -> Refractory lining
+Refractory lining -> Heat transfer -> Ambient
+```
+
+The refractory lining and molten metal are separate `thermal.store` instances.
+The molten-metal instance alone connects material ports. The generic
+`thermal.fuel-burner` owns fuel-to-heat efficiency and direct emissions; the
+receiving store owns how much requested heat it can accept. The model does not
+add a fuel-network component because this slice has no fuel-supply constraint.
+Historical and temperature-led policies target the same visible components;
+neither policy changes their governing equations.
 
 ## Data and state rules
 

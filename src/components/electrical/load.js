@@ -53,6 +53,7 @@ export const electricalLoadDefinition = {
   },
 
   editor: {
+    visualRole: "boundary",
     groups: [
       {
         id: "demand",

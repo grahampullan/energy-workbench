@@ -53,6 +53,7 @@ export const electricalPvDefinition = {
   },
 
   editor: {
+    visualRole: "equipment",
     groups: [
       {
         id: "generation",

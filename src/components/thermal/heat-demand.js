@@ -64,6 +64,7 @@ export const heatDemandDefinition = {
   },
 
   editor: {
+    visualRole: "boundary",
     summaryOutput: "unmetHeatFlowkW",
     groups: [{
       id: "demand",

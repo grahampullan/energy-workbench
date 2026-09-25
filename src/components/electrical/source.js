@@ -33,6 +33,7 @@ export const electricalSourceDefinition = {
   },
 
   editor: {
+    visualRole: "equipment",
     groups: [
       { id: "rating", label: "Rating", parameters: ["maximumPowerkW"] }
     ]

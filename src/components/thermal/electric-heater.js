@@ -69,6 +69,7 @@ export const electricHeaterDefinition = {
   },
 
   editor: {
+    visualRole: "equipment",
     groups: [
       {
         id: "rating",

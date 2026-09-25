@@ -181,18 +181,13 @@ function requestedHeatInputs(runtimeComponent, context, connections) {
   return connections.map((connection) => {
     const source = otherComponent(runtimeComponent, connection);
     const target = context.getTarget(source.id);
-    if (!target || !Number.isFinite(target.powerkW)) {
+    if (!target) {
       throw resolutionError(
         "runtime.missing-policy-target",
-        `Policy did not provide a finite power target for ${source.id}`
+        `Policy did not provide a heat-source target for ${source.id}`
       );
     }
     const limits = context.getOperatingLimits(source.id);
-    const conversion = finiteCapability(
-      limits,
-      "heatOutputPerElectricalInput",
-      { positive: true }
-    );
     const maximumHeatOutputkW = finiteCapability(
       limits,
       "maximumHeatOutputkW"
@@ -203,16 +198,47 @@ function requestedHeatInputs(runtimeComponent, context, connections) {
         "Thermal capability supplyTemperatureC is missing or invalid"
       );
     }
-    const requestedPowerkW = Math.min(
-      limits.maximumPowerkW,
-      Math.max(limits.minimumPowerkW, target.powerkW)
-    );
-    return {
-      connection,
-      requestedHeatFlowkW: Math.min(
+    let requestedHeatFlowkW;
+    if (Number.isFinite(target.heatOutputkW) && target.heatOutputkW >= 0) {
+      requestedHeatFlowkW = Math.min(
+        maximumHeatOutputkW,
+        target.heatOutputkW
+      );
+    } else if (Number.isFinite(target.powerkW)) {
+      const conversion = finiteCapability(
+        limits,
+        "heatOutputPerElectricalInput",
+        { positive: true }
+      );
+      const minimumPowerkW = limits?.minimumPowerkW;
+      const maximumPowerkW = limits?.maximumPowerkW;
+      if (
+        !Number.isFinite(minimumPowerkW) ||
+        !Number.isFinite(maximumPowerkW) ||
+        minimumPowerkW > maximumPowerkW
+      ) {
+        throw resolutionError(
+          "runtime.thermal-capability-contract",
+          "A power-targeted heat source must publish valid power limits"
+        );
+      }
+      const requestedPowerkW = Math.min(
+        maximumPowerkW,
+        Math.max(minimumPowerkW, target.powerkW)
+      );
+      requestedHeatFlowkW = Math.min(
         maximumHeatOutputkW,
         -requestedPowerkW * conversion
-      ),
+      );
+    } else {
+      throw resolutionError(
+        "runtime.missing-policy-target",
+        `Policy target for ${source.id} must provide non-negative heatOutputkW or finite powerkW`
+      );
+    }
+    return {
+      connection,
+      requestedHeatFlowkW,
       supplyTemperatureC: limits.supplyTemperatureC
     };
   });
@@ -286,6 +312,11 @@ function resolveStore(runtimeComponent, context, stepContext) {
     return null;
   }
   const checkedMaterialInFlow = createMaterialFlow(materialInFlow);
+  const heatOutFlow = resolveHeatOutput(
+    runtimeComponent,
+    context,
+    topology.heatOut
+  );
   const massOutflowKgPerSecond = Math.min(
     requestedMaterialOutflow(runtimeComponent, context, topology.materialOut),
     context.operatingLimits.maximumMassOutflowKgPerSecond
@@ -294,11 +325,6 @@ function resolveStore(runtimeComponent, context, stepContext) {
     massFlowKgPerSecond: massOutflowKgPerSecond,
     specificEnthalpyKjPerKg: currentSpecificEnthalpy
   });
-  const heatOutFlow = resolveHeatOutput(
-    runtimeComponent,
-    context,
-    topology.heatOut
-  );
   const requestedInputs = requestedHeatInputs(
     runtimeComponent,
     context,
@@ -500,15 +526,17 @@ export const thermalStoreDefinition = {
   ],
 
   outputs: {
-    massInflowKgPerSecond: { unit: "kg/s" },
-    massOutflowKgPerSecond: { unit: "kg/s" },
-    enthalpyInflowkW: { unit: "kW" },
-    enthalpyOutflowkW: { unit: "kW" },
-    heatInputkW: { unit: "kW" },
-    heatOutputkW: { unit: "kW" },
+    massInflowKgPerSecond: { label: "Material inflow", unit: "kg/s" },
+    massOutflowKgPerSecond: { label: "Material outflow", unit: "kg/s" },
+    materialOutflowTemperatureC: { label: "Discharge temperature", unit: "°C" },
+    materialOutflowTemperatureMarginK: { label: "Discharge temperature margin", unit: "K" },
+    enthalpyInflowkW: { label: "Material enthalpy rate in", unit: "kW" },
+    enthalpyOutflowkW: { label: "Material enthalpy rate out", unit: "kW" },
+    heatInputkW: { label: "Heat-transfer input", unit: "kW" },
+    heatOutputkW: { label: "Heat-transfer output", unit: "kW" },
     passiveHeatInputkW: { unit: "kW" },
     passiveHeatOutputkW: { unit: "kW" },
-    netEnergyFlowkW: { unit: "kW" },
+    netEnergyFlowkW: { label: "Stored enthalpy change rate", unit: "kW" },
     containedMassKg: { unit: "kg" },
     containedEnthalpykWh: { unit: "kWh" },
     specificEnthalpyKjPerKg: { unit: "kJ/kg" },
@@ -518,6 +546,7 @@ export const thermalStoreDefinition = {
   },
 
   editor: {
+    visualRole: "store",
     summaryOutput: "temperatureC",
     temperatureChart: {
       outputField: "temperatureC",
@@ -709,9 +738,17 @@ export const thermalStoreDefinition = {
       return { ...runtimeComponent.initialState };
     },
 
-    getOperatingLimits(runtimeComponent, stepContext) {
+    getOperatingLimits(runtimeComponent, stepContext, target = null) {
       const temperatureC = storeTemperatureC(runtimeComponent, stepContext.state);
-      const capacity = thermalCapacitykWhPerK(runtimeComponent, stepContext.state);
+      const requestedOutflow = target?.massOutflowKgPerSecond ?? 0;
+      if (!Number.isFinite(requestedOutflow) || requestedOutflow < 0) {
+        throw new RangeError("Material-outflow target must be finite and non-negative");
+      }
+      const remainingMassKg = Math.max(0, stepContext.state.massKg -
+        requestedOutflow * stepContext.timeStepSeconds);
+      const capacity = thermalCapacitykWhPerK(runtimeComponent, {
+        massKg: remainingMassKg
+      });
       const maximumHeatOutputFromEnergykW = capacity > 0
         ? capacity * Math.max(
             0,
@@ -888,10 +925,15 @@ export const thermalStoreDefinition = {
       }
       const temperatureMarginK =
         nextTemperatureC - runtimeComponent.parameters.minimumUsefulTemperatureC;
+      const materialOutflowTemperatureMarginK =
+        currentTemperatureC - runtimeComponent.parameters.minimumUsefulTemperatureC;
       const diagnostics = [];
       if (
         runtimeComponent.ports.find(({ id }) => id === "heat-out")
           .connectionIds.length === 0 &&
+        runtimeComponent.ports.find(({ id }) => id === "material-out")
+          .connectionIds.length === 0 &&
+        nextMassKg > TOLERANCE &&
         stepContext.stepIndex === runtimeComponent.modelData.finalStepIndex &&
         temperatureMarginK < -TOLERANCE
       ) {
@@ -899,6 +941,16 @@ export const thermalStoreDefinition = {
           severity: "warning",
           code: "thermal.store.minimum-temperature-missed",
           message: `Final store temperature is ${-temperatureMarginK} K below the minimum useful temperature`
+        });
+      }
+      if (
+        materialOutFlow.massFlowKgPerSecond > TOLERANCE &&
+        materialOutflowTemperatureMarginK < -TOLERANCE
+      ) {
+        diagnostics.push({
+          severity: "warning",
+          code: "thermal.store.material-delivery-temperature",
+          message: `Material leaves ${-materialOutflowTemperatureMarginK} K below the minimum useful temperature`
         });
       }
       const nextSpecificEnthalpyKjPerKg = specificEnthalpyKjPerKg(nextState);
@@ -914,6 +966,8 @@ export const thermalStoreDefinition = {
         outputs: {
           massInflowKgPerSecond: materialInFlow.massFlowKgPerSecond,
           massOutflowKgPerSecond: materialOutFlow.massFlowKgPerSecond,
+          materialOutflowTemperatureC: currentTemperatureC,
+          materialOutflowTemperatureMarginK,
           enthalpyInflowkW,
           enthalpyOutflowkW,
           heatInputkW,

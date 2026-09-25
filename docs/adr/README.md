@@ -29,3 +29,4 @@ rather than rewriting its history.
 | [0018](0018-repeatable-collector-ports.md) | Repeatable collector ports | Partly superseded by 0020 |
 | [0019](0019-unified-thermal-store.md) | Unified thermal store | Partly superseded by 0020 |
 | [0020](0020-explicit-heat-transfer.md) | Explicit passive heat transfer | Accepted |
+| [0021](0021-synthetic-ladle-process-slice.md) | Synthetic ladle process slice | Accepted |

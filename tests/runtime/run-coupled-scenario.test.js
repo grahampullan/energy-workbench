@@ -261,6 +261,8 @@ test("coupled runtime follows demand and balances electrical and thermal connect
   assert.deepEqual(store.outputs, {
     massInflowKgPerSecond: 0,
     massOutflowKgPerSecond: 0,
+    materialOutflowTemperatureC: 80,
+    materialOutflowTemperatureMarginK: 10,
     enthalpyInflowkW: 0,
     enthalpyOutflowkW: 0,
     heatInputkW: 10,

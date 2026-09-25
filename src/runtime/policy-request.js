@@ -97,9 +97,12 @@ export function requestPolicyOperation(
   }
 
   if (
-    typeof operation.balancingComponentId !== "string" ||
-    operation.balancingComponentId.length === 0 ||
-    !componentIds.has(operation.balancingComponentId)
+    operation.balancingComponentId !== null &&
+    (
+      typeof operation.balancingComponentId !== "string" ||
+      operation.balancingComponentId.length === 0 ||
+      !componentIds.has(operation.balancingComponentId)
+    )
   ) {
     diagnostics.push(policyDiagnostic(
       "runtime.policy-balancing-component",
@@ -109,6 +112,7 @@ export function requestPolicyOperation(
     ));
   }
   if (
+    operation.balancingComponentId !== null &&
     Object.hasOwn(operation.targets, operation.balancingComponentId)
   ) {
     diagnostics.push(policyDiagnostic(

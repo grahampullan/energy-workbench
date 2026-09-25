@@ -42,6 +42,7 @@ export const exampleComponentDefinition = {
   },
 
   editor: {
+    visualRole: "equipment",
     groups: [
       { id: "rating", label: "Rating", parameters: ["ratedPowerkW"] }
     ]
@@ -117,6 +118,8 @@ the first runtime slice.
 
 - Parameter declarations own units, defaults, hard bounds, model validity, and
   useful editor ranges.
+- `editor.visualRole` may be `store`, `equipment`, `boundary`, or `interaction`.
+  It controls topology presentation only and does not change runtime behaviour.
 - Initial-state declarations own units and defaults. Component validation owns
   state constraints that depend on parameters or other state fields.
 - Ports declare compatibility through `flowType` and permitted direction. A
@@ -133,7 +136,10 @@ the first runtime slice.
   component-owned prepared data.
 - `initialise` creates state for one run; it does not modify the persisted
   component.
-- `getOperatingLimits` reports what is feasible from current state.
+- `getOperatingLimits(runtimeComponent, stepContext, target)` reports what is
+  feasible from current state. It is called first with a null target to inform
+  policy and once more with the chosen target before resolution planning.
+  Components own any resulting refinement of their coupled capabilities.
 - `getOperatingLimits` publishes capabilities. `resolution.describe` declares
   the targets and already-settled connection flows needed for current
   resolution, plus the connection flows this component determines. It contains
@@ -189,7 +195,9 @@ segments.
   requesting policy operation.
 - `policy.request(runtimeModel, stepContext, policyContext)` returns
   `{ targets, balancingComponentId }`. Targets are keyed by component ID. The
-  balancing component is explicit and must not also receive a target.
+  balancing component is explicit and must not also receive a target. Use
+  `balancingComponentId: null` when the topology has no residual balancing
+  operation; do not nominate an unrelated component as a placeholder.
 - `policyContext.operatingLimitsByComponentId` is a read-only plain-object
   snapshot. Policies may use it to coordinate components without repeating
   component equations.
@@ -297,7 +305,17 @@ The store keeps only mass and contained enthalpy as state. It derives
 temperature using constant specific heat capacity and an enthalpy-reference
 temperature. Start-of-step mass and specific enthalpy limit and characterise
 outflow. An empty store has zero contained enthalpy and reports its reference
-temperature. Its explicit update is:
+temperature. Before heat exchange is resolved, the store reserves the requested
+withdrawal, capped by current inventory. It publishes the thermal capacity of
+the remaining mass, at the current temperature, so heat-transfer components
+cannot remove heat from material already allocated to discharge. Incoming mass
+does not become available for same-step withdrawal or passive heat exchange.
+This uses current state and a policy target, not a proposed next state.
+
+Discharge-temperature outputs and warnings use the current temperature carried
+by outgoing material. The state temperature is the temperature at timestep end;
+its empty-store reference value is not a delivered-material temperature.
+Its explicit update is:
 
 ```text
 massNext = mass + (massIn - massOut) * dtSeconds
@@ -359,6 +377,20 @@ temperature before state is committed.
 
 This is not a thermal bus. Thermal branches require a visible junction
 component that owns their allocation or mixing equation.
+
+### Fuel burner
+
+`thermal.fuel-burner` has one thermal output. A policy requests
+`{ heatOutputkW }`; the receiving store reconciles that target with source and
+sink capabilities and determines the accepted thermal connection flow. The
+burner then applies its own efficiency and direct-emissions factor to that
+accepted flow. Its reported fuel input is therefore actual fuel use, not the
+unconstrained policy request.
+
+The current burner has no fuel connection because the public ladle slice has
+no fuel-supply capacity, price, composition, or network constraint. Add a
+visible fuel flow and supply component only when a current case requires those
+boundary semantics.
 
 ### Battery storage
 

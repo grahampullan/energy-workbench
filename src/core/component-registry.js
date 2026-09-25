@@ -6,6 +6,12 @@ const FIELD_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*$/u;
 const SEMANTIC_VERSION_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const PORT_DIRECTIONS = new Set(["in", "out", "bidirectional"]);
 const PORT_CARDINALITIES = new Set(["one", "many"]);
+const EDITOR_VISUAL_ROLES = new Set([
+  "store",
+  "equipment",
+  "boundary",
+  "interaction"
+]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -158,6 +164,16 @@ function assertResolution(resolution, definitionType) {
   assertFunction(resolution.describe, `${definitionType}.resolution.describe`);
 }
 
+function assertEditor(editor, definitionType) {
+  assertRecord(editor, `${definitionType}.editor`);
+  if (
+    editor.visualRole !== undefined &&
+    !EDITOR_VISUAL_ROLES.has(editor.visualRole)
+  ) {
+    throw new TypeError(`${definitionType}.editor.visualRole is invalid`);
+  }
+}
+
 function assertComponentDefinition(definition) {
   assertRecord(definition, "Component definition");
   assertStableId(definition.type, "Component definition type");
@@ -175,7 +191,7 @@ function assertComponentDefinition(definition) {
   assertPorts(definition.ports, definition.type);
   assertRecord(definition.outputs, `${definition.type}.outputs`);
   assertOutputs(definition.outputs, definition.type);
-  assertRecord(definition.editor, `${definition.type}.editor`);
+  assertEditor(definition.editor, definition.type);
   assertFunction(definition.validate, `${definition.type}.validate`);
   assertResolution(definition.resolution, definition.type);
   assertRecord(definition.model, `${definition.type}.model`);

@@ -90,6 +90,7 @@ export const constantTemperatureDefinition = {
   },
 
   editor: {
+    visualRole: "boundary",
     summaryOutput: "temperatureC",
     groups: [{
       id: "boundary",

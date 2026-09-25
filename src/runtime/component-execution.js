@@ -92,7 +92,7 @@ export function initialiseComponentStates(runtimeModel, scenario, diagnostics) {
   return freezeJsonValue(states);
 }
 
-export function getComponentOperatingLimits(runtimeModel, stepContext, diagnostics) {
+export function getComponentOperatingLimits(runtimeModel, stepContext, diagnostics, targets = {}) {
   const limitsByComponentId = new Map();
 
   runtimeModel.components.forEach((component) => {
@@ -101,7 +101,8 @@ export function getComponentOperatingLimits(runtimeModel, stepContext, diagnosti
     try {
       limits = component.definition.model.getOperatingLimits(
         component,
-        componentStepContext(stepContext, component)
+        componentStepContext(stepContext, component),
+        targets[component.id] ?? null
       );
     } catch (error) {
       diagnostics.push(runtimeDiagnostic(

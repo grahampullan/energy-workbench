@@ -25,7 +25,10 @@ export const materialSinkDefinition = {
     specificEnthalpyKjPerKg: { unit: "kJ/kg" },
     enthalpyFlowkW: { unit: "kW" }
   },
-  editor: { summaryOutput: "massFlowKgPerSecond" },
+  editor: {
+    visualRole: "boundary",
+    summaryOutput: "massFlowKgPerSecond"
+  },
   validate() {
     return [];
   },

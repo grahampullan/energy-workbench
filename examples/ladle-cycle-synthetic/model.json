@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "model.ladle-cycle-synthetic",
+  "name": "Synthetic ladle operating cycle",
+  "components": [
+    {
+      "id": "burner",
+      "type": "thermal.fuel-burner",
+      "definitionVersion": "0.1.0",
+      "name": "Preheat burner",
+      "parameters": {
+        "maximumFuelInputPowerkW": 800,
+        "efficiency": 0.6,
+        "supplyTemperatureC": 1600,
+        "directEmissionsKgCO2PerKWh": 0.184
+      },
+      "initialState": {}
+    },
+    {
+      "id": "material-source",
+      "type": "material.source",
+      "definitionVersion": "0.1.0",
+      "name": "Molten-metal arrival",
+      "parameters": {
+        "massFlowSeriesId": "material-inflow",
+        "specificEnthalpyKjPerKg": 1312
+      },
+      "initialState": {}
+    },
+    {
+      "id": "refractory",
+      "type": "thermal.store",
+      "definitionVersion": "0.2.0",
+      "name": "Refractory lining",
+      "parameters": {
+        "maximumMassKg": 1500,
+        "specificHeatCapacityKjPerKgK": 1,
+        "enthalpyReferenceTemperatureC": 0,
+        "maximumTemperatureC": 1600,
+        "minimumUsefulTemperatureC": 800,
+        "maximumHeatInputkW": 480,
+        "maximumHeatOutputkW": 0
+      },
+      "initialState": {
+        "massKg": 1500,
+        "containedEnthalpykWh": 166.66666666666666
+      }
+    },
+    {
+      "id": "metal",
+      "type": "thermal.store",
+      "definitionVersion": "0.2.0",
+      "name": "Molten metal",
+      "parameters": {
+        "maximumMassKg": 6000,
+        "specificHeatCapacityKjPerKgK": 0.82,
+        "enthalpyReferenceTemperatureC": 0,
+        "maximumTemperatureC": 1650,
+        "minimumUsefulTemperatureC": 1450,
+        "maximumHeatInputkW": 0,
+        "maximumHeatOutputkW": 0
+      },
+      "initialState": {
+        "massKg": 0,
+        "containedEnthalpykWh": 0
+      }
+    },
+    {
+      "id": "metal-refractory-contact",
+      "type": "thermal.heat-transfer",
+      "definitionVersion": "0.1.0",
+      "name": "Metal–refractory contact",
+      "parameters": {
+        "conductancekWPerK": 0.15
+      },
+      "initialState": {}
+    },
+    {
+      "id": "refractory-loss",
+      "type": "thermal.heat-transfer",
+      "definitionVersion": "0.1.0",
+      "name": "Refractory heat loss",
+      "parameters": {
+        "conductancekWPerK": 0.02
+      },
+      "initialState": {}
+    },
+    {
+      "id": "metal-loss",
+      "type": "thermal.heat-transfer",
+      "definitionVersion": "0.1.0",
+      "name": "Metal heat loss",
+      "parameters": {
+        "conductancekWPerK": 0.01
+      },
+      "initialState": {}
+    },
+    {
+      "id": "material-sink",
+      "type": "material.sink",
+      "definitionVersion": "0.1.0",
+      "name": "Casting process",
+      "parameters": {},
+      "initialState": {}
+    },
+    {
+      "id": "ambient",
+      "type": "thermal.constant-temperature",
+      "definitionVersion": "0.1.0",
+      "name": "Ambient",
+      "parameters": {
+        "temperatureSeriesId": "ambient-temperature"
+      },
+      "initialState": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "burner-to-refractory",
+      "name": "Burner heat to refractory",
+      "from": { "componentId": "burner", "portId": "heat-out" },
+      "to": { "componentId": "refractory", "portId": "heat-in" }
+    },
+    {
+      "id": "source-to-metal",
+      "name": "Molten-metal arrival",
+      "from": { "componentId": "material-source", "portId": "material-out" },
+      "to": { "componentId": "metal", "portId": "material-in" }
+    },
+    {
+      "id": "metal-to-sink",
+      "name": "Molten metal to casting",
+      "from": { "componentId": "metal", "portId": "material-out" },
+      "to": { "componentId": "material-sink", "portId": "material-in" }
+    },
+    {
+      "id": "metal-to-contact",
+      "name": "Metal boundary to contact",
+      "from": { "componentId": "metal", "portId": "passive-heat-out" },
+      "to": { "componentId": "metal-refractory-contact", "portId": "source" }
+    },
+    {
+      "id": "contact-to-refractory",
+      "name": "Contact heat to refractory",
+      "from": { "componentId": "metal-refractory-contact", "portId": "sink" },
+      "to": { "componentId": "refractory", "portId": "passive-heat-in" }
+    },
+    {
+      "id": "refractory-to-loss",
+      "name": "Refractory boundary to heat loss",
+      "from": { "componentId": "refractory", "portId": "passive-heat-out" },
+      "to": { "componentId": "refractory-loss", "portId": "source" }
+    },
+    {
+      "id": "refractory-loss-to-ambient",
+      "name": "Refractory heat loss to Ambient",
+      "from": { "componentId": "refractory-loss", "portId": "sink" },
+      "to": { "componentId": "ambient", "portId": "heat-in" }
+    },
+    {
+      "id": "metal-to-loss",
+      "name": "Metal boundary to heat loss",
+      "from": { "componentId": "metal", "portId": "passive-heat-out" },
+      "to": { "componentId": "metal-loss", "portId": "source" }
+    },
+    {
+      "id": "metal-loss-to-ambient",
+      "name": "Metal heat loss to Ambient",
+      "from": { "componentId": "metal-loss", "portId": "sink" },
+      "to": { "componentId": "ambient", "portId": "heat-in" }
+    }
+  ]
+}

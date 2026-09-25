@@ -131,3 +131,15 @@ test("component registry accepts one or many port cardinality", () => {
     /cardinality is invalid/u
   );
 });
+
+test("component registry accepts only declared editor visual roles", () => {
+  assert.doesNotThrow(() => createComponentRegistry([
+    createTestComponentDefinition({ editor: { visualRole: "store" } })
+  ]));
+  assert.throws(
+    () => createComponentRegistry([
+      createTestComponentDefinition({ editor: { visualRole: "container" } })
+    ]),
+    /editor\.visualRole is invalid/u
+  );
+});

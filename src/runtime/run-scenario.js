@@ -147,7 +147,7 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
 
   for (let stepIndex = 0; stepIndex < runtimeModel.time.stepCount; stepIndex += 1) {
     const stepContext = createStepContext(runtimeModel, states, stepIndex);
-    const limitsByComponentId = getComponentOperatingLimits(
+    let limitsByComponentId = getComponentOperatingLimits(
       runtimeModel,
       stepContext,
       diagnostics
@@ -164,6 +164,16 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       diagnostics
     );
     if (operation === null || hasErrors(diagnostics)) {
+      return failure(diagnostics);
+    }
+
+    limitsByComponentId = getComponentOperatingLimits(
+      runtimeModel,
+      stepContext,
+      diagnostics,
+      operation.targets
+    );
+    if (hasErrors(diagnostics)) {
       return failure(diagnostics);
     }
 

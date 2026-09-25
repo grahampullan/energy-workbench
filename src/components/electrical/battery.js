@@ -82,6 +82,7 @@ export const electricalBatteryDefinition = {
   },
 
   editor: {
+    visualRole: "store",
     groups: [
       {
         id: "storage",

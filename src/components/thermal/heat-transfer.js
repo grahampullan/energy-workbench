@@ -176,6 +176,7 @@ export const heatTransferDefinition = {
   },
 
   editor: {
+    visualRole: "interaction",
     summaryOutput: "heatFlowkW",
     hiddenFlowChartPorts: ["source"],
     groups: [{

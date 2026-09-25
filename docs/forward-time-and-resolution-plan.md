@@ -3,7 +3,7 @@
 **Status:** Implemented for the current electrical, thermal, and material-flow
 components; future flow types must extend the same small contract
 
-**Date:** 15 August 2026
+**Date:** 18 August 2026
 
 ## Purpose
 
@@ -134,9 +134,11 @@ heat exchanger while delivered heat and electrical demand propagate to their
 destinations. Each stateful component advances only after all current flows
 are settled and checked.
 
-This topology is an acceptance case for dependency analysis, not an immediate
-Push 2 implementation commitment. Heat recovery, heat pumps, and broader
-thermal storage remain conditional Push 3 scope.
+This topology now has a definition-level acceptance test. The test proves that
+the heat pump can resolve first from current capabilities and its policy target,
+followed by the heat exchanger and connected supplies/stores, without creating
+a same-timestep cycle. It does not implement heat-recovery, heat-pump, or
+broader thermal-storage physics; those remain conditional Push 3 scope.
 
 ## Material-inventory proof
 
@@ -182,7 +184,14 @@ as an ordinary thermal-flow connection. If a later case requires heat to
 reverse direction, that boundary contract must be extended deliberately rather
 than represented by a negative directed heat flow.
 
-The public repository should contain the smallest reusable physical component
+The public neutral ladle cycle implements this topology with explicit heat
+losses to a constant-temperature Ambient boundary. A generic fuel burner
+preheats the refractory and reports fuel input and direct emissions. A
+historical schedule and a temperature-led policy operate the same physical
+model. The latter uses current refractory capability and remaining preheat
+time to target the required temperature plus a declared margin.
+
+The public repository contains only the smallest reusable physical component
 set with neutral synthetic tests. Private MHI-informed data, assumptions,
 calibration, and the named ladle study remain outside the repository.
 
@@ -197,11 +206,13 @@ calibration, and the named ladle study remain outside the repository.
    hold, and empty operation. **Complete.**
 4. Add refractory and molten-metal `thermal.store` instances around the shared
    `thermal.heat-transfer`, with timestep-refinement tests. Extend the component
-   set only if these governing equations prove insufficient.
+   set only if these governing equations prove insufficient. **Complete.**
 5. Add fuel, burner, process modes, policy comparisons, and the private ladle
-   UI required for External Gate 2.
+   UI required for External Gate 2. **Public generic capability complete;
+   private study and practitioner evaluation remain.**
 6. Use the later heat-exchanger, heat-pump, and store topology to test the
    dependency design before undertaking conditional Push 3 implementation.
+   **Dependency acceptance test complete; equipment implementation deferred.**
 
 The dependency declarations and material-flow contract should remain as small
 as the examples permit. Do not introduce a generic constraint language,

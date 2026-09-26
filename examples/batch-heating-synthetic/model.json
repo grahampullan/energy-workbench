@@ -12,7 +12,11 @@
         "maximumImportPowerkW": 60,
         "maximumExportPowerkW": 0
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "electrical.balance",
+        "settings": {}
+      }
     },
     {
       "id": "heater",
@@ -24,7 +28,13 @@
         "efficiency": 0.9,
         "supplyTemperatureC": 150
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "electrical.follow-schedule",
+        "settings": {
+          "direction": -1
+        }
+      }
     },
     {
       "id": "batch",
@@ -113,6 +123,29 @@
       "to": {
         "componentId": "ambient",
         "portId": "heat-in"
+      }
+    }
+  ],
+  "informationSources": [
+    {
+      "id": "heating-schedule",
+      "name": "Heater power schedule",
+      "seriesId": "heater-input-power",
+      "quantity": "active-power",
+      "unit": "kW"
+    }
+  ],
+  "informationConnections": [
+    {
+      "id": "info-heating-schedule-value-to-heater-policy-power",
+      "name": "Heater power",
+      "from": {
+        "sourceId": "heating-schedule",
+        "portId": "value"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "policy.power"
       }
     }
   ]

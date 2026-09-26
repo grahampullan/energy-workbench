@@ -138,6 +138,7 @@ function buildRuntimeComponents(model, scenario, registry, diagnostics) {
       type: component.type,
       definitionVersion: component.definitionVersion,
       name: component.name,
+      policy: component.policy ?? null,
       definition,
       parameters: component.parameters,
       initialState: component.initialState,
@@ -234,6 +235,8 @@ export function prepareRuntimeModel({ model, scenario, registry } = {}) {
     time: inputs.scenario.time,
     series: inputs.scenario.series,
     components: Object.freeze(components),
+    informationSources: resolvedModel.informationSources ?? [],
+    informationConnections: resolvedModel.informationConnections ?? [],
     connections: Object.freeze(connections)
   });
 

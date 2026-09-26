@@ -14,7 +14,7 @@ import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { materialDischarge } from "../../src/core/material-discharge.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
@@ -23,8 +23,6 @@ import {
   validateModel,
   validateScenario
 } from "../../src/core/validation/validate-documents.js";
-import { createLadleCyclePolicy } from
-  "../../src/policies/ladle-cycle.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 const exampleDirectory = new URL(
@@ -51,26 +49,15 @@ const registry = createComponentRegistry([
   thermalStoreDefinition
 ]);
 
-function policy(strategy) {
-  return createLadleCyclePolicy({
-    burnerComponentId: "burner",
-    refractoryComponentId: "refractory",
-    inventoryComponentId: "metal",
-    modeSeriesId: "process-mode",
-    historicalHeatOutputSeriesId: "historical-burner-output",
-    outflowSeriesId: "material-outflow",
-    strategy,
-    operatingMarginK: 10
-  });
-}
-
+const temperatureModel = await readExampleJson("model-temperature-led.json");
 function run(strategy, scenarioDocument = scenario, modelDocument = model) {
-  return runScenario({
-    model: modelDocument,
-    scenario: scenarioDocument,
-    registry,
-    policy: policy(strategy)
-  });
+  const configured = structuredClone(modelDocument);
+  if (strategy === "minimum-fuel") {
+    configured.components.find(({ id }) => id === "burner").policy = temperatureModel.components.find(({ id }) => id === "burner").policy;
+    configured.informationConnections = temperatureModel.informationConnections;
+    configured.informationSources = temperatureModel.informationSources;
+  }
+  return runScenario({ model: configured, scenario: scenarioDocument, registry });
 }
 
 function componentAtStep(step, componentId) {
@@ -148,6 +135,14 @@ test("synthetic ladle documents are valid and expose the checked dependency orde
 
 test("historical ladle cycle matches the reviewed synthetic fixture", () => {
   assertReviewedResult("historical");
+});
+
+test("historical heating and discharge follow their schedules independently of process-mode labels", () => {
+  const relabelled = structuredClone(scenario);
+  relabelled.series.find(({ id }) => id === "process-mode").data.values.fill(0);
+  const result = run("historical", relabelled);
+  assert.equal(result.completed, true, JSON.stringify(result.diagnostics));
+  assert.deepEqual(result.results.steps, run("historical").results.steps);
 });
 
 test("reduced and zero inflow report an unmet tapping request without losing mass or enthalpy", () => {

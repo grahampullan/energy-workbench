@@ -1,3 +1,4 @@
+import { informationView, componentPolicyView } from "./information-view.js";
 import {
   ACTIVE_POWER_FLOW_TYPE,
   MATERIAL_MASS_FLOW_TYPE,
@@ -178,6 +179,21 @@ function operationFields(componentResult, discharge) {
 }
 
 function primaryMetric(definition, componentResult) {
+  const summaryOutputId = definition.editor.summaryOutput;
+  if (
+    typeof summaryOutputId === "string" &&
+    typeof componentResult.outputs[summaryOutputId] === "number"
+  ) {
+    const value = componentResult.outputs[summaryOutputId];
+    const unit = definition.outputs[summaryOutputId]?.unit ?? "";
+    return {
+      label: fieldLabel(summaryOutputId, definition.outputs[summaryOutputId]),
+      value,
+      unit,
+      displayValue: formatEngineeringValue(value, unit)
+    };
+  }
+
   if (typeof componentResult.outputs.powerBalanceErrorkW === "number") {
     const value = componentResult.outputs.powerBalanceErrorkW;
     return {
@@ -197,21 +213,6 @@ function primaryMetric(definition, componentResult) {
     };
   }
 
-  const summaryOutputId = definition.editor.summaryOutput;
-  if (
-    typeof summaryOutputId === "string" &&
-    typeof componentResult.outputs[summaryOutputId] === "number"
-  ) {
-    const value = componentResult.outputs[summaryOutputId];
-    const unit = definition.outputs[summaryOutputId]?.unit ?? "";
-    return {
-      label: fieldLabel(summaryOutputId, definition.outputs[summaryOutputId]),
-      value,
-      unit,
-      displayValue: formatEngineeringValue(value, unit)
-    };
-  }
-
   const firstNumericOutput = Object.entries(componentResult.outputs).find(
     ([, value]) => typeof value === "number"
   );
@@ -228,11 +229,12 @@ function primaryMetric(definition, componentResult) {
   };
 }
 
-function powerTone(metric) {
-  if (metric.unit !== "kW" || typeof metric.value !== "number" || Math.abs(metric.value) < 1e-9) {
+function powerTone(metric, componentResult) {
+  const value = componentResult.actualCommand?.powerkW ?? metric.value;
+  if (metric.unit !== "kW" || typeof value !== "number" || Math.abs(value) < 1e-9) {
     return "neutral";
   }
-  return metric.value > 0 ? "exporting" : "importing";
+  return value > 0 ? "exporting" : "importing";
 }
 
 function componentView(
@@ -240,9 +242,11 @@ function componentView(
   definition,
   componentResult,
   parameterOverrides,
-  timestepLabel
+  timestepLabel,
+  policyExplanation
 ) {
   const metric = primaryMetric(definition, componentResult);
+  const outputFields = fieldViews(definition.outputs, componentResult.outputs);
   const discharge = materialDischarge(componentResult);
   const parameterFields = fieldViews(definition.parameters, {
     ...component.parameters,
@@ -254,14 +258,19 @@ function componentView(
     type: component.type,
     definitionName: definition.name,
     definitionVersion: definition.version,
+    modelExplanation: definition.explanation ?? null,
+    policyExplanation,
     visualRole: definition.editor.visualRole ?? "equipment",
     timestepLabel,
     metric,
-    powerTone: powerTone(metric),
+    metricDetails: (definition.editor.summaryDetails ?? []).map((id) =>
+      outputFields.find((field) => field.id === id)
+    ),
+    powerTone: powerTone(metric, componentResult),
     parameterGroups: parameterGroups(definition, parameterFields),
     discharge,
     operationFields: operationFields(componentResult, discharge),
-    outputFields: fieldViews(definition.outputs, componentResult.outputs),
+    outputFields,
     stateFields: fieldViews(definition.initialState, componentResult.state)
   };
 }
@@ -374,6 +383,7 @@ export function createWorkbenchView({
   registry,
   results,
   stepIndex,
+  scenario = null,
   parameterOverrides = []
 }) {
   if (!model || !registry || !results) {
@@ -406,13 +416,16 @@ export function createWorkbenchView({
     if (!componentResult) {
       throw new Error(`Run results do not contain component: ${component.id}`);
     }
-    return componentView(
+    const policyView = componentPolicyView(model, component, registry, scenario);
+    const result = componentView(
       component,
       definitionFor(registry, component),
       componentResult,
       overridesByComponentId.get(component.id) ?? {},
-      timestepLabel
+      timestepLabel,
+      policyView.definition?.explanation ?? null
     );
+    return { ...result, policyView, roleExplanation: policyView.role?.explanation ?? null };
   });
 
   const connections = step.connections.map((connectionResult) => {
@@ -438,6 +451,8 @@ export function createWorkbenchView({
     elapsedSeconds: step.elapsedSeconds,
     endElapsedSeconds,
     timelineLabel: timestepLabel,
+    informationConnections: informationView(model, registry),
+    informationSources: model.informationSources ?? [],
     components,
     connections
   };

@@ -1,6 +1,8 @@
+import { createPolicyInspector } from "./policy-inspector.js";
 import { bindNumberParameterControls } from "./board-box-adapter.js";
 import { formatEngineeringValue } from "./engineering-format.js";
 import { parameterOverrideKey } from "./preview-model.js";
+import { createModelEquations } from "./model-equations.js";
 
 function descriptionList(fields) {
   const list = document.createElement("dl");
@@ -47,7 +49,9 @@ export function createComponentInspector({
   onParameterInput,
   onReset,
   onApply,
-  onSaveVariant
+  onSaveVariant,
+  onTraceInformation = () => {},
+  onApplyPolicy = () => {}
 }) {
   let selectedComponentId = null;
   let bindings = [];
@@ -61,6 +65,7 @@ export function createComponentInspector({
   let saveVariantButton;
   let diagnosticsHeading;
   let diagnosticsView;
+  let inspectorView = "controls";
 
   function disposeBindings() {
     bindings.forEach((binding) => binding.dispose());
@@ -169,10 +174,41 @@ export function createComponentInspector({
     liveResult = document.createElement("div");
     liveResult.className = "inspector-live-result";
     liveResult.append(document.createElement("span"), document.createElement("strong"));
-    target.append(eyebrow, heading, definitionName, timestep, liveResult);
+    target.append(eyebrow, heading, definitionName);
+
+    const controls = document.createElement("div");
+    controls.className = "inspector-controls";
+    controls.append(timestep, liveResult);
+    const equations = createModelEquations(component);
+    const policyPanel = createPolicyInspector(component, { onTrace: onTraceInformation, onApply: onApplyPolicy });
+    const views = document.createElement("div");
+    views.className = "inspector-view-controls";
+    views.setAttribute("role", "group");
+    views.setAttribute("aria-label", "Inspector view");
+    for (const [view, label] of [["controls", "Controls"], ["equations", "Equations"], ["policy", component.policyView?.role ? "Role" : "Policy"]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.dataset.inspectorView = view;
+      button.addEventListener("click", () => {
+        inspectorView = view;
+        updateView();
+      });
+      views.append(button);
+    }
+    function updateView() {
+      controls.hidden = inspectorView !== "controls";
+      equations.hidden = inspectorView !== "equations";
+      policyPanel.hidden = inspectorView !== "policy";
+      for (const button of views.children) {
+        button.setAttribute("aria-pressed", String(button.dataset.inspectorView === inspectorView));
+      }
+    }
+    updateView();
+    target.append(views, controls, equations, policyPanel);
 
     for (const group of component.parameterGroups) {
-      target.append(parameterGroup(component, group));
+      controls.append(parameterGroup(component, group));
     }
 
     const actions = document.createElement("section");
@@ -203,11 +239,11 @@ export function createComponentInspector({
     diagnosticsView = document.createElement("ul");
     diagnosticsView.className = "preview-diagnostics";
     actions.append(previewStatus, buttons, diagnosticsHeading, diagnosticsView);
-    target.append(actions);
+    controls.append(actions);
 
     resultSections = document.createElement("div");
     resultSections.className = "inspector-results";
-    target.append(resultSections);
+    controls.append(resultSections);
     selectedComponentId = component.id;
   }
 

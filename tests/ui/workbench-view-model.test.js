@@ -8,9 +8,7 @@ import { electricalBusDefinition } from "../../src/components/electrical/bus.js"
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
 import { electricalPvDefinition } from "../../src/components/electrical/pv.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
-import { createPvBatterySelfConsumptionPolicy } from
-  "../../src/policies/pv-battery-self-consumption.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import {
   createWorkbenchView,
@@ -39,10 +37,6 @@ const run = runScenario({
   model,
   scenario,
   registry,
-  policy: createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: "battery",
-    balancingComponentId: "grid"
-  })
 });
 
 test("browser presentation derives the selected timestep from canonical results", () => {
@@ -105,6 +99,25 @@ test("presentation rejects an unavailable timestep", () => {
     }),
     /stepIndex must be between/u
   );
+});
+
+test("PV presentation separates the grid's physical role from the battery policy", () => {
+  const view = createWorkbenchView({ model, scenario, registry, results: run.results, stepIndex: 0 });
+  const grid = view.components.find(({ id }) => id === "grid");
+  const battery = view.components.find(({ id }) => id === "battery");
+
+  assert.deepEqual(view.components.filter(({ policyExplanation }) => policyExplanation).map(({ id }) => id), ["battery"]);
+  assert.equal(grid.policyExplanation, null);
+  assert.equal(grid.policyView.definition, null);
+  assert.equal(grid.policyView.role.role, "electrical-balance");
+  assert.equal(grid.roleExplanation, grid.policyView.role.explanation);
+  assert.deepEqual(grid.policyView.requestSources, [{ id: "bus", name: "Electrical bus" }]);
+  assert.deepEqual(grid.policyView.connections, []);
+  assert.equal(battery.roleExplanation, null);
+  assert.equal(battery.policyView.role, null);
+  assert.equal(battery.policyView.definition.type, "electrical.self-consumption");
+  assert.ok(battery.policyView.available.every((definition) => !definition.role));
+  assert.deepEqual(battery.policyView.availableRoles.map(({ role }) => role), ["electrical-balance"]);
 });
 
 test("temporary parameter values do not replace canonical runtime results", () => {

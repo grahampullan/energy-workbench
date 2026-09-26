@@ -14,7 +14,7 @@ import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
 import {
@@ -22,8 +22,6 @@ import {
   validateModel,
   validateScenario
 } from "../../src/core/validation/validate-documents.js";
-import { createHeatDemandFollowingPolicy } from
-  "../../src/policies/heat-demand-following.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 const exampleDirectory = new URL("../../examples/coupled-thermal/", import.meta.url);
@@ -47,12 +45,7 @@ const registry = createComponentRegistry([
   heatTransferDefinition,
   thermalStoreDefinition
 ]);
-const policy = createHeatDemandFollowingPolicy({
-  heaterComponentId: "heater",
-  demandComponentId: "heat-demand",
-  balancingComponentId: "grid"
-});
-const runResult = runScenario({ model, scenario, policy, registry });
+const runResult = runScenario({ model, scenario, registry });
 const storeModelComponent = model.components.find(
   (component) => component.id === "store"
 );

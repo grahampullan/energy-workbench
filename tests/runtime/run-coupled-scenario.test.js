@@ -9,9 +9,7 @@ import { heatDemandDefinition } from "../../src/components/thermal/heat-demand.j
 import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
-import { createHeatDemandFollowingPolicy } from
-  "../../src/policies/heat-demand-following.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function createFixture({
@@ -27,11 +25,7 @@ function createFixture({
   storeMinimumUsefulTemperatureC = 70,
   heatTransferConductancekWPerK = 0,
   demandDefinition = heatDemandDefinition,
-  policy = createHeatDemandFollowingPolicy({
-    heaterComponentId: "heater",
-    demandComponentId: "heat-demand",
-    balancingComponentId: "grid"
-  })
+  heaterPowerkW = null
 } = {}) {
   return {
     model: {
@@ -41,6 +35,7 @@ function createFixture({
       components: [
         {
           id: "grid",
+        policy: { type: "electrical.balance", settings: {} },
           type: electricalGridDefinition.type,
           definitionVersion: electricalGridDefinition.version,
           name: "Grid",
@@ -52,6 +47,7 @@ function createFixture({
         },
         {
           id: "heater",
+        policy: heaterPowerkW === null ? { type: "thermal.follow-demand", settings: {} } : { type: "electrical.follow-schedule", settings: { direction: -1 } },
           type: electricHeaterDefinition.type,
           definitionVersion: electricHeaterDefinition.version,
           name: "Electric heater",
@@ -112,6 +108,11 @@ function createFixture({
           initialState: {}
         }
       ],
+      informationSources: heaterPowerkW === null ? [] : [{ id: "heater-schedule", name: "Heater schedule", seriesId: "heater-input", quantity: "active-power", unit: "kW" }],
+      informationConnections: heaterPowerkW === null ? [
+        { id: "info-demand", name: "Heat demand", from: { componentId: "heat-demand", portId: "requested-heat" }, to: { componentId: "heater", portId: "policy.demand" } },
+        { id: "info-efficiency", name: "Efficiency", from: { componentId: "heater", portId: "efficiency" }, to: { componentId: "heater", portId: "policy.efficiency" } }
+      ] : [{ id: "info-heater", name: "Heater power", from: { sourceId: "heater-schedule", portId: "value" }, to: { componentId: "heater", portId: "policy.power" } }],
       connections: [
         {
           id: "grid-to-heater",
@@ -151,6 +152,7 @@ function createFixture({
       name: "Coupled runtime scenario",
       time: { timeStepSeconds, stepCount: demandValues.length },
       series: [
+        ...(heaterPowerkW === null ? [] : [{ id: "heater-input", name: "Heater power", unit: "kW", data: { kind: "inline", values: demandValues.map(() => -heaterPowerkW) } }]),
         {
           id: "thermal-demand",
           name: "Thermal demand",
@@ -165,7 +167,6 @@ function createFixture({
         }
       ]
     },
-    policy,
     registry: createComponentRegistry([
       electricalGridDefinition,
       constantTemperatureDefinition,
@@ -389,12 +390,7 @@ test("the store clamps heater operation at its supply-temperature boundary", () 
     demandValues: [0],
     heaterEfficiency: 0.8,
     heaterSupplyTemperatureC: 85,
-    policy: {
-      request: () => ({
-        targets: { heater: { powerkW: -100 } },
-        balancingComponentId: "grid"
-      })
-    }
+    heaterPowerkW: -100
   }));
 
   assert.equal(result.completed, true);
@@ -495,25 +491,9 @@ test("coupled connection balance checks component-evaluated thermal flows", () =
 });
 
 test("heat-demand-following policy validates its component contract", () => {
-  assert.throws(
-    () => createHeatDemandFollowingPolicy(),
-    /heaterComponentId must be a non-empty string/u
-  );
-  assert.throws(
-    () => createHeatDemandFollowingPolicy({
-      heaterComponentId: "heater",
-      demandComponentId: "heat-demand"
-    }),
-    /balancingComponentId must be a non-empty string/u
-  );
-
-  const result = runScenario(createFixture({
-    policy: createHeatDemandFollowingPolicy({
-      heaterComponentId: "store",
-      demandComponentId: "heat-demand",
-      balancingComponentId: "grid"
-    })
-  }));
+  const fixture = createFixture();
+  fixture.model.components.find(({ id }) => id === "store").policy = { type: "thermal.follow-demand", settings: {} };
+  const result = runScenario(fixture);
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.policy-failed"));
+  assert.ok(diagnosticCodes(result).includes("model.incompatible-policy"));
 });

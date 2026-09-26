@@ -10,6 +10,8 @@ await build({
   bundle: true,
   format: "esm",
   platform: "browser",
+  loader: { ".woff2": "file", ".woff": "file", ".ttf": "file" },
+  assetNames: "fonts/[name]-[hash]",
   target: "es2022",
   sourcemap: true,
   legalComments: "eof",

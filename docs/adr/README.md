@@ -23,10 +23,12 @@ rather than rewriting its history.
 | [0012](0012-restricted-thermal-flow.md) | Restricted thermal flow and storage | Partly superseded by 0019 and 0020 |
 | [0013](0013-restricted-coupled-resolver.md) | Restricted coupled resolver | Superseded by 0015 |
 | [0014](0014-flow-type-and-connection-result-contract.md) | Flow type and connection-result contract | Partly superseded by 0015 |
-| [0015](0015-component-owned-resolution.md) | Component-owned resolution | Partly superseded by 0016 |
-| [0016](0016-resolution-dependency-plan.md) | Resolution-dependency plan | Accepted |
+| [0015](0015-component-owned-resolution.md) | Component-owned resolution | Partly superseded by 0016 and 0023 |
+| [0016](0016-resolution-dependency-plan.md) | Resolution-dependency plan | Role terminology clarified by 0023 |
 | [0017](0017-material-mass-and-enthalpy-flow.md) | Material mass and enthalpy flow | Partly superseded by 0019 |
 | [0018](0018-repeatable-collector-ports.md) | Repeatable collector ports | Partly superseded by 0020 |
 | [0019](0019-unified-thermal-store.md) | Unified thermal store | Partly superseded by 0020 |
 | [0020](0020-explicit-heat-transfer.md) | Explicit passive heat transfer | Accepted |
 | [0021](0021-synthetic-ladle-process-slice.md) | Synthetic ladle process slice | Accepted |
+| [0022](0022-connected-component-policies.md) | Component policies with explicit information connections | Role classification superseded by 0023 |
+| [0023](0023-physical-boundaries-and-policy-inputs.md) | Physical boundaries, policy inputs, and balancing roles | Accepted definition; implementation gaps recorded |

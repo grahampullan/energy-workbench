@@ -1,3 +1,4 @@
+import { validateInformationModel } from "../information-model.js";
 import { validateDocumentStructure } from "./document-validator.js";
 import { createDiagnostic, createValidationResult } from "./validation-result.js";
 
@@ -317,6 +318,7 @@ export function validateModel(model, { registry } = {}) {
     }));
   }
 
+  diagnostics.push(...validateInformationModel(model, registry));
   return createValidationResult(diagnostics);
 }
 

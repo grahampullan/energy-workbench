@@ -23,8 +23,13 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 4. Keep every governing equation, physical constraint, feasibility rule, port
    relationship, and state transition in its owning component definition. Do
    not duplicate component physics in policies or runtime modules.
-5. Keep policies limited to operating targets, priorities, schedules, and
-   explicit roles such as the visible component that accepts residual flow.
+5. Keep operating policies limited to their owning component's requested target.
+   Give them only immutable connected information inputs and settings. Treat
+   balancing as explicit physical configuration; the current `electrical.balance`
+   policy encoding is a documented migration gap, not a pattern for new policies.
+   Keep public information outputs with the owning component definition; never
+   let a policy inspect the model or global state. Physical resolution may use
+   only declared boundary data from its connected ports, not arbitrary telemetry.
 6. Keep runtime code generic: prepare inputs, order component work, transfer
    typed connection flows, check consistency, commit states, and collect
    results. Do not select whole-model solvers or branch on component type to
@@ -66,6 +71,14 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 - Dispose subscriptions explicitly.
 - Do not duplicate component metadata or equations in inspectors; generate
   controls from the component definition where practical.
+- Keep static equation descriptions beside their component or policy owner.
+  The inspector renders the descriptions and symbols with KaTeX; it never
+  evaluates them. Update descriptions with equation or policy changes and
+  verify that the documented TeX renders. Keep these descriptions independent
+  of selected-timestep values and parameter previews.
+- Use consistent units in displayed equations: kJ, kW, seconds, and kJ/K.
+  Update symbol legends together with equations. Keep storage-unit conversion
+  factors out of the displayed model relationships; runtime units are separate.
 - Keep canonical values and units unchanged in models and runtime results. Use
   the shared UI engineering formatter for significant figures, readable SI
   units, chart axes, and accessible value text; never round a non-zero value to
@@ -73,7 +86,7 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 - Use D3 selections, keyed data joins, scales, axes, and shape generators for
   SVG charts and graphical overlays. Keep D3 within `src/ui` and derive its
   input data from canonical run results.
-- Draw topology connections as solid lines. Assign connection identity from
+- Draw physical topology connections as solid lines. Assign connection identity from
   Tableau 10 in stable model order, and reuse that exact colour for the
   connection's Results series. Hover emphasis is shared between Model and
   Results and changes weight or background, not the identity colour.
@@ -92,6 +105,15 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 - Coalesce continuous drag, resize, scrub, and chart rendering to one animation
   frame. Preview scheduling must still preserve the latest pending value.
 
+- Draw information connections as labelled dashed arrows, separate from Results
+  flow series. Reveal selected policy inputs and their upstream dependencies;
+  provide a toggle for all information connections. Keep schedule sources named.
+- Give information-source cards the same board-box dragging and zoom behaviour
+  as physical components. Keep their positions when hiding and revealing links;
+  reroute information connections as either endpoint moves.
+- Persist policy choices, settings and input connections together through a
+  validated model command. Reject missing or incompatible inputs explicitly.
+
 ## Test defaults
 
 - Put a focused test beside every engineering equation, limit, and state
@@ -106,6 +128,7 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
 - Is the main model-to-result path easy to follow?
 - Is a new abstraction justified by current use?
 - Are dependencies and units explicit?
+- Are policy inputs distinguished from physical boundary data and balancing roles?
 - Is validation owned in one place for each concern?
 - Is component physics present only in the owning component definition?
 - Is runtime orchestration independent of specific component types and model

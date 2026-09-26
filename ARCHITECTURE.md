@@ -12,7 +12,7 @@ Energy Workbench has one semantic model and one deterministic simulation
 runtime. The browser, Node tests, and CLI call the same runtime.
 
 ```text
-JSON project + component registry + scenario + policy
+JSON model (including policies and information connections) + registry + scenario
                          |
                          v
                     runScenario
@@ -59,6 +59,22 @@ UI and file handling sit outside the engineering calculation.
 - May call `core` commands and the shared runtime.
 - Must not contain engineering equations or a second simulation path.
 
+The inspector renders static mathematical explanations supplied by component
+definitions and active policies. Component `explanation` metadata describes
+governing equations; each selected policy definition supplies its `explanation`.
+These descriptions are plain data, not executable expressions, and are not
+persisted in model documents or run results. Policy choices, settings, and
+information connections are persisted in the model. KaTeX belongs only to the
+UI rendering layer. Equation rendering
+does not calculate timestep values or participate in simulation.
+
+Displayed equations use a consistent unit convention: energy in kJ, power in
+kW, time in seconds, and heat capacity in kJ/K. Their symbol legends describe
+these equation units; they need not match the storage units of runtime fields
+or editable parameters. Show the governing relationships without numerical
+unit-conversion factors. This convention changes explanation metadata only,
+not canonical model values, information-port units, or runtime calculations.
+
 ### `src/cli`
 
 - Is a thin Node composition and file-I/O boundary.
@@ -78,11 +94,91 @@ Keep these representations distinct:
 Use the engineering vocabulary `Component`, `Port`, and `Connection`, qualified
 in code where needed. Do not export an ambiguous bare `Component` class.
 
+### Components, connections, policies, and roles
+
+These terms describe separate responsibilities:
+
+| Abstraction | Responsibility |
+| --- | --- |
+| Component | Owns its physical equations, state, capabilities, feasibility checks, and public ports. |
+| Physical port | Declares a physical exchange, its flow type, permitted direction, and the boundary data needed to resolve it. |
+| Physical connection | Couples two compatible physical ports. Their actual flows must agree, including reference direction; the connection transfers no unaccounted energy or material. |
+| Information port | Declares a named value with a quantity, unit, and defined availability in the calculation. |
+| Information connection | Copies a published value to a declared input. It transfers no energy or material and may connect physically non-adjacent components. |
+| Operating policy | Chooses its component's requested operation from explicitly connected information inputs and fixed settings. |
+| Balancing role | Explicit configuration assigning which physical boundary accepts the remainder required by conservation. It makes no operating decision. |
+
+A policy chooses a request. Component equations determine feasible and actual
+operation. A balancing role identifies which boundary the physical calculation
+determines. One port must not have both an independent policy target and a
+balancing requirement for the same flow field in the same timestep.
+
+Physical connections also provide **boundary data**: the capabilities,
+prescriptions, targets, and settled flows required by the connected components'
+physical equations. These data belong to the declared physical port contract.
+Their calculation direction need not match the connection's reference
+orientation or the direction of energy flow. A physical connection is not a
+general channel for reading another component's state or settings.
+
+For each external value, classify its use, not just its quantity:
+
+- Resolving a physical exchange uses the boundary data of the component's
+  connected physical ports. A junction can combine its own terminal data through
+  its equation; it cannot inspect unrelated equipment.
+- Choosing a requested operation uses an explicit information input to the
+  policy, even when the source is the controlled component itself or a physical
+  neighbour. Physical connectivity does not grant a policy access to that data.
+- Component-owned prescribed profiles remain inputs to that component's
+  equation. A policy that needs a schedule receives it through an information
+  connection from a named schedule source.
+
+For example, a heat-transfer component reads the two connected boundary
+temperatures to calculate heat flow. A heating policy reads a temperature
+through an information connection to decide how much heat to request. The
+temperature may be numerically identical in both cases; the two uses have
+different contracts.
+
+The PV example makes the separation explicit:
+
+1. PV and load publish generation and demand directly to the battery's policy
+   inputs. The policy requests `demand - generation`.
+2. The battery applies its own power and stored-energy limits.
+3. The bus applies conservation to its settled physical terminal flows and
+   determines the required grid exchange.
+4. The grid, assigned the balancing role, accepts that exchange if its limits
+   permit it. Otherwise the physical calculation reports infeasibility; no
+   hidden policy redispatches the other components.
+
+The bus-to-grid requirement is therefore physical boundary data. It needs no
+additional information connection. A grid policy choosing operation from, for
+example, a price signal would require an explicit information input and a
+different valid assignment of the remaining physical degrees of freedom.
+
+Information connections do not imply an event bus or arbitrary evaluation order.
+The current runtime evaluates them before policy requests, using current
+profiles and start-of-step state/capabilities. The grid remainder is available
+only after battery resolution. Exposing it to a policy would require an
+explicitly supported later stage or delay; adding a dashed connection alone
+cannot make it available earlier. Same-step cycles are rejected.
+
+**Current implementation boundaries.** `electrical.balance` currently stores
+the balancing role in the policy field. The inspector distinguishes it in a
+Role tab and a Physical role explanation, and groups role choices separately
+from operating policies. The persisted encoding remains a mismatch with the
+definitions above, not a zero-input operating policy. Separating role storage
+and registration requires a model/API migration that has not yet been
+implemented. Policy functions already receive only connected values and
+settings. Physical resolution still exposes ID-based lookup helpers and runtime
+endpoint objects; these should be narrowed to declared, connection-local
+boundary access. Existing helper availability is not permission for new code to
+read arbitrary model data.
+
 A component step follows one direction:
 
 ```text
 component constraints and capabilities
--> policy targets, priorities, and operating roles
+-> checked information-dependency plan and named input values
+-> component policy targets, with configured balancing roles
 -> component capabilities refined for those targets
 -> checked resolution-dependency plan
 -> component resolution of feasible and actual operation
@@ -91,16 +187,19 @@ component constraints and capabilities
 ```
 
 Requested, feasible, and actual operation must never be conflated. A policy
-receives a read-only snapshot of current component constraints so it can choose
-targets, priorities, schedules, and explicit balancing roles without
-duplicating component equations. Each component definition resolves its own
+receives only its explicitly connected information inputs and its
+configured settings. It has no access to the model, scenario, clock, global
+state, component objects, or a global capability map. Even its own component
+capabilities must arrive through information connections. Each component
+definition resolves its own
 physical feasibility and produces its actual port behaviour. The runtime
 coordinates these calls but does not clamp operation using knowledge of a
 component's physics.
 
 Every component publishes its current capabilities through
-`getOperatingLimits`. The runtime calls it once for the policy's read-only
-snapshot and again with the component's chosen target as a third argument,
+`getOperatingLimits`. The runtime calls it once for current boundary capabilities
+and component-owned information outputs and again with the component's chosen
+target as a third argument,
 before preparing the resolution plan. This is one deterministic refinement,
 not an iterative solve. The component owns how its target affects its coupled
 capabilities. A material store reserves the feasible current-step withdrawal
@@ -111,7 +210,8 @@ targets and settled connection flows required before resolution, plus the
 connection flows it alone determines. This is dependency metadata, not a
 second implementation of the component equation.
 
-After current-step capabilities and policy roles are known, the runtime checks
+After current-step capabilities, policy targets, and configured roles are known,
+the runtime checks
 those declarations, derives an acyclic sequence of resolution stages, and
 executes components in that order. It rejects missing or conflicting flow
 determiners, absent prerequisites, and same-step cycles before resolving
@@ -165,6 +265,65 @@ user chooses the components, connections, and policy; component and flow-type
 contracts provide the boundary semantics. The user does not manually assign
 `target`, `variable`, and `max` states to every connection endpoint.
 
+### Component policies and information connections
+
+A `ModelComponent` may persist `policy: { type, settings }`. Reusable policy
+functions are registered at the application boundary through
+`createComponentRegistry(definitions, { policies })`. Each definition declares
+compatible component types, required physical ports, typed named inputs,
+settings, a simple description and equations. `request(inputs, settings)`
+returns only the owning component's target. The current `electrical.balance`
+registration is the role-encoding exception described above: it returns no
+target, and the owning component participates in the physical balance.
+
+Physical connections retain their existing meaning. The model separately
+stores `informationConnections`, each with identity, name, and `from`/`to`
+references to named information ports. A component definition's `information`
+section owns its public `inputs` and `outputs`. Policy input ports are named
+`policy.<input-id>` on the controlled component. Information types declare both
+quantity and unit: active power and heat rate are distinct even though both
+use kW. Inputs accept one source unless explicitly declared many; outputs may
+feed multiple consumers. Copying information transfers no energy or material.
+
+Named `informationSources` bind scenario series to schedule outputs. A value
+schedule publishes its typed value and an always-enabled permission. A period
+schedule declares an integer `activeValue` and publishes permission and time
+remaining in the contiguous matching period. Only the schedule source reads
+future schedule entries. Its policy consumers receive scalar input values.
+These sources are scenario boundaries shown as labelled input cards in the
+viewer; they are not physical equipment or energy components.
+
+All information in this slice is available before policy requests: current
+scenario inputs, start-of-step state/capabilities, and derived information
+outputs. The runtime checks the information graph and evaluates it in dependency
+order. An output reader receives only its own state, parameters, capabilities
+and connected information inputs. It never receives other components or a
+model-wide lookup. Same-step information cycles, missing inputs, invalid
+references, incompatible quantities/units and duplicate input sources fail
+explicitly. Reading one's own start-of-step state into a policy input is valid.
+Current-step settled flows, policy outputs and next states are not information
+sources in this version. There is no implicit previous-step delay or event bus.
+
+In the PV example, solar generation and load demand connect directly to the
+battery's policy inputs. Both are non-negative powers. The policy requests
+demand minus generation; the battery resolves its own feasibility, then the
+physical bus and grid balance the remainder. Information connections need not
+follow the physical route through the bus. Additional controlled equipment
+requires explicit input wiring and an appropriate calculation order.
+The thermal example explicitly connects requested heat demand across the store
+to the heater policy. Schedule-following heat and discharge policies each take
+one rate input; zero means off. They require no separate permission or process
+mode. In the temperature-led ladle, the Heating period source supplies time
+remaining, with zero outside the period. That one input defines when heating
+can occur and its deadline; the policy calculates the requested heating power.
+Process-mode codes remain in the source configuration, outside policy code.
+
+The viewer shows physical connections normally, selected component information
+inputs and their upstream dependencies on selection, or all information
+connections via a toggle. The inspector lists input sources and can trace them
+in the viewer. Policy edits update the model atomically with their settings and
+connections, validate and run before application, and survive save/reopen.
+
 ### Flow types and connections
 
 A small central `FlowType` contract owns the exact fields, units, and boundary
@@ -178,7 +337,7 @@ Keep ownership precise:
 
 | Owner | Stored contract |
 | --- | --- |
-| `ModelComponent` | Identity, definition version, parameter values, and initial state |
+| `ModelComponent` | Identity, definition version, parameters, initial state, and optional policy assignment |
 | `ComponentDefinition` | Ports, parameter/state/output specifications, equations, validation, and editor metadata |
 | Port | `{ id, flowType, direction, cardinality? }`, where direction is `in`, `out`, or `bidirectional`, and cardinality is `one` by default or explicitly `many` |
 | Persisted connection | Identity, name, and `from`/`to` component-port references only |
@@ -314,19 +473,21 @@ grid -> electric heater -> thermal store (hot-water instance) -> heat demand
 ```
 
 The grid, heater, store, heat-transfer, demand, and constant-temperature
-components own their respective equations. The policy chooses operational targets and
-explicitly identifies the grid as the balancing component. The runtime orders
-the component
-calculations and transfers their typed port flows; it must not use a whole-model
+components own their respective equations. Policies choose operational targets;
+the model explicitly assigns the grid the balancing role. The runtime orders
+the component calculations and transfers their typed port flows; it must not use a whole-model
 coupled resolver. Thermal branching requires a visible junction component with
 an explicit component-owned allocation or mixing contract; it is not inferred
 from component order.
 
 A fixed component reports equal minimum and maximum operating power and needs
 no policy target. A component with variable limits requires an explicit policy
-target unless the policy nominates it as the balancing component. A topology
-with no residual balancing operation explicitly uses
-`balancingComponentId: null`; it does not nominate an unrelated component.
+target unless it is assigned the balancing role. Currently that role is encoded
+as an `electrical.balance` policy assignment. The runtime derives its internal
+`balancingComponentId` from
+that assignment, or uses null when none is assigned. This slice supports one
+electrical balancing role per model; multiple independent networks require an
+explicit extension of the physical resolution contract.
 Where residual balancing is required, the balancing component must be visible,
 connected to the operation it balances, and physically able to accept it.
 Where a branching electrical bus is
@@ -338,12 +499,12 @@ model; negative grid power exports it.
 The public Push 2 ladle cycle uses the same component contracts:
 
 ```text
-Fuel burner -> Refractory lining
-Molten-metal arrival -> Molten metal -> Casting process
+Fuel burner -> Ladle lining
+Molten-metal arrival -> Metal in ladle -> Casting process
                          |       |
                          |       +-> Heat transfer -> Ambient
-                         +-> Heat transfer -> Refractory lining
-Refractory lining -> Heat transfer -> Ambient
+                         +-> Heat transfer -> Ladle lining
+Ladle lining -> Heat transfer -> Ambient
 ```
 
 The refractory lining and molten metal are separate `thermal.store` instances.
@@ -405,8 +566,10 @@ language.
 - Is every governing equation and physical constraint owned by its visible
   component definition?
 - Does the runtime avoid component-type branches and model-specific physics?
-- Are balancing components and other operational roles chosen explicitly by
-  policy?
+- Are balancing roles configured explicitly and distinguished from operating
+  policies?
+- Does physical resolution use only declared boundary data from connected ports,
+  while every runtime policy input arrives through an information connection?
 - Does each connection field have exactly one clear determination path, with
   endpoint capabilities treated as feasibility rather than competing actual
   values?

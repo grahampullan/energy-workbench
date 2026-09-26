@@ -5,7 +5,7 @@ import { fuelBurnerDefinition } from
   "../../src/components/thermal/fuel-burner.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function fixture({ efficiency = 0.8 } = {}) {
@@ -17,6 +17,7 @@ function fixture({ efficiency = 0.8 } = {}) {
       components: [
         {
           id: "burner",
+          policy: { type: "thermal.follow-schedule", settings: {} },
           type: fuelBurnerDefinition.type,
           definitionVersion: fuelBurnerDefinition.version,
           name: "Burner",
@@ -45,6 +46,10 @@ function fixture({ efficiency = 0.8 } = {}) {
           initialState: { massKg: 1000, containedEnthalpykWh: 50 }
         }
       ],
+      informationSources: [{ id: "heat-schedule", name: "Heat schedule", seriesId: "heat", quantity: "heat-rate", unit: "kW" }],
+      informationConnections: [
+        { id: "info-heat", name: "Heat", from: { sourceId: "heat-schedule", portId: "value" }, to: { componentId: "burner", portId: "policy.request" } }
+      ],
       connections: [{
         id: "burner-to-body",
         name: "Burner to body",
@@ -57,20 +62,12 @@ function fixture({ efficiency = 0.8 } = {}) {
       id: "scenario.fuel-burner-test",
       name: "Fuel burner test",
       time: { timeStepSeconds: 3600, stepCount: 1 },
-      series: []
+      series: [{ id: "heat", name: "Heat", unit: "kW", data: { kind: "inline", values: [60] } }]
     },
     registry: createComponentRegistry([
       fuelBurnerDefinition,
       thermalStoreDefinition
-    ]),
-    policy: {
-      request() {
-        return {
-          targets: { burner: { heatOutputkW: 60 } },
-          balancingComponentId: null
-        };
-      }
-    }
+    ])
   };
 }
 

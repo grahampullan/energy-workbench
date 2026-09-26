@@ -149,6 +149,54 @@ function assertPorts(ports, definitionType) {
   }
 }
 
+function assertInformationPort(port, label) {
+  assertRecord(port, label);
+  assertStableId(port.quantity, `${label}.quantity`);
+  if (typeof port.unit !== "string" || !port.unit.length) {
+    throw new TypeError(`${label}.unit is required`);
+  }
+  if (typeof port.label !== "string" || !port.label.length) {
+    throw new TypeError(`${label}.label is required`);
+  }
+  if (port.cardinality !== undefined && !PORT_CARDINALITIES.has(port.cardinality)) {
+    throw new TypeError(`${label}.cardinality is invalid`);
+  }
+}
+
+function assertPolicyDefinition(policy) {
+  assertRecord(policy, "Policy definition");
+  assertStableId(policy.type, "Policy type");
+  if (typeof policy.name !== "string" || !policy.name.length) {
+    throw new TypeError(`${policy.type}.name is required`);
+  }
+  assertRecord(policy.inputs, `${policy.type}.inputs`);
+  assertRecord(policy.settings, `${policy.type}.settings`);
+  assertFunction(policy.request, `${policy.type}.request`);
+  if (!Array.isArray(policy.componentTypes) || !policy.componentTypes.length) {
+    throw new TypeError(`${policy.type} must declare compatible component types`);
+  }
+  policy.componentTypes.forEach((type) => assertStableId(type, "Policy component type"));
+  for (const [id, port] of Object.entries(policy.inputs)) {
+    assertStableId(id, `${policy.type} input`);
+    assertInformationPort(port, `${policy.type}.${id}`);
+  }
+  for (const [id, spec] of Object.entries(policy.settings)) {
+    assertStableId(id, `${policy.type} setting`);
+    assertRecord(spec, `${policy.type}.${id}`);
+    assertJsonValue(spec.default, `${policy.type}.${id}.default`);
+    if (spec.choices && (!Array.isArray(spec.choices) || !spec.choices.some(({ value }) => value === spec.default))) {
+      throw new TypeError(`${policy.type}.${id} choices must include the default`);
+    }
+  }
+  if (policy.requiredPorts !== undefined) {
+    if (!Array.isArray(policy.requiredPorts)) throw new TypeError(`${policy.type}.requiredPorts must be an array`);
+    policy.requiredPorts.forEach((id) => assertStableId(id, "Policy physical port"));
+  }
+  if (policy.role !== undefined && policy.role !== "electrical-balance") {
+    throw new TypeError(`${policy.type}.role is not supported`);
+  }
+}
+
 function assertOutputs(outputs, definitionType) {
   for (const [output, specification] of Object.entries(outputs)) {
     assertFieldName(output, `${definitionType} output`);
@@ -164,13 +212,19 @@ function assertResolution(resolution, definitionType) {
   assertFunction(resolution.describe, `${definitionType}.resolution.describe`);
 }
 
-function assertEditor(editor, definitionType) {
+function assertEditor(editor, definitionType, outputs) {
   assertRecord(editor, `${definitionType}.editor`);
   if (
     editor.visualRole !== undefined &&
     !EDITOR_VISUAL_ROLES.has(editor.visualRole)
   ) {
     throw new TypeError(`${definitionType}.editor.visualRole is invalid`);
+  }
+  if (editor.summaryDetails !== undefined && (
+    !Array.isArray(editor.summaryDetails) ||
+    editor.summaryDetails.some((id) => typeof id !== "string" || !Object.hasOwn(outputs, id))
+  )) {
+    throw new TypeError(`${definitionType}.editor.summaryDetails must reference declared outputs`);
   }
 }
 
@@ -189,9 +243,18 @@ function assertComponentDefinition(definition) {
   assertRecord(definition.initialState, `${definition.type}.initialState`);
   assertInitialStateSpecifications(definition.initialState, definition.type);
   assertPorts(definition.ports, definition.type);
+  if (definition.information) {
+    for (const direction of ["inputs", "outputs"]) {
+      for (const [id, port] of Object.entries(definition.information[direction] ?? {})) {
+        assertStableId(id, `${definition.type} information port`);
+        assertInformationPort(port, `${definition.type}.${id}`);
+        if (direction === "outputs") assertFunction(port.read, `${definition.type}.${id}.read`);
+      }
+    }
+  }
   assertRecord(definition.outputs, `${definition.type}.outputs`);
   assertOutputs(definition.outputs, definition.type);
-  assertEditor(definition.editor, definition.type);
+  assertEditor(definition.editor, definition.type, definition.outputs);
   assertFunction(definition.validate, `${definition.type}.validate`);
   assertResolution(definition.resolution, definition.type);
   assertRecord(definition.model, `${definition.type}.model`);
@@ -206,11 +269,17 @@ function definitionKey(type, version) {
   return `${type}@${version}`;
 }
 
-export function createComponentRegistry(definitions = []) {
+export function createComponentRegistry(definitions = [], { policies = [] } = {}) {
   if (!Array.isArray(definitions)) {
     throw new TypeError("Component definitions must be an array");
   }
 
+  const policiesByType = new Map();
+  for (const policy of policies) {
+    assertPolicyDefinition(policy);
+    if (policiesByType.has(policy.type)) throw new Error(`Duplicate policy: ${policy.type}`);
+    policiesByType.set(policy.type, policy);
+  }
   const definitionsByKey = new Map();
 
   function register(definition) {
@@ -246,5 +315,8 @@ export function createComponentRegistry(definitions = []) {
     register(definition);
   }
 
-  return Object.freeze({ register, get, has, hasType, list });
+  return Object.freeze({ register, get, has, hasType, list,
+    getPolicy: (type) => policiesByType.get(type),
+    listPolicies: () => [...policiesByType.values()]
+  });
 }

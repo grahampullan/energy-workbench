@@ -67,6 +67,21 @@ export const constantTemperatureDefinition = {
   type: "thermal.constant-temperature",
   version: "0.1.0",
   name: "Constant temperature",
+  explanation: {
+    title: "Prescribed temperature boundary",
+    summary: "The boundary temperature follows the scenario and is unaffected by the heat it receives.",
+    equations: [
+      { label: "Boundary temperature", tex: String.raw`T(t)=T_{\mathrm{profile}}(t)` },
+      { label: "Received heat", tex: String.raw`\dot Q_{\mathrm{received}}=\sum_j\dot Q_j` }
+    ],
+    symbols: [
+      { tex: String.raw`T,\ T_{\mathrm{profile}}`, description: "Boundary and prescribed temperature", unit: "°C" },
+      { tex: String.raw`\dot Q_j`, description: "Incoming heat-transfer rate on connection j", unit: "kW" },
+      { tex: String.raw`\dot Q_{\mathrm{received}}`, description: "Total received heat-transfer rate", unit: "kW" },
+      { tex: "t", description: "Simulation time", unit: "s" }
+    ],
+    notes: ["Temperature is fixed within each timestep and may vary between timesteps. This represents an infinite thermal reservoir; it has no finite energy-storage state."]
+  },
 
   parameters: {
     temperatureSeriesId: {

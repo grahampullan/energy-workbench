@@ -25,6 +25,26 @@ export const electricHeaterDefinition = {
   type: "thermal.electric-heater",
   version: "0.2.0",
   name: "Electric heater",
+  information: {
+    outputs: {
+      "efficiency": { label: "Heater efficiency", quantity: "efficiency", unit: "1", read: ({ limits }) => limits.heatOutputPerElectricalInput }
+    }
+  },
+
+  explanation: {
+    title: "Electricity-to-heat conversion",
+    summary: "Electrical consumption follows accepted heat output through a constant conversion efficiency.",
+    equations: [
+      { label: "Conversion", tex: String.raw`\dot Q=\eta P_{\mathrm{input}}` },
+      { label: "Input limit", tex: String.raw`0\leq P_{\mathrm{input}}\leq P_{\mathrm{input,max}}` }
+    ],
+    symbols: [
+      { tex: String.raw`\dot Q`, description: "Actual heat output", unit: "kW" },
+      { tex: String.raw`P_{\mathrm{input}},P_{\mathrm{input,max}}`, description: "Actual and maximum electrical consumption", unit: "kW" },
+      { tex: String.raw`\eta`, description: "Conversion efficiency", unit: "1" }
+    ],
+    notes: ["The policy requests signed electrical power: consumption is negative. The receiving store reconciles the heat request against its temperature and input limits.", "Heat-supply temperature and efficiency are fixed parameters. The heater has no thermal storage or startup delay."]
+  },
 
   parameters: {
     maximumElectricalInputPowerkW: {
@@ -63,13 +83,14 @@ export const electricHeaterDefinition = {
   ],
 
   outputs: {
-    electricalInputPowerkW: { unit: "kW" },
+    electricalInputPowerkW: { unit: "kW", label: "Electrical input" },
     heatOutputkW: { unit: "kW" },
     supplyTemperatureC: { unit: "°C" }
   },
 
   editor: {
     visualRole: "equipment",
+    summaryOutput: "electricalInputPowerkW",
     groups: [
       {
         id: "rating",

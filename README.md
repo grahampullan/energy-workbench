@@ -41,11 +41,26 @@ flows, a definition-driven component inspector, run KPIs, linked power- and
 mass-flow charts, integrated-energy results, component temperature charts, and
 timestep scrubbing. Scenario inputs are hidden by default and can be overlaid
 with **Show scenario inputs**; temperature requirement lines remain visible.
+The inspector's **Equations** view shows each component's governing
+equations, symbols, and units, together with its relevant
+active-policy rules. The **Policy** view shows the selected rule and the source
+of every input, with controls to choose a compatible policy, settings and input
+connections. Changes are validated and run before they update the working model.
+For a balancing component, such as the PV example's grid, a **Role** tab shows
+its physical role and the connected source of its power requirement. Its role
+is also shown separately from policy rules in **Equations** and from operating
+policies in the operation selector.
+Selecting a component reveals its information inputs as dashed arrows;
+**Show information connections** reveals the full information layer. Schedule
+sources appear as named cards. Input buttons trace their sources in the viewer.
+These static explanations remain unchanged during
+timestep scrubbing. KaTeX, its styles, and its fonts are bundled locally.
 Numeric parameter controls create temporary preview runs which can be reset or
 applied to the in-memory working model.
 Components can also be moved and resized as temporary layout changes;
 reloading restores the saved layout. The applied working model can be
-downloaded and opened again as JSON, while a completed preview can be
+downloaded and opened again as JSON, including its policies and information
+connections, while a completed preview can be
 downloaded separately as a named parameter variant.
 
 ## Development

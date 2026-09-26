@@ -438,6 +438,47 @@ export const thermalStoreDefinition = {
   type: "thermal.store",
   version: "0.2.0",
   name: "Thermal store",
+  information: {
+    outputs: {
+      "temperature": { label: "Temperature", quantity: "temperature", unit: "°C", read: ({ limits }) => limits.temperatureC },
+      "heat-capacity": { label: "Heat capacity", quantity: "thermal-capacity", unit: "kWh/K", read: ({ limits }) => limits.thermalCapacitykWhPerK },
+      "required-temperature": { label: "Required temperature", quantity: "temperature", unit: "°C", read: ({ limits }) => limits.minimumUsefulTemperatureC },
+      "maximum-temperature": { label: "Maximum temperature", quantity: "temperature", unit: "°C", read: ({ limits }) => limits.maximumTemperatureC }
+    }
+  },
+
+  explanation: {
+    title: "Mass and enthalpy storage",
+    summary: "A well-mixed thermal body stores mass and enthalpy. Material carries its specific enthalpy across the boundary; heat transfer changes stored enthalpy without transferring mass.",
+    equations: [
+      { label: "Mass balance", tex: String.raw`m_{n+1}=m_n+(\dot m_{\mathrm{in}}-\dot m_{\mathrm{out}})\Delta t` },
+      { label: "Enthalpy balance", tex: String.raw`\begin{aligned}H_{n+1}&=H_n+\dot H_{\mathrm{net}}\Delta t\\\dot H_{\mathrm{net}}&=\dot m_{\mathrm{in}}h_{\mathrm{in}}-\dot m_{\mathrm{out}}h_{\mathrm{out}}\\&\quad+\dot Q_{\mathrm{in}}-\dot Q_{\mathrm{out}}\end{aligned}` },
+      { label: "Temperature and outgoing material", tex: String.raw`\begin{aligned}T_n&=T_{\mathrm{ref}}+\frac{H_n}{m_n c_p}\\h_{\mathrm{out}}&=\frac{H_n}{m_n}\qquad(m_n>0)\end{aligned}` },
+      { label: "Inventory-limited discharge", tex: String.raw`\dot m_{\mathrm{out}}=\min\!\left(\dot m_{\mathrm{requested}},\frac{m_n}{\Delta t}\right)` },
+      { label: "Capacity available for heat exchange", tex: String.raw`\begin{aligned}m_{\mathrm{remaining}}&=m_n-\dot m_{\mathrm{out}}\Delta t\\C_{\mathrm{remaining}}&=m_{\mathrm{remaining}}c_p\end{aligned}` }
+    ],
+    symbols: [
+      { tex: "n", description: "Timestep index; n denotes the start and n+1 the end", unit: "" },
+      { tex: "m", description: "Contained mass", unit: "kg" },
+      { tex: "H", description: "Contained enthalpy relative to the reference temperature", unit: "kJ" },
+      { tex: String.raw`\dot H_{\mathrm{net}}`, description: "Net rate of enthalpy entering the store", unit: "kW" },
+      { tex: String.raw`\dot m`, description: "Material mass-flow rate; subscripts identify inflow, outflow, or policy request", unit: "kg/s" },
+      { tex: "h", description: "Specific enthalpy of the incoming or outgoing material", unit: "kJ/kg" },
+      { tex: String.raw`\dot Q`, description: "Total heat-transfer rate, including active and passive connections", unit: "kW" },
+      { tex: String.raw`T,\ T_{\mathrm{ref}}`, description: "Store temperature and enthalpy-reference temperature", unit: "°C" },
+      { tex: "c_p", description: "Constant specific heat capacity", unit: "kJ/(kg K)" },
+      { tex: "C", description: "Thermal capacity", unit: "kJ/K" },
+      { tex: String.raw`\Delta t`, description: "Timestep duration", unit: "s" }
+    ],
+    notes: [
+      "Temperature is uniform and specific heat is constant. Phase changes and spatial temperature gradients are not represented.",
+      "The update is explicit: current state determines outgoing specific enthalpy and temperature. Incoming material becomes available for withdrawal on the next timestep.",
+      "Current-step discharge reserves inventory before passive heat exchange. The heat-transfer components use the remaining thermal capacity.",
+      "Disconnected material ports have zero flow, giving a fixed-mass body. An empty store has zero enthalpy, zero outgoing specific enthalpy, and its reference temperature.",
+      "Active heating is limited by input power, maximum store temperature, and heat-supply temperature. Useful heat output is limited by output power and energy above the minimum useful temperature.",
+      "Mass must remain within capacity. Material below the minimum useful temperature is discharged with a warning; that temperature requirement does not stop tapping."
+    ]
+  },
 
   parameters: {
     maximumMassKg: {

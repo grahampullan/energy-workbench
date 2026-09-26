@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { prepareRuntimeModel } from "../../src/runtime/prepare-runtime-model.js";
 import { createTestComponentDefinition } from "../helpers/component-definition.js";
 

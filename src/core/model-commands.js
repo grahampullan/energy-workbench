@@ -5,6 +5,7 @@ import { createDiagnostic } from "./validation/validation-result.js";
 
 const commandHandlers = new Map([
   ["setParameter", setParameter],
+  ["setComponentPolicy", setComponentPolicy],
   ["unsetParameter", unsetParameter],
   ["addComponent", addComponent],
   ["removeComponent", removeComponent],
@@ -227,7 +228,7 @@ function removeComponent(model, command) {
     return { diagnostics };
   }
 
-  const incidentConnections = model.connections.filter((connection) =>
+  const incidentConnections = [...model.connections, ...(model.informationConnections ?? [])].filter((connection) =>
     connection.from.componentId === componentId || connection.to.componentId === componentId
   );
   if (incidentConnections.length > 0) {
@@ -312,6 +313,40 @@ function disconnectPorts(model, command) {
     },
     diagnostics
   };
+}
+
+function setComponentPolicy(model, command) {
+  const diagnostics = [];
+  const found = findComponent(model, command.componentId, diagnostics);
+  if (!found) return { diagnostics };
+  if (!isRecord(command.policy) || !Array.isArray(command.informationConnections) || !Array.isArray(command.informationSources)) {
+    return { diagnostics: [commandError("command.invalid-policy", "Policy, information connections and schedule sources are required")] };
+  }
+  if (command.informationConnections.some(({ to }) => to?.componentId !== command.componentId || !to.portId?.startsWith("policy."))) {
+    return { diagnostics: [commandError("command.invalid-policy", "Policy inputs must belong to the selected component")] };
+  }
+  const owns = ({ to }) => to.componentId === command.componentId && to.portId.startsWith("policy.");
+  const candidate = cloneJsonValue(model);
+  const component = candidate.components[found.componentIndex];
+  const inverseCommand = {
+    type: "setComponentPolicy", componentId: command.componentId,
+    policy: component.policy ?? {},
+    informationConnections: (model.informationConnections ?? []).filter(owns),
+    informationSources: model.informationSources ?? [],
+    connectionOrder: (model.informationConnections ?? []).map(({ id }) => id)
+  };
+  if (Object.keys(command.policy).length) component.policy = cloneJsonValue(command.policy);
+  else delete component.policy;
+  candidate.informationConnections = [
+    ...(candidate.informationConnections ?? []).filter((connection) => !owns(connection)),
+    ...cloneJsonValue(command.informationConnections)
+  ];
+  if (command.connectionOrder) {
+    const positions = new Map(command.connectionOrder.map((id, index) => [id, index]));
+    candidate.informationConnections.sort((a, b) => (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity));
+  }
+  candidate.informationSources = cloneJsonValue(command.informationSources);
+  return { candidate, inverseCommand, diagnostics };
 }
 
 /**

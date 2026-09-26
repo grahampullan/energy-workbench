@@ -1,3 +1,6 @@
+import { applyModelCommand } from "../core/model-commands.js";
+import { policyDefinitions } from "../policies/definitions.js";
+import "katex/dist/katex.css";
 import { electricalBatteryDefinition } from "../components/electrical/battery.js";
 import { electricalBusDefinition } from "../components/electrical/bus.js";
 import { electricalGridDefinition } from "../components/electrical/grid.js";
@@ -15,12 +18,6 @@ import { heatTransferDefinition } from "../components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from "../components/thermal/store.js";
 import { createComponentRegistry } from "../core/component-registry.js";
 import { validateVariant } from "../core/validation/validate-documents.js";
-import { createHeatDemandFollowingPolicy } from "../policies/heat-demand-following.js";
-import { createPvBatterySelfConsumptionPolicy } from "../policies/pv-battery-self-consumption.js";
-import { createScheduledHeatingPolicy } from "../policies/scheduled-heating.js";
-import { createScheduledMaterialInventoryPolicy } from
-  "../policies/scheduled-material-inventory.js";
-import { createLadleCyclePolicy } from "../policies/ladle-cycle.js";
 import { runScenario } from "../runtime/run-scenario.js";
 import { createTopologyBoard } from "./board-box-adapter.js";
 import { createComponentInspector } from "./component-inspector.js";
@@ -51,98 +48,12 @@ import {
 
 const DEFAULT_EXAMPLE_ID = "blog-electrical";
 const EXAMPLES = Object.freeze({
-  "blog-electrical": Object.freeze({
-    label: "PV and battery",
-    root: "/examples/blog-electrical",
-    initialComponentType: "electrical.battery",
-    createKpis: createElectricalRunKpis,
-    createPolicy(model) {
-      return createPvBatterySelfConsumptionPolicy({
-        batteryComponentId: componentIdForType(model, "electrical.battery"),
-        balancingComponentId: componentIdForType(model, "electrical.grid")
-      });
-    }
-  }),
-  "coupled-thermal": Object.freeze({
-    label: "Coupled thermal",
-    root: "/examples/coupled-thermal",
-    initialComponentType: "thermal.store",
-    createKpis: createCoupledThermalRunKpis,
-    createPolicy(model) {
-      return createHeatDemandFollowingPolicy({
-        heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
-        demandComponentId: componentIdForType(model, "thermal.heat-demand"),
-        balancingComponentId: componentIdForType(model, "electrical.grid")
-      });
-    }
-  }),
-  "batch-heating-synthetic": Object.freeze({
-    label: "Batch heating",
-    root: "/examples/batch-heating-synthetic",
-    initialComponentType: "thermal.store",
-    createKpis: createBatchHeatingRunKpis,
-    createPolicy(model) {
-      return createScheduledHeatingPolicy({
-        heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
-        powerSeriesId: "heater-input-power",
-        balancingComponentId: componentIdForType(model, "electrical.grid")
-      });
-    }
-  }),
-  "material-inventory-synthetic": Object.freeze({
-    label: "Material inventory",
-    root: "/examples/material-inventory-synthetic",
-    initialComponentType: "thermal.store",
-    createKpis: createMaterialInventoryRunKpis,
-    createPolicy(model) {
-      return createScheduledMaterialInventoryPolicy({
-        heaterComponentId: componentIdForType(model, "thermal.electric-heater"),
-        powerSeriesId: "heater-input-power",
-        inventoryComponentId: componentIdForType(
-          model,
-          "thermal.store"
-        ),
-        outflowSeriesId: "material-outflow",
-        balancingComponentId: componentIdForType(model, "electrical.grid")
-      });
-    }
-  }),
-  "ladle-cycle-historical": Object.freeze({
-    label: "Ladle · historical",
-    root: "/examples/ladle-cycle-synthetic",
-    initialComponentId: "refractory",
-    createKpis: createLadleRunKpis,
-    createPolicy() {
-      return createLadleCyclePolicy({
-        burnerComponentId: "burner",
-        refractoryComponentId: "refractory",
-        inventoryComponentId: "metal",
-        modeSeriesId: "process-mode",
-        historicalHeatOutputSeriesId: "historical-burner-output",
-        outflowSeriesId: "material-outflow",
-        strategy: "historical",
-        operatingMarginK: 10
-      });
-    }
-  }),
-  "ladle-cycle-minimum-fuel": Object.freeze({
-    label: "Ladle · temperature-led",
-    root: "/examples/ladle-cycle-synthetic",
-    initialComponentId: "refractory",
-    createKpis: createLadleRunKpis,
-    createPolicy() {
-      return createLadleCyclePolicy({
-        burnerComponentId: "burner",
-        refractoryComponentId: "refractory",
-        inventoryComponentId: "metal",
-        modeSeriesId: "process-mode",
-        historicalHeatOutputSeriesId: "historical-burner-output",
-        outflowSeriesId: "material-outflow",
-        strategy: "minimum-fuel",
-        operatingMarginK: 10
-      });
-    }
-  })
+  "blog-electrical": { label: "PV and battery", root: "/examples/blog-electrical", initialComponentType: "electrical.battery", createKpis: createElectricalRunKpis },
+  "coupled-thermal": { label: "Coupled thermal", root: "/examples/coupled-thermal", initialComponentType: "thermal.store", createKpis: createCoupledThermalRunKpis },
+  "batch-heating-synthetic": { label: "Batch heating", root: "/examples/batch-heating-synthetic", initialComponentType: "thermal.store", createKpis: createBatchHeatingRunKpis },
+  "material-inventory-synthetic": { label: "Material inventory", root: "/examples/material-inventory-synthetic", initialComponentType: "thermal.store", createKpis: createMaterialInventoryRunKpis },
+  "ladle-cycle-historical": { label: "Ladle · historical", root: "/examples/ladle-cycle-synthetic", initialComponentId: "refractory", createKpis: createLadleRunKpis },
+  "ladle-cycle-minimum-fuel": { label: "Ladle · temperature-led", root: "/examples/ladle-cycle-synthetic", modelFile: "model-temperature-led.json", initialComponentId: "refractory", createKpis: createLadleRunKpis }
 });
 
 function componentIdForType(model, type) {
@@ -191,7 +102,7 @@ function definitionRegistry() {
     heatDemandDefinition,
     heatTransferDefinition,
     thermalStoreDefinition
-  ]);
+  ], { policies: policyDefinitions });
 }
 
 function uniqueDiagnostics(diagnostics) {
@@ -242,7 +153,7 @@ function showFatalError(error) {
 async function startWorkbench() {
   const example = selectedExample();
   const [loadedModel, scenario, layout] = await Promise.all([
-    loadJson(`${example.root}/model.json`),
+    loadJson(`${example.root}/${example.modelFile ?? "model.json"}`),
     loadJson(`${example.root}/scenario.json`),
     loadJson(`${example.root}/layout.json`)
   ]);
@@ -251,14 +162,13 @@ async function startWorkbench() {
   }
 
   const registry = definitionRegistry();
-  const policy = example.createPolicy(loadedModel);
   const initialComponentId = example.initialComponentId ?? componentIdForType(
     loadedModel,
     example.initialComponentType
   );
 
   function execute(model) {
-    const run = runScenario({ model, scenario, registry, policy });
+    const run = runScenario({ model, scenario, registry });
     if (!run.completed) {
       throw runtimeFailure(run);
     }
@@ -272,6 +182,9 @@ async function startWorkbench() {
   let pendingModel = null;
   let selectedComponentId = initialComponentId;
   let highlightedConnectionId = null;
+  let tracedInformationConnectionId = null;
+  let informationComponentId = null;
+  let showInformationConnections = false;
   let stepIndex = Math.floor(activeRun.results.steps.length / 2);
   let previewDiagnostics = [];
   let previewReady = false;
@@ -302,6 +215,7 @@ async function startWorkbench() {
       registry,
       results: activeRun.results,
       stepIndex,
+      scenario,
       parameterOverrides: overrideList()
     });
   }
@@ -334,7 +248,7 @@ async function startWorkbench() {
       model: chartModel,
       stepIndex,
       selectedComponentId,
-      highlightedConnectionId
+      highlightedConnectionId: view.connections.some(({ id }) => id === highlightedConnectionId) ? highlightedConnectionId : null
     });
   }
 
@@ -634,6 +548,7 @@ async function startWorkbench() {
     previewDiagnostics = run.diagnostics;
     previewReady = false;
     highlightedConnectionId = null;
+    tracedInformationConnectionId = null;
     stepIndex = Math.min(stepIndex, run.results.steps.length - 1);
     element("model-name").textContent = model.name;
     updateResultViews({ rebuildParameters: true });
@@ -679,7 +594,24 @@ async function startWorkbench() {
     onParameterInput: requestPreview,
     onReset: resetPreview,
     onApply: applyPreview,
-    onSaveVariant: savePreviewVariant
+    onSaveVariant: savePreviewVariant,
+    onTraceInformation(id) {
+      tracedInformationConnectionId = id;
+      topology.update();
+    },
+    onApplyPolicy(command) {
+      if (previewOverrides.size || schedulerState.running || schedulerState.pending) return { error: "Apply or reset parameter previews before changing operation." };
+      const changed = applyModelCommand(workingModel, { type: "setComponentPolicy", ...command }, { registry });
+      if (!changed.applied) return { error: diagnosticsMessage(changed.diagnostics) };
+      try {
+        const kind = registry.getPolicy(command.policy.type).role ? "Role" : "Policy";
+        replaceWorkingModel(changed.model, `updated ${kind.toLowerCase()}`);
+        informationComponentId = selectedComponentId;
+        topology.update();
+        setDocumentStatus(`${kind} updated; save the model to keep these changes.`);
+        return {};
+      } catch (error) { return { error: error.message }; }
+    }
   });
   resultsChart = createResultsChart({
     target: element("results-chart"),
@@ -698,14 +630,14 @@ async function startWorkbench() {
     layout,
     getView(componentId) {
       if (!componentId) {
-        return { ...view, highlightedConnectionId };
+        return { ...view, highlightedConnectionId: highlightedConnectionId ?? tracedInformationConnectionId, selectedComponentId: informationComponentId, showInformationConnections };
       }
       const component = view.components.find((candidate) => candidate.id === componentId);
       if (!component) {
         throw new Error(`View does not contain component: ${componentId}`);
       }
-      const highlightedConnection = view.connections.find(
-        (connection) => connection.id === highlightedConnectionId
+      const highlightedConnection = [...view.connections, ...view.informationConnections].find(
+        (connection) => connection.id === (highlightedConnectionId ?? tracedInformationConnectionId)
       );
       const highlighted = highlightedConnection !== undefined && (
         highlightedConnection.fromComponentId === componentId ||
@@ -719,6 +651,8 @@ async function startWorkbench() {
     },
     onSelect(componentId) {
       selectedComponentId = componentId;
+      informationComponentId = componentId;
+      tracedInformationConnectionId = null;
       topology.update();
       updateInspector();
       updateChart();
@@ -726,6 +660,10 @@ async function startWorkbench() {
     onConnectionHighlight: highlightConnection
   });
 
+  element("show-information-connections").addEventListener("change", (event) => {
+    showInformationConnections = event.target.checked;
+    topology.update();
+  });
   const modelFileInput = element("open-model-file");
   const exampleSelect = element("example-select");
   const workspace = element("workspace");

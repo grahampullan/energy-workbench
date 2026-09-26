@@ -5,7 +5,7 @@ import { constantTemperatureDefinition } from
   "../../src/components/thermal/constant-temperature.js";
 import { electricHeaterDefinition } from "../../src/components/thermal/electric-heater.js";
 import { heatDemandDefinition } from "../../src/components/thermal/heat-demand.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { prepareRuntimeModel } from "../../src/runtime/prepare-runtime-model.js";
 
 function series(id, unit, values) {

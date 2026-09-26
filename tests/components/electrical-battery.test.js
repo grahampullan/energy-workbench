@@ -4,7 +4,7 @@ import test from "node:test";
 import { electricalBatteryDefinition } from "../../src/components/electrical/battery.js";
 import { electricalBusDefinition } from "../../src/components/electrical/bus.js";
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function createBatteryFixture({
@@ -25,6 +25,7 @@ function createBatteryFixture({
       components: [
         {
           id: "grid",
+          policy: { type: "electrical.balance", settings: {} },
           type: electricalGridDefinition.type,
           definitionVersion: electricalGridDefinition.version,
           name: "Grid",
@@ -44,6 +45,7 @@ function createBatteryFixture({
         },
         {
           id: "battery",
+          policy: { type: "electrical.self-consumption", settings: {} },
           type: electricalBatteryDefinition.type,
           definitionVersion: electricalBatteryDefinition.version,
           name: "Battery",
@@ -56,6 +58,14 @@ function createBatteryFixture({
           },
           initialState: { storedEnergykWh }
         }
+      ],
+      informationSources: [
+        { id: "generation-schedule", name: "Generation schedule", seriesId: "generation", quantity: "active-power", unit: "kW" },
+        { id: "demand-schedule", name: "Demand schedule", seriesId: "demand", quantity: "active-power", unit: "kW" }
+      ],
+      informationConnections: [
+        { id: "info-generation", name: "Generation", from: { sourceId: "generation-schedule", portId: "value" }, to: { componentId: "battery", portId: "policy.generation" } },
+        { id: "info-demand", name: "Demand", from: { sourceId: "demand-schedule", portId: "value" }, to: { componentId: "battery", portId: "policy.demand" } }
       ],
       connections: [
         {
@@ -80,17 +90,10 @@ function createBatteryFixture({
         timeStepSeconds,
         stepCount: requestedPowerkW.length
       },
-      series: []
-    },
-    policy: {
-      request(runtimeModel, stepContext) {
-        return {
-          targets: {
-            battery: { powerkW: requestedPowerkW[stepContext.stepIndex] }
-          },
-          balancingComponentId: "grid"
-        };
-      }
+      series: [
+        { id: "generation", name: "Generation", unit: "kW", data: { kind: "inline", values: requestedPowerkW.map((v) => Math.max(0, -v)) } },
+        { id: "demand", name: "Demand", unit: "kW", data: { kind: "inline", values: requestedPowerkW.map((v) => Math.max(0, v)) } }
+      ]
     },
     registry: createComponentRegistry([
       electricalBatteryDefinition,

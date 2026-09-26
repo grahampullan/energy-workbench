@@ -5,7 +5,7 @@ import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function store(id, temperatureC) {
@@ -69,12 +69,6 @@ function fixture({ conductancekWPerK = 0.1, timeStepSeconds = 3600 } = {}) {
       name: "One explicit step",
       time: { timeStepSeconds, stepCount: 1 },
       series: []
-    },
-    policy: {
-      request: () => ({
-        targets: {},
-        balancingComponentId: "hot"
-      })
     },
     registry: createComponentRegistry([
       heatTransferDefinition,

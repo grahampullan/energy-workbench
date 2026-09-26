@@ -8,9 +8,7 @@ import { electricalBusDefinition } from "../../src/components/electrical/bus.js"
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
 import { electricalPvDefinition } from "../../src/components/electrical/pv.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
-import { createPvBatterySelfConsumptionPolicy } from
-  "../../src/policies/pv-battery-self-consumption.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import { createResultsChartModel } from "../../src/ui/results-chart-model.js";
 import { createElectricalRunKpis } from "../../src/ui/run-kpi-model.js";
@@ -37,10 +35,6 @@ const run = runScenario({
   model,
   scenario,
   registry,
-  policy: createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: "battery",
-    balancingComponentId: "grid"
-  })
 });
 
 test("chart model derives directional power series from canonical connection results", () => {

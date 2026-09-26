@@ -23,6 +23,23 @@ export const electricalPvDefinition = {
   type: "electrical.pv",
   version: "0.2.0",
   name: "Solar PV",
+  information: {
+    outputs: {
+      "power": { label: "Solar power", quantity: "active-power", unit: "kW", read: ({ limits }) => limits.minimumPowerkW }
+    }
+  },
+
+  explanation: {
+    title: "Prescribed solar generation",
+    summary: "Solar power as function of time.",
+    equations: [{ label: "Electrical output", tex: String.raw`P(t)=\alpha P_{\mathrm{profile}}(t)` }],
+    symbols: [
+      { tex: String.raw`P,P_{\mathrm{profile}}`, description: "Actual output and scenario generation", unit: "kW" },
+      { tex: String.raw`\alpha`, description: "Generation profile multiplier", unit: "1" },
+      { tex: "t", description: "Simulation time", unit: "s" }
+    ],
+    notes: []
+  },
 
   parameters: {
     generationSeriesId: {

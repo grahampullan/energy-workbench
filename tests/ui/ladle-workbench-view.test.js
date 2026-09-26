@@ -14,12 +14,10 @@ import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { MATERIAL_MASS_FLOW_TYPE } from "../../src/core/flow-types.js";
 import { validateLayout } from
   "../../src/core/validation/validate-documents.js";
-import { createLadleCyclePolicy } from
-  "../../src/policies/ladle-cycle.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import { createResultsChartModel } from
   "../../src/ui/results-chart-model.js";
@@ -58,22 +56,15 @@ const registry = createComponentRegistry([
   thermalStoreDefinition
 ]);
 
+const temperatureModel = await readExampleJson("model-temperature-led.json");
 function run(strategy, modelDocument = model) {
-  return runScenario({
-    model: modelDocument,
-    scenario,
-    registry,
-    policy: createLadleCyclePolicy({
-      burnerComponentId: "burner",
-      refractoryComponentId: "refractory",
-      inventoryComponentId: "metal",
-      modeSeriesId: "process-mode",
-      historicalHeatOutputSeriesId: "historical-burner-output",
-      outflowSeriesId: "material-outflow",
-      strategy,
-      operatingMarginK: 10
-    })
-  });
+  const configured = structuredClone(modelDocument);
+  if (strategy === "minimum-fuel") {
+    configured.components.find(({ id }) => id === "burner").policy = temperatureModel.components.find(({ id }) => id === "burner").policy;
+    configured.informationConnections = temperatureModel.informationConnections;
+    configured.informationSources = temperatureModel.informationSources;
+  }
+  return runScenario({ model: configured, scenario, registry });
 }
 
 const historical = run("historical");
@@ -311,4 +302,43 @@ test("zero inflow reports the full discharge shortfall and no delivery temperatu
     assert.equal(kpis[id].value, null);
     assert.equal(kpis[id].displayValue, "—");
   }
+});
+
+test("ladle policy inputs show rate schedules and a single heating-period connection", () => {
+  const view = createWorkbenchView({ model, registry, results: historical.results, scenario, stepIndex: 0 });
+  const burner = view.components.find(({ id }) => id === "burner");
+  const metal = view.components.find(({ id }) => id === "metal");
+  assert.deepEqual(burner.policyView.connections.map(({ label }) => label), ["Heating schedule"]);
+  assert.deepEqual(metal.policyView.connections.map(({ label }) => label), ["Discharge schedule"]);
+  assert.equal(view.informationConnections.length, 2);
+  // The period remains available when changing the historical burner's policy.
+  const remaining = registry.getPolicy("thermal.reach-temperature").inputs.remaining;
+  assert.ok(burner.policyView.optionsFor(remaining).some(({ label }) => label === "Heating period · Time remaining"));
+
+  const temperatureView = createWorkbenchView({ model: temperatureModel, registry, results: improved.results, scenario, stepIndex: 0 });
+  const periods = temperatureView.informationConnections.filter(({ from }) => from.sourceId === "preheat-period");
+  assert.equal(periods.length, 1);
+  assert.equal(periods[0].label, "Heating time remaining");
+  assert.equal(periods[0].sourceLabel, "Heating period · Time remaining");
+});
+
+test("inspector equations follow component and policy identity, independently of timestep values", () => {
+    const atStep = (stepIndex, parameterOverrides = []) => createWorkbenchView({
+    model: temperatureModel, registry, results: improved.results, stepIndex, parameterOverrides
+  });
+  const first = atStep(0);
+  const last = atStep(119, [{
+    componentId: "material-source", parameter: "profileMultiplier", value: 0.8
+  }]);
+  for (const component of first.components) {
+    const later = last.components.find(({ id }) => id === component.id);
+    assert.equal(component.modelExplanation, registry.get(component.type, component.definitionVersion).explanation);
+    assert.equal(later.modelExplanation, component.modelExplanation);
+    assert.equal(later.policyExplanation, component.policyExplanation);
+  }
+  assert.equal(first.components.find(({ id }) => id === "burner").policyExplanation.title,
+    "Heat towards temperature");
+  assert.equal(first.components.find(({ id }) => id === "metal").policyExplanation.title,
+    "Follow discharge schedule");
+  assert.equal(first.components.find(({ id }) => id === "ambient").policyExplanation, null);
 });

@@ -8,6 +8,16 @@ export const electricalSourceDefinition = {
   type: "electrical.source",
   version: "0.2.0",
   name: "Electrical source",
+  explanation: {
+    title: "Controllable electrical supply",
+    summary: "The source supplies electrical power within its declared output rating.",
+    equations: [{ label: "Output capability", tex: String.raw`0\leq P\leq P_{\max}` }],
+    symbols: [
+      { tex: "P", description: "Actual electrical output", unit: "kW" },
+      { tex: String.raw`P_{\max}`, description: "Maximum output rating", unit: "kW" }
+    ],
+    notes: ["Operation follows a policy target or an explicitly assigned balancing role. Fuel, conversion loss, ramp rate, and stored energy are not modelled."]
+  },
 
   parameters: {
     maximumPowerkW: {

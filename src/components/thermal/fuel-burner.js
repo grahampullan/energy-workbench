@@ -52,6 +52,33 @@ export const fuelBurnerDefinition = {
   type: "thermal.fuel-burner",
   version: "0.1.0",
   name: "Fuel burner",
+  information: {
+    outputs: {
+      "maximum-heat": { label: "Maximum heat output", quantity: "heat-rate", unit: "kW", read: ({ limits }) => limits.maximumHeatOutputkW }
+    }
+  },
+
+  explanation: {
+    title: "Fuel-to-heat conversion",
+    summary: "Fuel use and direct emissions follow the heat actually accepted by the receiving store.",
+    equations: [
+      { label: "Conversion", tex: String.raw`\dot Q=\eta P_{\mathrm{fuel}}` },
+      { label: "Direct emissions", tex: String.raw`\dot m_{\mathrm{CO_2}}=f_{\mathrm{CO_2}}P_{\mathrm{fuel}}` },
+      { label: "Heat-output limit", tex: String.raw`0\leq\dot Q\leq\min(\dot Q_{\mathrm{requested}},\eta P_{\mathrm{fuel,max}})` }
+    ],
+    symbols: [
+      { tex: String.raw`\dot Q`, description: "Actual heat output", unit: "kW" },
+      { tex: String.raw`\dot Q_{\mathrm{requested}}`, description: "Policy heat-output request", unit: "kW" },
+      { tex: String.raw`P_{\mathrm{fuel}},\ P_{\mathrm{fuel,max}}`, description: "Actual and maximum fuel input power", unit: "kW" },
+      { tex: String.raw`\eta`, description: "Conversion efficiency", unit: "1" },
+      { tex: String.raw`f_{\mathrm{CO_2}}`, description: "Direct fuel-emissions factor", unit: "kgCO₂/kJ" },
+      { tex: String.raw`\dot m_{\mathrm{CO_2}}`, description: "Direct emissions rate", unit: "kgCO₂/s" }
+    ],
+    notes: [
+      "Efficiency and heat-supply temperature are fixed parameters. The receiving store also limits accepted heat according to its own state and constraints.",
+      "The burner has no thermal storage, startup delay, or fuel-network constraint. Emissions cover the declared direct fuel factor."
+    ]
+  },
 
   parameters: {
     maximumFuelInputPowerkW: {

@@ -12,7 +12,11 @@
         "maximumImportPowerkW": 120,
         "maximumExportPowerkW": 0
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "electrical.balance",
+        "settings": {}
+      }
     },
     {
       "id": "heater",
@@ -24,7 +28,11 @@
         "efficiency": 0.9,
         "supplyTemperatureC": 90
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "thermal.follow-demand",
+        "settings": {}
+      }
     },
     {
       "id": "store",
@@ -137,6 +145,33 @@
       "to": {
         "componentId": "ambient",
         "portId": "heat-in"
+      }
+    }
+  ],
+  "informationSources": [],
+  "informationConnections": [
+    {
+      "id": "info-heat-demand-requested-heat-to-heater-policy-demand",
+      "name": "Requested heat",
+      "from": {
+        "componentId": "heat-demand",
+        "portId": "requested-heat"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "policy.demand"
+      }
+    },
+    {
+      "id": "info-heater-efficiency-to-heater-policy-efficiency",
+      "name": "Heater efficiency",
+      "from": {
+        "componentId": "heater",
+        "portId": "efficiency"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "policy.efficiency"
       }
     }
   ]

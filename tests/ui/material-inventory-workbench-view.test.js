@@ -12,12 +12,10 @@ import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { MATERIAL_MASS_FLOW_TYPE } from "../../src/core/flow-types.js";
 import { validateLayout } from
   "../../src/core/validation/validate-documents.js";
-import { createScheduledMaterialInventoryPolicy } from
-  "../../src/policies/scheduled-material-inventory.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import { createResultsChartModel } from
   "../../src/ui/results-chart-model.js";
@@ -48,14 +46,7 @@ const registry = createComponentRegistry([
   thermalStoreDefinition,
   materialSinkDefinition
 ]);
-const policy = createScheduledMaterialInventoryPolicy({
-  heaterComponentId: "heater",
-  powerSeriesId: "heater-input-power",
-  inventoryComponentId: "inventory",
-  outflowSeriesId: "material-outflow",
-  balancingComponentId: "grid"
-});
-const run = runScenario({ model, scenario, registry, policy });
+const run = runScenario({ model, scenario, registry });
 
 function activeStepIndices(series, field) {
   return series.values

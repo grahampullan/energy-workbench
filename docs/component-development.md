@@ -120,6 +120,18 @@ the first runtime slice.
   useful editor ranges.
 - `editor.visualRole` may be `store`, `equipment`, `boundary`, or `interaction`.
   It controls topology presentation only and does not change runtime behaviour.
+- `editor.summaryOutput` selects the published output shown on the component card
+  and inspector summary, ahead of the default signed command power. Output
+  metadata supplies its label and unit. The electric heater shows positive
+  electrical input; its signed command still identifies electrical consumption.
+- `editor.summaryDetails` lists additional published outputs to show below the
+  main card value. Heat demand shows requested heat prominently, followed by
+  supplied and unmet heat. These values also form the card's accessible label.
+- Static `explanation` equations use kJ for energy, kW for power, seconds for
+  duration, and kJ/K for heat capacity. Symbol units follow this convention even
+  when runtime fields use kWh or hours. Unit conversions belong to implementation,
+  not the displayed governing relationships; do not change runtime units to
+  simplify explanation metadata.
 - Initial-state declarations own units and defaults. Component validation owns
   state constraints that depend on parameters or other state fields.
 - Ports declare compatibility through `flowType` and permitted direction. A
@@ -154,6 +166,45 @@ the first runtime slice.
 The policy requests operation. It does not set independent port flows or bypass
 component limits.
 
+## Inspector equation descriptions
+
+A component may publish a static `explanation` alongside its implementation.
+All built-in components provide one. Each reusable policy definition publishes
+a single `explanation`. The inspector shows it on the component with that
+policy assignment. Components without policies show only their physical model.
+
+Both use the same plain-data shape:
+
+```js
+explanation: {
+  title: "Fuel-to-heat conversion",
+  summary: "Accepted heat output determines fuel use.",
+  equations: [
+    { label: "Conversion", tex: String.raw`\dot Q=\eta P_{\mathrm{fuel}}` }
+  ],
+  symbols: [
+    { tex: String.raw`\dot Q`, description: "Heat output", unit: "kW" },
+    { tex: String.raw`\eta`, description: "Efficiency", unit: "1" },
+    { tex: String.raw`P_{\mathrm{fuel}}`, description: "Fuel input", unit: "kW" }
+  ],
+  notes: ["Efficiency is constant."]
+}
+```
+
+Use an empty equation or symbol array for a rule best explained in words.
+Describe sign conventions, timestep units, physical limits, and special cases
+such as empty inventories. Distinguish policy requests from physical limits.
+These strings document the implementation; they are never evaluated as model
+code. They contain no selected-timestep substitutions or parameter values.
+
+The browser renders them in the inspector's Equations view, including MathML
+for accessibility. Component sections show the summary, equations, and symbol
+definitions; component notes remain reference documentation and are not shown
+in the inspector. Policy sections also show their operating rules.
+TeX, symbols, and explanatory text are tested separately
+from the existing numerical regression tests. Keep both the description and
+the numerical implementation current when an equation changes.
+
 ## Runtime preparation
 
 `prepareRuntimeModel({ model, scenario, registry })` is the deterministic
@@ -174,7 +225,7 @@ their explicit boundaries.
 
 ## Fixed-timestep execution
 
-`runScenario({ model, scenario, policy, registry, options })` prepares the model,
+`runScenario({ model, scenario, registry, options })` prepares the model,
 initialises isolated state, and runs every scenario step synchronously.
 
 Each step uses only current state, current materialised scenario values,
@@ -193,14 +244,20 @@ segments.
 
 - The runtime evaluates every component's current operating limits once before
   requesting policy operation.
-- `policy.request(runtimeModel, stepContext, policyContext)` returns
-  `{ targets, balancingComponentId }`. Targets are keyed by component ID. The
-  balancing component is explicit and must not also receive a target. Use
-  `balancingComponentId: null` when the topology has no residual balancing
-  operation; do not nominate an unrelated component as a placeholder.
-- `policyContext.operatingLimitsByComponentId` is a read-only plain-object
-  snapshot. Policies may use it to coordinate components without repeating
-  component equations.
+- Each component persists its selected `policy: { type, settings }`. Register
+  policy definitions explicitly with `createComponentRegistry(definitions,
+  { policies })`. The old whole-model policy argument is rejected.
+- The runtime resolves typed information connections before policy evaluation.
+  `policy.request(inputs, settings)` receives exactly two immutable plain
+  objects and returns only the owning component's target. Every runtime value,
+  including own-component capabilities, must arrive through a named input.
+- `electrical.balance` currently encodes a static balancing role in the policy
+  catalogue and returns null. Conceptually this is physical configuration, not
+  an operating policy. Its component resolves actual balancing power through
+  physical ports. The inspector labels this as a physical role, with separate
+  role choices and explanations. Separating role storage and registration is a
+  pending migration; at most one such role is supported in the current runtime. See the
+  [abstraction definitions](../ARCHITECTURE.md#components-connections-policies-and-roles).
 - The runtime checks each component's resolution declaration after the policy
   request, rejects missing or conflicting flow ownership and same-step cycles,
   and executes the resulting stages in dependency order.
@@ -236,7 +293,8 @@ and determined connections for diagnostics.
 
 The current `electrical.bus` has one repeatable bidirectional `terminal` port.
 It waits for its non-balancing connection flows, applies its own conservation
-equation, and settles the connection to the policy's `balancingComponentId`.
+equation, and settles the connection to the component assigned the balancing
+role (the runtime's internal `balancingComponentId`).
 The balancing component then checks that residual against its own limits. A
 grid is one possible balancing component; it is not selected automatically.
 Positive grid power is import into the model; negative grid power is export.
@@ -356,17 +414,16 @@ grid -> electric heater -> thermal store (hot-water instance) -> heat demand
                            +-> heat transfer -> constant temperature (“Ambient”)
 ```
 
-`createHeatDemandFollowingPolicy({ heaterComponentId, demandComponentId,
-balancingComponentId })`
-requests heater electrical input from the current heat demand and the heater's
-declared conversion. Component resolution then follows the visible topology:
+The heater selects `thermal.follow-demand`. Explicit information connections
+supply requested heat from the demand component and efficiency from the heater
+itself. The policy requests electrical input from those two inputs. Component resolution then follows the visible topology:
 
 1. the heat-transfer component settles passive source and sink flows from the
    current store and prescribed Ambient temperatures;
 2. the store settles charge, useful discharge, and temperature limits while
    accounting for the settled passive flow;
 3. the heater applies its conversion equation to the accepted heat flow;
-4. the policy-selected grid checks and accepts the heater's electrical flow.
+4. the grid assigned the balancing role checks and accepts the heater's electrical flow.
 
 The heater's requested command is `{ powerkW }`. Its feasible and actual
 commands also contain `heatOutputkW`, making the cross-domain allocation
@@ -424,22 +481,77 @@ timestep, matching the committed next state.
 
 ### PV-battery self-consumption policy
 
-`createPvBatterySelfConsumptionPolicy({ batteryComponentId,
-balancingComponentId })` implements the
-Push 1A priority without knowing PV or load equations. It sums the fixed
-operating power of every component other than the bus, grid, and target battery,
-then requests the opposite power from the battery:
+The battery selects `electrical.self-consumption`. Solar PV's `power` output
+connects directly to `policy.generation`; the load's `demand` output connects
+directly to `policy.demand`. Both inputs are non-negative powers in kW:
 
 ```text
-battery request = -(fixed generation + fixed demand)
+battery request = connected demand - connected generation
 ```
 
-The battery clamps that target to its own power and energy limits. The visible
-bus sends any remainder to the named balancing component. This means surplus
-serves fixed demand, charges the battery, then exports; a deficit uses fixed
-generation, discharges the battery, then imports. The policy rejects any
-additional variable component because dispatch priority for multiple
-controllable devices must be explicit.
+The battery applies its own power and energy limits. Physical bus resolution
+then calculates the remainder accepted by the grid's `electrical.balance`
+role. No policy scans unrelated components. Information arrives directly from
+the source components before the battery acts, independently of the physical
+connections through the bus.
+
+## Declaring information outputs and policy inputs
+
+Component definitions own public information output readers:
+
+```js
+information: {
+  outputs: {
+    temperature: {
+      label: "Temperature", quantity: "temperature", unit: "°C",
+      read: ({ limits }) => limits.temperatureC
+    }
+  }
+}
+```
+
+Readers receive `{ state, parameters, limits, inputs }` for their own component.
+`inputs` contains only declared information connections. All values are from
+start-of-step state or pre-policy calculations. Readers cannot consume actual
+flows or proposed next states. Component information inputs declare quantity,
+unit, label, and optional `cardinality: "many"`; the information graph must be
+acyclic. Outputs may fan out. Policies are terminal consumers, so own-component
+state-to-policy connections are valid.
+
+Persist an information connection independently of physical connections:
+
+```json
+{
+  "id": "refractory-temperature-to-burner",
+  "name": "Refractory temperature",
+  "from": { "componentId": "refractory", "portId": "temperature" },
+  "to": { "componentId": "burner", "portId": "policy.temperature" }
+}
+```
+
+For schedules, declare a named `informationSources` entry with `id`, `name`,
+`seriesId`, `quantity` and `unit`, then connect `{ sourceId, portId: "value" }`.
+It also exposes `enabled: true`. For an operating period, use quantity
+`process-mode`, unit `mode-code` and an integer `activeValue`. Its outputs are
+`enabled` and `remaining-hours`. Remaining time includes the current timestep
+and stops at the first different mode; future periods are separate. Full
+scenario series never reach policy functions.
+
+Schedule-following heat and discharge policies consume only `value`: the
+scheduled rate is the request, and zero means off. Do not add a separate
+permission input for the same schedule. Temperature-led heating consumes
+`remaining-hours` from its Heating period source; zero means outside the
+period, so no separate `enabled` connection is needed. Component equations
+still limit actual heat and discharge to physical capability.
+
+Policy definitions declare `type`, `name`, `componentTypes`, `inputs`,
+`settings`, `explanation`, and `request(inputs, settings)`. Optional
+`requiredPorts` restrict policies such as discharge to components with a
+connected material outlet. Settings specify defaults, units, numeric bounds
+or choices. Keep process names and phase codes in model configuration, not in
+reusable rule functions. See `src/policies/definitions.js` for the current
+catalogue. Add equation/limit tests and information-validation tests with new
+rules; example regressions must retain physical results.
 
 ## Definition checklist
 

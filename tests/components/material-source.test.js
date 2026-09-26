@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { materialSourceDefinition } from "../../src/components/material/source.js";
 import { materialSinkDefinition } from "../../src/components/material/sink.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function run(profileMultiplier, values = [0, 10]) {
@@ -28,7 +28,6 @@ function run(profileMultiplier, values = [0, 10]) {
         data: { kind: "inline", values } }]
     },
     registry: createComponentRegistry([materialSourceDefinition, materialSinkDefinition]),
-    policy: { request: () => ({ targets: {}, balancingComponentId: null }) }
   });
 }
 

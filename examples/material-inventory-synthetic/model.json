@@ -23,7 +23,11 @@
         "maximumImportPowerkW": 20,
         "maximumExportPowerkW": 0
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "electrical.balance",
+        "settings": {}
+      }
     },
     {
       "id": "heater",
@@ -35,7 +39,13 @@
         "efficiency": 1,
         "supplyTemperatureC": 150
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "electrical.follow-schedule",
+        "settings": {
+          "direction": -1
+        }
+      }
     },
     {
       "id": "inventory",
@@ -54,6 +64,10 @@
       "initialState": {
         "massKg": 0,
         "containedEnthalpykWh": 0
+      },
+      "policy": {
+        "type": "material.follow-schedule",
+        "settings": {}
       }
     },
     {
@@ -112,6 +126,48 @@
       "to": {
         "componentId": "material-sink",
         "portId": "material-in"
+      }
+    }
+  ],
+  "informationSources": [
+    {
+      "id": "heating-schedule",
+      "name": "Heater power schedule",
+      "seriesId": "heater-input-power",
+      "quantity": "active-power",
+      "unit": "kW"
+    },
+    {
+      "id": "discharge-schedule",
+      "name": "Discharge schedule",
+      "seriesId": "material-outflow",
+      "quantity": "mass-rate",
+      "unit": "kg/s"
+    }
+  ],
+  "informationConnections": [
+    {
+      "id": "info-heating-schedule-value-to-heater-policy-power",
+      "name": "Heater power",
+      "from": {
+        "sourceId": "heating-schedule",
+        "portId": "value"
+      },
+      "to": {
+        "componentId": "heater",
+        "portId": "policy.power"
+      }
+    },
+    {
+      "id": "info-discharge-schedule-value-to-inventory-policy-request",
+      "name": "Discharge schedule",
+      "from": {
+        "sourceId": "discharge-schedule",
+        "portId": "value"
+      },
+      "to": {
+        "componentId": "inventory",
+        "portId": "policy.request"
       }
     }
   ]

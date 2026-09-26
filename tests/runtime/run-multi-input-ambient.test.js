@@ -5,7 +5,7 @@ import { constantTemperatureDefinition } from
   "../../src/components/thermal/constant-temperature.js";
 import { resolutionDescription } from
   "../../src/components/model-resolution.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { THERMAL_HEAT_FLOW_TYPE } from "../../src/core/flow-types.js";
 import { createThermalFlow } from "../../src/core/thermal-flow.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
@@ -135,11 +135,6 @@ function fixture() {
         unit: "°C",
         data: { kind: "inline", values: [15] }
       }]
-    },
-    policy: {
-      request() {
-        return { targets: {}, balancingComponentId: "ambient" };
-      }
     },
     registry: createComponentRegistry([
       firstSourceDefinition,

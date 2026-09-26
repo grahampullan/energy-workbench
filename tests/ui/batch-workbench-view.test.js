@@ -12,9 +12,7 @@ import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
-import { createScheduledHeatingPolicy } from
-  "../../src/policies/scheduled-heating.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import { createResultsChartModel } from "../../src/ui/results-chart-model.js";
 import { createBatchHeatingRunKpis } from "../../src/ui/run-kpi-model.js";
@@ -44,12 +42,7 @@ const registry = createComponentRegistry([
   electricHeaterDefinition,
   heatTransferDefinition
 ]);
-const policy = createScheduledHeatingPolicy({
-  heaterComponentId: "heater",
-  powerSeriesId: "heater-input-power",
-  balancingComponentId: "grid"
-});
-const run = runScenario({ model, scenario, registry, policy });
+const run = runScenario({ model, scenario, registry });
 
 function assertSeriesClose(actual, expected, tolerance = 1e-12) {
   assert.equal(actual.length, expected.length);
@@ -190,7 +183,6 @@ test("batch workbench explains a missed final temperature on the batch", () => {
     model: failingModel,
     scenario,
     registry,
-    policy
   });
   const stepIndex = failingRun.results.steps.length - 1;
   const view = createWorkbenchView({

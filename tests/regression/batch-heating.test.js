@@ -12,7 +12,7 @@ import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
 import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
 import {
@@ -20,8 +20,6 @@ import {
   validateModel,
   validateScenario
 } from "../../src/core/validation/validate-documents.js";
-import { createScheduledHeatingPolicy } from
-  "../../src/policies/scheduled-heating.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 const exampleDirectory = new URL(
@@ -47,12 +45,7 @@ const registry = createComponentRegistry([
   electricHeaterDefinition,
   heatTransferDefinition
 ]);
-const policy = createScheduledHeatingPolicy({
-  heaterComponentId: "heater",
-  powerSeriesId: "heater-input-power",
-  balancingComponentId: "grid"
-});
-const runResult = runScenario({ model, scenario, policy, registry });
+const runResult = runScenario({ model, scenario, registry });
 const batchModelComponent = model.components.find(
   (component) => component.id === "batch"
 );
@@ -182,7 +175,7 @@ test("batch-heating example matches the reviewed headless result fixture", () =>
     assertClose(summary[name], expectedValue);
   }
   assert.deepEqual(
-    runScenario({ model, scenario, policy, registry }),
+    runScenario({ model, scenario, registry }),
     runResult
   );
 });
@@ -221,7 +214,7 @@ test("batch component warns when the final required temperature is missed", () =
   failingModel.components.find(
     (component) => component.id === "batch"
   ).parameters.minimumUsefulTemperatureC = 135;
-  const result = runScenario({ model: failingModel, scenario, policy, registry });
+  const result = runScenario({ model: failingModel, scenario, registry });
 
   assert.equal(result.completed, true);
   assert.deepEqual(

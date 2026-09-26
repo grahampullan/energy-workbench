@@ -143,6 +143,29 @@ export const heatTransferDefinition = {
   type: "thermal.heat-transfer",
   version: "0.1.0",
   name: "Heat transfer",
+  explanation: {
+    title: "Directed thermal contact",
+    summary: "Heat flows from the source to the sink according to conductance and their current temperature difference, subject to explicit-timestep temperature limits.",
+    equations: [
+      { label: "Conductance law", tex: String.raw`\dot Q_{\mathrm{free}}=G\max(0,T_s-T_d)` },
+      { label: "Equilibrium limit", tex: String.raw`\dot Q_{\mathrm{eq}}=\frac{\max(0,T_s-T_d)}{\Delta t(1/C_s+1/C_d)}` },
+      { label: "Sink temperature limit", tex: String.raw`\dot Q_{\mathrm{limit}}=\frac{C_d\max(0,T_{d,\max}-T_d)}{\Delta t}` },
+      { label: "Actual heat transfer", tex: String.raw`\dot Q=\min(\dot Q_{\mathrm{free}},\dot Q_{\mathrm{eq}},\dot Q_{\mathrm{limit}})` }
+    ],
+    symbols: [
+      { tex: String.raw`\dot Q`, description: "Heat-transfer rate", unit: "kW" },
+      { tex: "G", description: "Thermal conductance", unit: "kW/K" },
+      { tex: String.raw`T_s,\ T_d`, description: "Source and destination temperatures", unit: "°C" },
+      { tex: String.raw`T_{d,\max}`, description: "Maximum destination temperature", unit: "°C" },
+      { tex: String.raw`C_s,\ C_d`, description: "Source and destination thermal capacities available for heat exchange", unit: "kJ/K" },
+      { tex: String.raw`\Delta t`, description: "Timestep duration", unit: "s" }
+    ],
+    notes: [
+      "Transfer is directed and non-negative. A source no hotter than its sink transfers no heat.",
+      "A finite body with zero thermal capacity transfers no heat. A fixed-temperature boundary has zero inverse capacity; a fixed-temperature sink imposes no upper-temperature limit.",
+      "If both boundaries have fixed temperatures, the equilibrium limit is unbounded. The component stores no energy and delivers exactly the heat removed from its source."
+    ]
+  },
 
   parameters: {
     conductancekWPerK: {

@@ -13,7 +13,10 @@ const contentTypes = new Map([
   [".js", "text/javascript; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
   [".map", "application/json; charset=utf-8"],
-  [".svg", "image/svg+xml"]
+  [".svg", "image/svg+xml"],
+  [".woff2", "font/woff2"],
+  [".woff", "font/woff"],
+  [".ttf", "font/ttf"]
 ]);
 
 function resolveRequestPath(requestUrl) {

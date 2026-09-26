@@ -23,6 +23,24 @@ export const electricalLoadDefinition = {
   type: "electrical.load",
   version: "0.2.0",
   name: "Electrical load",
+  information: {
+    outputs: {
+      demand: { label: "Demand power", quantity: "active-power", unit: "kW", read: ({ limits }) => -limits.minimumPowerkW }
+    }
+  },
+
+  explanation: {
+    title: "Prescribed electrical demand",
+    summary: "The demand multiplier scales the scenario profile to impose electrical consumption.",
+    equations: [{ label: "Signed power", tex: String.raw`P(t)=-\alpha P_{\mathrm{demand}}(t)` }],
+    symbols: [
+      { tex: "P", description: "Signed component power; consumption is negative", unit: "kW" },
+      { tex: String.raw`P_{\mathrm{demand}}`, description: "Non-negative scenario demand", unit: "kW" },
+      { tex: String.raw`\alpha`, description: "Demand profile multiplier", unit: "1" },
+      { tex: "t", description: "Simulation time", unit: "s" }
+    ],
+    notes: ["The load has no storage or demand response. A network unable to meet this prescribed demand fails its feasibility checks."]
+  },
 
   parameters: {
     demandSeriesId: {

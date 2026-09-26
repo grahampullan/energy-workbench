@@ -12,7 +12,7 @@ import { electricalLoadDefinition } from
 import { electricalPvDefinition } from
   "../../src/components/electrical/pv.js";
 import { createComponentRegistry } from
-  "../../src/core/component-registry.js";
+  "../helpers/registry.js";
 import { validateVariant } from
   "../../src/core/validation/validate-documents.js";
 import {

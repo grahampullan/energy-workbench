@@ -89,6 +89,13 @@ export const electricalBusDefinition = {
   type: "electrical.bus",
   version: "0.3.0",
   name: "Electrical bus",
+  explanation: {
+    title: "Electrical power conservation",
+    summary: "The bus connects electrical branches and conserves their instantaneous signed power.",
+    equations: [{ label: "Terminal power balance", tex: String.raw`\sum_j P_j=0` }],
+    symbols: [{ tex: "P_j", description: "Power at terminal j, positive into the bus and negative out", unit: "kW" }],
+    notes: ["The bus is lossless and stores no energy. The model explicitly assigns the component that can accept residual power.", "Voltage, current, reactive power, and transmission losses are not represented."]
+  },
 
   parameters: {},
   initialState: {},

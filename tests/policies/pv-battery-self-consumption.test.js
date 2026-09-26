@@ -7,9 +7,7 @@ import { electricalGridDefinition } from "../../src/components/electrical/grid.j
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
 import { electricalPvDefinition } from "../../src/components/electrical/pv.js";
 import { electricalSourceDefinition } from "../../src/components/electrical/source.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
-import { createPvBatterySelfConsumptionPolicy } from
-  "../../src/policies/pv-battery-self-consumption.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 function createFixture({
@@ -17,11 +15,7 @@ function createFixture({
   generationValues = [5, 5, 0, 0],
   loadProfileMultiplier = 1,
   pvProfileMultiplier = 1,
-  storedEnergykWh = 0,
-  policy = createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: "battery",
-    balancingComponentId: "grid"
-  })
+  storedEnergykWh = 0
 } = {}) {
   return {
     model: {
@@ -31,6 +25,7 @@ function createFixture({
       components: [
         {
           id: "grid",
+          policy: { type: "electrical.balance", settings: {} },
           type: electricalGridDefinition.type,
           definitionVersion: electricalGridDefinition.version,
           name: "Grid",
@@ -72,6 +67,7 @@ function createFixture({
         },
         {
           id: "battery",
+          policy: { type: "electrical.self-consumption", settings: {} },
           type: electricalBatteryDefinition.type,
           definitionVersion: electricalBatteryDefinition.version,
           name: "Battery",
@@ -84,6 +80,10 @@ function createFixture({
           },
           initialState: { storedEnergykWh }
         }
+      ],
+      informationConnections: [
+        { id: "info-pv", name: "Solar power", from: { componentId: "pv", portId: "power" }, to: { componentId: "battery", portId: "policy.generation" } },
+        { id: "info-demand", name: "Demand", from: { componentId: "load", portId: "demand" }, to: { componentId: "battery", portId: "policy.demand" } }
       ],
       connections: [
         {
@@ -135,7 +135,6 @@ function createFixture({
         }
       ]
     },
-    policy,
     registry: createComponentRegistry([
       electricalBatteryDefinition,
       electricalBusDefinition,
@@ -204,84 +203,41 @@ test("dispatch consumes fixed component limits including profile multipliers", (
   });
 });
 
-test("runtime gives policies an immutable operating-limit snapshot", () => {
-  let receivedPolicyContext;
-  const selfConsumptionPolicy = createPvBatterySelfConsumptionPolicy({
-    batteryComponentId: "battery",
-    balancingComponentId: "grid"
-  });
-  const fixture = createFixture({
-    demandValues: [2],
-    generationValues: [5],
-    policy: {
-      request(runtimeModel, stepContext, policyContext) {
-        receivedPolicyContext = policyContext;
-        return selfConsumptionPolicy.request(
-          runtimeModel,
-          stepContext,
-          policyContext
-        );
-      }
-    }
-  });
-
+test("runtime gives policies only immutable connected values and settings", () => {
+  const fixture = createFixture({ demandValues: [2], generationValues: [5] });
+  let received;
+  const policies = fixture.registry.listPolicies().map((definition) => definition.type === "electrical.self-consumption"
+    ? { ...definition, request(...args) { received = args; return definition.request(...args); } } : definition);
+  fixture.registry = createComponentRegistry(fixture.registry.list(), { policies });
   const result = runScenario(fixture);
-
-  assert.equal(result.completed, true);
-  assert.equal(Object.isFrozen(receivedPolicyContext), true);
-  assert.equal(
-    Object.isFrozen(receivedPolicyContext.operatingLimitsByComponentId),
-    true
-  );
-  assert.deepEqual(receivedPolicyContext.operatingLimitsByComponentId.pv, {
-    minimumPowerkW: 5,
-    maximumPowerkW: 5
-  });
-  assert.deepEqual(receivedPolicyContext.operatingLimitsByComponentId.load, {
-    minimumPowerkW: -2,
-    maximumPowerkW: -2
-  });
+  assert.equal(result.completed, true, JSON.stringify(result.diagnostics));
+  assert.equal(received.length, 2);
+  assert.deepEqual(received, [{ generation: 5, demand: 2 }, {}]);
+  assert.ok(received.every(Object.isFrozen));
+  assert.throws(() => { received[0].generation = 100; }, TypeError);
 });
 
-test("self-consumption policy rejects invalid battery and extra variable operation", () => {
-  assert.throws(
-    () => createPvBatterySelfConsumptionPolicy(),
-    /batteryComponentId must be a non-empty string/u
-  );
-  assert.throws(
-    () => createPvBatterySelfConsumptionPolicy({ batteryComponentId: "battery" }),
-    /balancingComponentId must be a non-empty string/u
-  );
+test("self-consumption holds equal generation and demand and rejects invalid input powers", () => {
+  const { registry } = createFixture();
+  const policy = registry.getPolicy("electrical.self-consumption");
+  assert.deepEqual(policy.request({ generation: 2, demand: 2 }), { powerkW: 0 });
+  assert.deepEqual(policy.request({ generation: 0, demand: 0 }), { powerkW: 0 });
+  for (const field of ["generation", "demand"]) {
+    for (const value of [-1, NaN, Infinity]) {
+      assert.throws(() => policy.request({ generation: 2, demand: 2, [field]: value }), RangeError);
+    }
+  }
+});
 
-  const wrongBattery = createFixture({
-    demandValues: [2],
-    generationValues: [5],
-    policy: createPvBatterySelfConsumptionPolicy({
-      batteryComponentId: "grid",
-      balancingComponentId: "grid"
-    })
-  });
-  const wrongBatteryResult = runScenario(wrongBattery);
-  assert.equal(wrongBatteryResult.completed, false);
-  assert.ok(diagnosticCodes(wrongBatteryResult).includes("runtime.policy-failed"));
-
-  const variableSource = createFixture({
-    demandValues: [2],
-    generationValues: [5]
-  });
-  variableSource.model.components[2] = {
-    id: "pv",
-    type: electricalSourceDefinition.type,
-    definitionVersion: electricalSourceDefinition.version,
-    name: "Variable source",
-    parameters: { maximumPowerkW: 10 },
-    initialState: {}
-  };
-  const variableSourceResult = runScenario(variableSource);
-  assert.equal(variableSourceResult.completed, false);
-  assert.ok(diagnosticCodes(variableSourceResult).includes("runtime.policy-failed"));
-  assert.match(
-    variableSourceResult.diagnostics.at(-1).message,
-    /requires fixed operation for component: pv/u
-  );
+test("self-consumption requires a compatible component and explicit information source", () => {
+  const wrongBattery = createFixture();
+  wrongBattery.model.components[0].policy = { type: "electrical.self-consumption", settings: {} };
+  assert.ok(diagnosticCodes(runScenario(wrongBattery)).includes("model.incompatible-policy"));
+  const missing = createFixture();
+  missing.model.informationConnections.pop();
+  assert.ok(diagnosticCodes(runScenario(missing)).includes("model.missing-policy-input"));
+  const variable = createFixture();
+  variable.model.components[2] = { id: "pv", name: "Variable source", type: electricalSourceDefinition.type,
+    definitionVersion: electricalSourceDefinition.version, parameters: { maximumPowerkW: 10 }, initialState: {} };
+  assert.ok(diagnosticCodes(runScenario(variable)).includes("model.information-source-port"));
 });

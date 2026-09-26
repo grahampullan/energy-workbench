@@ -13,13 +13,11 @@ import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import {
   ACTIVE_POWER_FLOW_TYPE,
   THERMAL_HEAT_FLOW_TYPE
 } from "../../src/core/flow-types.js";
-import { createHeatDemandFollowingPolicy } from
-  "../../src/policies/heat-demand-following.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 import { createResultsChartModel } from "../../src/ui/results-chart-model.js";
 import { createCoupledThermalRunKpis } from "../../src/ui/run-kpi-model.js";
@@ -51,11 +49,6 @@ const run = runScenario({
   model,
   scenario,
   registry,
-  policy: createHeatDemandFollowingPolicy({
-    heaterComponentId: "heater",
-    demandComponentId: "heat-demand",
-    balancingComponentId: "grid"
-  })
 });
 
 function assertSeriesClose(actual, expected, tolerance = 1e-12) {
@@ -129,6 +122,7 @@ test("coupled topology and inspector expose the important thermal results", () =
     (component) => component.id === "store-loss"
   );
   const ambient = view.components.find((component) => component.id === "ambient");
+  const heater = view.components.find((component) => component.id === "heater");
   const demand = view.components.find((component) => component.id === "heat-demand");
   const runtimeStore = runtimeStep.components.find(
     (component) => component.componentId === "store"
@@ -139,7 +133,15 @@ test("coupled topology and inspector expose the important thermal results", () =
   const runtimeDemand = runtimeStep.components.find(
     (component) => component.componentId === "heat-demand"
   );
+  const runtimeHeater = runtimeStep.components.find(
+    (component) => component.componentId === "heater"
+  );
 
+  assert.equal(heater.metric.label, "Electrical input");
+  assert.equal(heater.metric.value, runtimeHeater.outputs.electricalInputPowerkW);
+  assert.ok(heater.metric.value > 0);
+  assert.equal(heater.metric.value, -runtimeHeater.actualCommand.powerkW);
+  assert.equal(heater.powerTone, "importing");
   assert.equal(store.metric.value, runtimeStore.outputs.temperatureC);
   assert.equal(store.metric.unit, "°C");
   assert.equal(heatLoss.metric.value, runtimeHeatLoss.outputs.heatFlowkW);
@@ -148,7 +150,12 @@ test("coupled topology and inspector expose the important thermal results", () =
   assert.equal(ambient.name, "Ambient");
   assert.equal(ambient.metric.label, "Temperature");
   assert.equal(ambient.metric.unit, "°C");
-  assert.equal(demand.metric.value, runtimeDemand.outputs.unmetHeatFlowkW);
+  assert.equal(demand.metric.value, runtimeDemand.outputs.demandHeatFlowkW);
+  assert.equal(demand.metric.label, "Requested heat");
+  assert.deepEqual(demand.metricDetails.map(({ label, value }) => ({ label, value })), [
+    { label: "Supplied heat", value: runtimeDemand.outputs.servedHeatFlowkW },
+    { label: "Unmet heat", value: runtimeDemand.outputs.unmetHeatFlowkW }
+  ]);
   assert.equal(
     demand.outputFields.find((field) => field.id === "servedHeatFlowkW").value,
     runtimeDemand.outputs.servedHeatFlowkW

@@ -24,6 +24,25 @@ export const electricalBatteryDefinition = {
   type: "electrical.battery",
   version: "0.2.0",
   name: "Electrical battery",
+  explanation: {
+    title: "Battery energy storage",
+    summary: "Signed power charges or discharges a finite energy store, with separate conversion efficiencies in each direction.",
+    equations: [
+      { label: "Charge and discharge", tex: String.raw`P_c=\max(0,-P),\qquad P_d=\max(0,P)` },
+      { label: "Energy update", tex: String.raw`E_{n+1}=E_n+\left(\eta_c P_c-\frac{P_d}{\eta_d}\right)\Delta t` },
+      { label: "Charging limit", tex: String.raw`P_c\leq\min\!\left(P_{c,\max},\frac{E_{\max}-E_n}{\eta_c\Delta t}\right)` },
+      { label: "Discharging limit", tex: String.raw`P_d\leq\min\!\left(P_{d,\max},\frac{E_n\eta_d}{\Delta t}\right)` }
+    ],
+    symbols: [
+      { tex: "P", description: "Net power; positive discharges and negative charges", unit: "kW" },
+      { tex: "P_c,P_d", description: "Non-negative charge and discharge power", unit: "kW" },
+      { tex: String.raw`P_{c,\max},P_{d,\max}`, description: "Charge and discharge power ratings", unit: "kW" },
+      { tex: String.raw`E_n,E_{n+1},E_{\max}`, description: "Start energy, end energy, and storage capacity", unit: "kJ" },
+      { tex: String.raw`\eta_c,\eta_d`, description: "Charging and discharging efficiencies", unit: "1" },
+      { tex: String.raw`\Delta t`, description: "Timestep duration", unit: "s" }
+    ],
+    notes: ["The policy selects a power target. Current energy, remaining capacity, and power ratings limit actual operation.", "Efficiencies are constant. Self-discharge, degradation, and thermal behaviour are not represented."]
+  },
 
   parameters: {
     capacitykWh: {

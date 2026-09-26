@@ -25,6 +25,22 @@ export const materialSourceDefinition = {
   type: "material.source",
   version: "0.1.0",
   name: "Material source",
+  explanation: {
+    title: "Prescribed material inflow",
+    summary: "A profile supplies material at a fixed specific enthalpy. The multiplier scales the mass and transported enthalpy together.",
+    equations: [
+      { label: "Mass flow", tex: String.raw`\dot m(t)=\alpha\dot m_{\mathrm{profile}}(t)` },
+      { label: "Transported enthalpy", tex: String.raw`\dot H(t)=\dot m(t)h_{\mathrm{source}}` }
+    ],
+    symbols: [
+      { tex: String.raw`\dot m,\ \dot m_{\mathrm{profile}}`, description: "Actual and prescribed mass-flow rates", unit: "kg/s" },
+      { tex: String.raw`\alpha`, description: "Inflow profile multiplier", unit: "1" },
+      { tex: String.raw`h_{\mathrm{source}}`, description: "Prescribed specific enthalpy", unit: "kJ/kg" },
+      { tex: String.raw`\dot H`, description: "Material enthalpy rate", unit: "kW" },
+      { tex: "t", description: "Simulation time", unit: "s" }
+    ],
+    notes: ["Profile rates and the multiplier must be non-negative. Each profile value is held throughout its timestep. The source has no inventory state."]
+  },
 
   parameters: {
     massFlowSeriesId: {

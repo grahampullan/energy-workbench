@@ -12,15 +12,13 @@ import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
 import { electricHeaterDefinition } from
   "../../src/components/thermal/electric-heater.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
 import {
   validateModel,
   validateScenario
 } from "../../src/core/validation/validate-documents.js";
-import { createScheduledMaterialInventoryPolicy } from
-  "../../src/policies/scheduled-material-inventory.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 const exampleDirectory = new URL(
@@ -44,16 +42,9 @@ const registry = createComponentRegistry([
   thermalStoreDefinition,
   materialSinkDefinition
 ]);
-const policy = createScheduledMaterialInventoryPolicy({
-  heaterComponentId: "heater",
-  powerSeriesId: "heater-input-power",
-  inventoryComponentId: "inventory",
-  outflowSeriesId: "material-outflow",
-  balancingComponentId: "grid"
-});
 
 function run(runScenarioDocument = scenario) {
-  return runScenario({ model, scenario: runScenarioDocument, policy, registry });
+  return runScenario({ model, scenario: runScenarioDocument, registry });
 }
 
 function componentAtStep(step, componentId) {

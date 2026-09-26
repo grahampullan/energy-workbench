@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { prepareRuntimeModel } from "../../src/runtime/prepare-runtime-model.js";
 
 function modelComponent({ parameters = {}, initialState = {} } = {}) {

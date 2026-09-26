@@ -1,3 +1,5 @@
+import { informationSourcePositions, renderInformationLayer } from "./information-layer.js";
+import { visibleInformationConnections } from "./information-view.js";
 import {
   Board,
   Box,
@@ -103,11 +105,14 @@ class WorkbenchComponent extends BoardBoxComponent {
     this.valueElement.className = "component-card-value";
     this.metricElement = document.createElement("span");
     this.metricElement.className = "component-card-metric";
+    this.detailsElement = document.createElement("span");
+    this.detailsElement.className = "component-card-details";
     this.button.append(
       this.typeElement,
       this.nameElement,
       this.valueElement,
-      this.metricElement
+      this.metricElement,
+      this.detailsElement
     );
     this.element.append(this.button);
     this.update();
@@ -122,11 +127,55 @@ class WorkbenchComponent extends BoardBoxComponent {
     this.nameElement.textContent = component.name;
     this.valueElement.textContent = component.metric.displayValue;
     this.metricElement.textContent = component.metric.label;
+    this.detailsElement.hidden = component.metricDetails.length === 0;
+    this.detailsElement.replaceChildren(...component.metricDetails.map((field) => {
+      const row = document.createElement("span");
+      row.className = "component-card-detail";
+      const label = document.createElement("span");
+      label.textContent = field.label;
+      const value = document.createElement("strong");
+      value.textContent = field.displayValue;
+      row.append(label, value);
+      return row;
+    }));
     this.button.dataset.powerTone = component.powerTone;
     this.button.dataset.highlighted = String(highlighted);
     this.button.dataset.visualRole = component.visualRole;
-    this.button.setAttribute("aria-label", `${component.name}, ${component.metric.label}: ${component.metric.displayValue}`);
+    const metrics = [component.metric, ...component.metricDetails]
+      .map((field) => `${field.label}: ${field.displayValue}`).join(", ");
+    this.button.setAttribute("aria-label", `${component.name}, ${metrics}`);
     this.button.setAttribute("aria-pressed", String(selected));
+  }
+}
+
+class InformationSourceComponent extends BoardBoxComponent {
+  constructor({ sourceId, getView }) {
+    super({});
+    this.sourceId = sourceId;
+    this.getView = getView;
+  }
+
+  make() {
+    const element = document.getElementById(this.id);
+    element.style.pointerEvents = "auto";
+    this.card = document.createElement("div");
+    this.card.className = "information-source";
+    this.card.dataset.informationSourceId = this.sourceId;
+    element.append(this.card);
+    this.update();
+  }
+
+  update() {
+    if (!this.card) return;
+    const view = this.getView();
+    const source = view.informationSources.find(({ id }) => id === this.sourceId);
+    const visible = visibleInformationConnections(view.informationConnections, view.selectedComponentId, view.showInformationConnections, view.highlightedConnectionId);
+    document.getElementById(this.boxId).hidden = !visible.some(({ from }) => from.sourceId === this.sourceId);
+    this.card.textContent = source.name;
+    this.card.classList.toggle("information-source--highlighted", visible.some(({ id, from }) => id === view.highlightedConnectionId && from.sourceId === this.sourceId));
+    const scale = this.sharedStateByAncestorId[this.boardId].transform.k;
+    this.card.style.fontSize = `${12 * scale}px`;
+    this.card.style.paddingInline = `${10 * scale}px`;
   }
 }
 
@@ -270,7 +319,13 @@ export function createTopologyBoard({
     .append("g")
     .attr("class", "connection-content");
 
+  svg.select("defs").append("marker")
+    .attr("id", "information-arrow").attr("viewBox", "0 0 10 10")
+    .attr("refX", 9).attr("refY", 5).attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto")
+    .append("path").attr("d", "M0 0 L10 5 L0 10 z").attr("fill", "#6d6586");
+  const informationContent = svg.append("g").attr("class", "information-content");
   const boxesByComponentId = new Map();
+  const boxesBySourceId = new Map();
   const verticalBoundaryComponentIds = new Set(model.components
     .filter(({ type }) => type === "thermal.constant-temperature")
     .map(({ id }) => id));
@@ -284,12 +339,50 @@ export function createTopologyBoard({
         connectionColours,
         onConnectionHighlight
       );
+      const view = getView();
+      const visible = visibleInformationConnections(view.informationConnections, view.selectedComponentId, view.showInformationConnections, view.highlightedConnectionId);
+      const sourceIds = new Set(visible.map(({ from }) => from.sourceId));
+      const endpoints = new Map([...boxesByComponentId, ...[...boxesBySourceId].filter(([id]) => sourceIds.has(id))]);
+      renderInformationLayer(informationContent, endpoints, view, onConnectionHighlight);
     }
   });
   const updateConnections = () => {
     target.dataset.detail = topologyDetailLevel(board.sharedState.transform.k);
     connectionRenderer.request();
   };
+  function syncInformationSources() {
+    const view = getView();
+    const sources = view.informationSources ?? [];
+    const sourceIds = new Set(sources.map(({ id }) => id));
+    for (const [id, box] of boxesBySourceId) {
+      if (!sourceIds.has(id)) {
+        board.boxes = board.boxes.filter((candidate) => candidate !== box);
+        boxesBySourceId.delete(id);
+      }
+    }
+    const positions = informationSourcePositions(
+      sources.filter(({ id }) => !boxesBySourceId.has(id)),
+      view.informationConnections ?? [],
+      new Map([...boxesByComponentId, ...boxesBySourceId])
+    );
+    const transform = board.sharedState.transform;
+    for (const position of positions) {
+      const box = new Box({
+        x: position.x * transform.k + transform.x,
+        y: position.y * transform.k + transform.y,
+        width: position.width * transform.k,
+        height: position.height * transform.k,
+        fixed: false,
+        margin: 0,
+        componentMargin: { top: 0, right: 0, bottom: 0, left: 0 },
+        className: "workbench-box workbench-box--information",
+        component: new InformationSourceComponent({ sourceId: position.id, getView })
+      });
+      box.customOnUpdateEnd = updateConnections;
+      board.addBox(box);
+      boxesBySourceId.set(position.id, box);
+    }
+  }
   for (const component of model.components) {
     const position = positionsByComponentId.get(component.id);
     if (!position) {
@@ -304,7 +397,7 @@ export function createTopologyBoard({
       x: position.x,
       y: position.y,
       width: position.width ?? BOX_WIDTH,
-      height: position.height ?? BOX_HEIGHT,
+      height: position.height ?? BOX_HEIGHT + 20 * getView(component.id).component.metricDetails.length,
       fixed: false,
       margin: 0,
       componentMargin: { top: 0, right: 0, bottom: 0, left: 0 },
@@ -317,6 +410,7 @@ export function createTopologyBoard({
   }
 
   board.customOnUpdateEnd = updateConnections;
+  syncInformationSources();
   board.make();
   updateConnections();
 
@@ -334,6 +428,7 @@ export function createTopologyBoard({
 
   return Object.freeze({
     update() {
+      syncInformationSources();
       board.update();
     },
     dispose() {

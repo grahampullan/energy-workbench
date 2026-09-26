@@ -9,17 +9,17 @@ must not be presented as an MHI result.
 ## Topology
 
 ```text
-Fuel burner -> Refractory lining
-Molten-metal arrival -> Molten metal -> Casting process
+Fuel burner -> Ladle lining
+Molten-metal arrival -> Metal in ladle -> Casting process
                          |       |
                          |       +-> Heat transfer -> Ambient
-                         +-> Heat transfer -> Refractory lining
-Refractory lining -> Heat transfer -> Ambient
+                         +-> Heat transfer -> Ladle lining
+Ladle lining -> Heat transfer -> Ambient
 ```
 
-“Refractory” means the heat-resistant lining inside the ladle. It persists
-between cycles and is represented by a fixed-mass `thermal.store`. Molten metal
-uses the same store equation with connected material ports, so it explicitly
+“Ladle lining” represents the heat-resistant refractory inside the ladle. It
+persists between cycles as a fixed-mass `thermal.store`. “Metal in ladle” uses
+the same store equation with connected material ports, so it explicitly
 tracks mass in, contained mass, mass out, and enthalpy. The baseline retains
 a synthetic 300 kg heel. Reduced inflow can empty the ladle: current-step
 discharge is reserved before publishing the thermal capacity available for
@@ -45,11 +45,18 @@ mode codes are:
 | 4 | Tap |
 | 5 | Hold |
 
-The historical policy follows the prescribed 400 kW burner-heat schedule. The
-temperature-led policy uses current refractory temperature and thermal
-capacity, remaining preheat time, the 800 °C requirement, and a 10 K operating
-margin to request heat. Component equations still determine accepted heat and
-fuel use.
+The historical policy follows Heating schedule, which requests 400 kW during
+preheating and zero otherwise. Discharge schedule directly requests the metal
+outflow rate. Neither schedule-following policy takes a separate permission
+input or reads process-mode codes.
+
+The temperature-led policy uses current refractory temperature and thermal
+capacity, Heating period's remaining time, the 800 °C requirement, and a 10 K
+operating margin to request heat. Remaining time is zero outside the heating
+period, switching heating off. Component equations still determine accepted
+heat, fuel use and available discharge. Heating period is also available as an
+unconnected source in the historical model so the inspector can switch to the
+temperature-led policy; only connected sources appear in the viewer.
 
 For the reviewed synthetic fixture, the temperature-led policy reduces fuel
 input from 333.3 kWh to 293.9 kWh and direct emissions from 61.3 kgCO2 to
@@ -70,6 +77,7 @@ Tests preserve:
 - model, scenario, and layout validity;
 - the derived three-stage resolution plan;
 - historical and temperature-led trajectories at reviewed checkpoints;
+- schedule-following operation independent of process-mode labels;
 - total material in, material out, and retained heel;
 - reduced and zero inflow, unmet discharge, and the empty-inventory boundary;
 - whole-system enthalpy conservation;

@@ -4,7 +4,13 @@
   "title": "Energy Workbench model",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "id", "name", "components", "connections"],
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "components",
+    "connections"
+  ],
   "properties": {
     "schemaVersion": {
       "const": "0.1.0"
@@ -27,13 +33,32 @@
       "items": {
         "$ref": "#/$defs/connection"
       }
+    },
+    "informationSources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/informationSource"
+      }
+    },
+    "informationConnections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/informationConnection"
+      }
     }
   },
   "$defs": {
     "modelComponent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "type", "definitionVersion", "name", "parameters", "initialState"],
+      "required": [
+        "id",
+        "type",
+        "definitionVersion",
+        "name",
+        "parameters",
+        "initialState"
+      ],
       "properties": {
         "id": {
           "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
@@ -52,13 +77,34 @@
         },
         "initialState": {
           "type": "object"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "settings"
+          ],
+          "properties": {
+            "type": {
+              "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+            },
+            "settings": {
+              "type": "object"
+            }
+          }
         }
       }
     },
     "connection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "from", "to"],
+      "required": [
+        "id",
+        "name",
+        "from",
+        "to"
+      ],
       "properties": {
         "id": {
           "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
@@ -68,6 +114,104 @@
         },
         "from": {
           "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/portReference"
+        },
+        "to": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/portReference"
+        }
+      }
+    },
+    "informationSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "seriesId",
+        "quantity",
+        "unit"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seriesId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "quantity": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "activeValue": {
+          "type": "integer"
+        }
+      }
+    },
+    "informationEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "portId"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "componentId"
+          ],
+          "properties": {
+            "componentId": {
+              "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+            }
+          }
+        },
+        {
+          "required": [
+            "sourceId"
+          ],
+          "properties": {
+            "sourceId": {
+              "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "componentId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "sourceId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "portId": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        }
+      }
+    },
+    "informationConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/stableId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from": {
+          "$ref": "#/$defs/informationEndpoint"
         },
         "to": {
           "$ref": "urn:energy-workbench:schema:common:0.1.0#/$defs/portReference"

@@ -1,3 +1,4 @@
+import { prepareInformation, requestConnectedPolicies } from "./information-execution.js";
 import { cloneJsonValue, freezeJsonValue } from "../core/json-value.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
 import {
@@ -8,7 +9,6 @@ import {
   resolveRuntimeComponents
 } from "./component-execution.js";
 import { checkConnectionBalances } from "./connection-execution.js";
-import { requestPolicyOperation } from "./policy-request.js";
 import { prepareResolutionPlan } from "./prepare-resolution-plan.js";
 import { prepareRuntimeModel } from "./prepare-runtime-model.js";
 
@@ -107,8 +107,8 @@ function stepResults({
 }
 
 export function runScenario({ model, scenario, policy, registry, options = {} } = {}) {
-  if (!policy || typeof policy.request !== "function") {
-    throw new TypeError("A policy with a request function is required");
+  if (policy !== undefined) {
+    throw new TypeError("Configure policies on model components and connect their information inputs");
   }
   if (!isRecord(options)) {
     throw new TypeError("Runtime options must be an object");
@@ -130,6 +130,12 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
     return failure(diagnostics);
   }
 
+  let informationPlan;
+  try { informationPlan = prepareInformation(runtimeModel, registry); }
+  catch (error) {
+    diagnostics.push(runtimeDiagnostic("runtime.information-preparation", error.message));
+    return failure(diagnostics);
+  }
   let states = initialiseComponentStates(
     runtimeModel,
     runtimeScenario(runtimeModel),
@@ -156,13 +162,7 @@ export function runScenario({ model, scenario, policy, registry, options = {} } 
       return failure(diagnostics);
     }
 
-    const operation = requestPolicyOperation(
-      policy,
-      runtimeModel,
-      stepContext,
-      limitsByComponentId,
-      diagnostics
-    );
+    const operation = requestConnectedPolicies(runtimeModel, informationPlan, stepContext, limitsByComponentId, diagnostics);
     if (operation === null || hasErrors(diagnostics)) {
       return failure(diagnostics);
     }

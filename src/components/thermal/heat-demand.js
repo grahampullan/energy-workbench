@@ -27,6 +27,29 @@ export const heatDemandDefinition = {
   type: "thermal.heat-demand",
   version: "0.2.0",
   name: "Heat demand",
+  information: {
+    outputs: {
+      "requested-heat": { label: "Requested heat", quantity: "heat-rate", unit: "kW", read: ({ limits }) => limits.maximumHeatFlowkW }
+    }
+  },
+
+  explanation: {
+    title: "Useful heat demand",
+    summary: "Heat satisfies the scaled scenario demand only when delivered at or above the required temperature.",
+    equations: [
+      { label: "Demand", tex: String.raw`\dot Q_d(t)=\alpha\dot Q_{\mathrm{profile}}(t)` },
+      { label: "Useful delivery", tex: String.raw`\dot Q_{\mathrm{served}}=\begin{cases}\min(\dot Q_{\mathrm{in}},\dot Q_d),&T_{\mathrm{in}}\geq T_{\min}\\0,&T_{\mathrm{in}}<T_{\min}\end{cases}` },
+      { label: "Unmet demand", tex: String.raw`\dot Q_{\mathrm{unmet}}=\dot Q_d-\dot Q_{\mathrm{served}}` }
+    ],
+    symbols: [
+      { tex: String.raw`\dot Q_d,\dot Q_{\mathrm{profile}}`, description: "Scaled and prescribed heat demand", unit: "kW" },
+      { tex: String.raw`\alpha`, description: "Demand profile multiplier", unit: "1" },
+      { tex: String.raw`\dot Q_{\mathrm{in}},\dot Q_{\mathrm{served}},\dot Q_{\mathrm{unmet}}`, description: "Incoming, useful, and unmet heat rates", unit: "kW" },
+      { tex: String.raw`T_{\mathrm{in}},T_{\min}`, description: "Delivery and minimum required temperatures", unit: "°C" },
+      { tex: "t", description: "Simulation time", unit: "s" }
+    ],
+    notes: ["The demand has no thermal storage. Insufficient heat or delivery temperature produces an unmet-heat warning."]
+  },
 
   parameters: {
     demandSeriesId: {
@@ -56,16 +79,17 @@ export const heatDemandDefinition = {
   }],
 
   outputs: {
-    demandHeatFlowkW: { unit: "kW" },
-    servedHeatFlowkW: { unit: "kW" },
-    unmetHeatFlowkW: { unit: "kW" },
+    demandHeatFlowkW: { unit: "kW", label: "Requested heat" },
+    servedHeatFlowkW: { unit: "kW", label: "Supplied heat" },
+    unmetHeatFlowkW: { unit: "kW", label: "Unmet heat" },
     deliveryTemperatureC: { unit: "°C" },
     deliveryTemperatureMarginK: { unit: "K" }
   },
 
   editor: {
     visualRole: "boundary",
-    summaryOutput: "unmetHeatFlowkW",
+    summaryOutput: "demandHeatFlowkW",
+    summaryDetails: ["servedHeatFlowkW", "unmetHeatFlowkW"],
     groups: [{
       id: "demand",
       label: "Demand",

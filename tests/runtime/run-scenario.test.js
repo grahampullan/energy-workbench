@@ -1,7 +1,8 @@
+import { policyDefinitions } from "../../src/policies/definitions.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { electricalBusDefinition } from "../../src/components/electrical/bus.js";
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
@@ -21,9 +22,7 @@ function createFixture({
   generationValues = [5, 40],
   timeStepSeconds = 900,
   pvInitialState = {},
-  policy = {
-    request: () => ({ targets: {}, balancingComponentId: "grid" })
-  }
+  sourceTarget = null
 } = {}) {
   const model = {
     schemaVersion: "0.1.0",
@@ -32,6 +31,7 @@ function createFixture({
     components: [
       {
         id: "grid",
+        policy: { type: "electrical.balance", settings: {} },
         type: gridDefinition.type,
         definitionVersion: gridDefinition.version,
         name: "Grid",
@@ -114,23 +114,26 @@ function createFixture({
   return {
     model,
     scenario,
-    policy,
     registry: createComponentRegistry([
       electricalBusDefinition,
       gridDefinition,
       pvDefinition,
       loadDefinition,
       electricalSourceDefinition
-    ])
+    ], { policies: [...policyDefinitions, {
+      type: "test.source", name: "Test source request", componentTypes: ["electrical.source"],
+      inputs: {}, settings: {}, request: () => sourceTarget
+    }] })
   };
 }
 
-function addDispatchableSource(fixture) {
+function addDispatchableSource(fixture, policy) {
   fixture.model.components.push({
     id: "source",
     type: electricalSourceDefinition.type,
     definitionVersion: electricalSourceDefinition.version,
     name: "Dispatchable source",
+    ...(policy ? { policy: { type: policy, settings: {} } } : {}),
     parameters: { maximumPowerkW: 50 },
     initialState: {}
   });
@@ -347,20 +350,14 @@ test("the grid remains idle when fixed PV exactly supplies fixed demand", () => 
   });
 });
 
-test("the balancing component cannot also receive a policy target", () => {
-  const fixture = createFixture({
-    policy: {
-      request: () => ({
-        targets: { grid: { powerkW: 0 } },
-        balancingComponentId: "grid"
-      })
-    }
-  });
-
+test("a balancing policy cannot also return a target", () => {
+  const fixture = createFixture();
+  const definitions = fixture.registry.listPolicies().map((definition) => definition.type === "electrical.balance"
+    ? { ...definition, request: () => ({ powerkW: 0 }) } : definition);
+  fixture.registry = createComponentRegistry(fixture.registry.list(), { policies: definitions });
   const result = runScenario(fixture);
-
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.policy-over-specified"));
+  assert.ok(diagnosticCodes(result).includes("runtime.information-policy"));
 });
 
 test("a non-grid controllable component requires an explicit valid policy request", () => {
@@ -370,31 +367,16 @@ test("a non-grid controllable component requires an explicit valid policy reques
   assert.equal(missingResult.completed, false);
   assert.ok(diagnosticCodes(missingResult).includes("runtime.missing-policy-target"));
 
-  const malformedRequest = createFixture({
-    policy: {
-      request: () => ({
-        targets: { source: { powerkW: "maximum" } },
-        balancingComponentId: "grid"
-      })
-    }
-  });
-  addDispatchableSource(malformedRequest);
+  const malformedRequest = createFixture({ sourceTarget: { powerkW: "maximum" } });
+  addDispatchableSource(malformedRequest, "test.source");
   const malformedResult = runScenario(malformedRequest);
   assert.equal(malformedResult.completed, false);
   assert.ok(diagnosticCodes(malformedResult).includes("runtime.missing-policy-target"));
 });
 
 test("policy fixes controllable operation before the grid balances the remainder", () => {
-  const fixture = createFixture({
-    maximumExportPowerkW: 100,
-    policy: {
-      request: () => ({
-        targets: { source: { powerkW: 100 } },
-        balancingComponentId: "grid"
-      })
-    }
-  });
-  addDispatchableSource(fixture);
+  const fixture = createFixture({ maximumExportPowerkW: 100, sourceTarget: { powerkW: 100 } });
+  addDispatchableSource(fixture, "test.source");
 
   const result = runScenario(fixture);
 
@@ -521,10 +503,7 @@ test("policy can select a non-grid component to balance the bus", () => {
   const fixture = createFixture({
     loadProfileMultiplier: 1,
     demandValues: [15],
-    generationValues: [5],
-    policy: {
-      request: () => ({ targets: {}, balancingComponentId: "source" })
-    }
+    generationValues: [5]
   });
   fixture.model.components = fixture.model.components.filter(
     (component) => component.id !== "grid"
@@ -532,7 +511,7 @@ test("policy can select a non-grid component to balance the bus", () => {
   fixture.model.connections = fixture.model.connections.filter(
     (connection) => connection.id !== "grid-to-bus"
   );
-  addDispatchableSource(fixture);
+  addDispatchableSource(fixture, "electrical.balance");
 
   const result = runScenario(fixture);
 
@@ -542,7 +521,7 @@ test("policy can select a non-grid component to balance the bus", () => {
   });
 });
 
-test("policy must name an existing balancing component", () => {
+test("a bus requires a connected component with a balancing policy", () => {
   const fixture = createFixture();
   fixture.model.components = fixture.model.components.filter(
     (component) => component.id !== "grid"
@@ -554,5 +533,5 @@ test("policy must name an existing balancing component", () => {
   const result = runScenario(fixture);
 
   assert.equal(result.completed, false);
-  assert.ok(diagnosticCodes(result).includes("runtime.policy-balancing-component"));
+  assert.ok(diagnosticCodes(result).includes("runtime.electrical-balancing-connection"));
 });

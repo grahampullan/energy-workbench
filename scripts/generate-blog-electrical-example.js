@@ -22,6 +22,7 @@ const model = {
   components: [
     {
       id: "grid",
+      policy: { type: "electrical.balance", settings: {} },
       type: "electrical.grid",
       definitionVersion: "0.2.0",
       name: "Grid",
@@ -63,6 +64,7 @@ const model = {
     },
     {
       id: "battery",
+      policy: { type: "electrical.self-consumption", settings: {} },
       type: "electrical.battery",
       definitionVersion: "0.2.0",
       name: "Battery",
@@ -77,6 +79,11 @@ const model = {
         storedEnergykWh: 0
       }
     }
+  ],
+  informationSources: [],
+  informationConnections: [
+    { id: "info-pv-power-to-battery-policy-generation", name: "Solar power", from: { componentId: "pv", portId: "power" }, to: { componentId: "battery", portId: "policy.generation" } },
+    { id: "info-load-demand-to-battery-policy-demand", name: "Demand power", from: { componentId: "load", portId: "demand" }, to: { componentId: "battery", portId: "policy.demand" } }
   ],
   connections: [
     {

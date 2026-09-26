@@ -12,7 +12,11 @@
         "maximumImportPowerkW": 1000,
         "maximumExportPowerkW": 1000
       },
-      "initialState": {}
+      "initialState": {},
+      "policy": {
+        "type": "electrical.balance",
+        "settings": {}
+      }
     },
     {
       "id": "bus",
@@ -58,6 +62,10 @@
       },
       "initialState": {
         "storedEnergykWh": 0
+      },
+      "policy": {
+        "type": "electrical.self-consumption",
+        "settings": {}
       }
     }
   ],
@@ -108,6 +116,33 @@
       "to": {
         "componentId": "bus",
         "portId": "terminal"
+      }
+    }
+  ],
+  "informationSources": [],
+  "informationConnections": [
+    {
+      "id": "info-pv-power-to-battery-policy-generation",
+      "name": "Solar power",
+      "from": {
+        "componentId": "pv",
+        "portId": "power"
+      },
+      "to": {
+        "componentId": "battery",
+        "portId": "policy.generation"
+      }
+    },
+    {
+      "id": "info-load-demand-to-battery-policy-demand",
+      "name": "Demand power",
+      "from": {
+        "componentId": "load",
+        "portId": "demand"
+      },
+      "to": {
+        "componentId": "battery",
+        "portId": "policy.demand"
       }
     }
   ]

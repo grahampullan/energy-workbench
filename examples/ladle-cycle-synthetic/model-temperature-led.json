@@ -16,8 +16,10 @@
       },
       "initialState": {},
       "policy": {
-        "type": "thermal.follow-schedule",
-        "settings": {}
+        "type": "thermal.reach-temperature",
+        "settings": {
+          "margin": 10
+        }
       }
     },
     {
@@ -242,13 +244,6 @@
       "activeValue": 1
     },
     {
-      "id": "heating-schedule",
-      "name": "Heating schedule",
-      "seriesId": "historical-burner-output",
-      "quantity": "heat-rate",
-      "unit": "kW"
-    },
-    {
       "id": "discharge-schedule",
       "name": "Discharge schedule",
       "seriesId": "material-outflow",
@@ -257,18 +252,6 @@
     }
   ],
   "informationConnections": [
-    {
-      "id": "info-heating-schedule-value-to-burner-policy-request",
-      "name": "Heating schedule",
-      "from": {
-        "sourceId": "heating-schedule",
-        "portId": "value"
-      },
-      "to": {
-        "componentId": "burner",
-        "portId": "policy.request"
-      }
-    },
     {
       "id": "info-discharge-schedule-value-to-metal-policy-request",
       "name": "Discharge schedule",
@@ -279,6 +262,78 @@
       "to": {
         "componentId": "metal",
         "portId": "policy.request"
+      }
+    },
+    {
+      "id": "info-refractory-temperature-to-burner-policy-temperature",
+      "name": "Refractory temperature",
+      "from": {
+        "componentId": "refractory",
+        "portId": "temperature"
+      },
+      "to": {
+        "componentId": "burner",
+        "portId": "policy.temperature"
+      }
+    },
+    {
+      "id": "info-refractory-heat-capacity-to-burner-policy-capacity",
+      "name": "Refractory heat capacity",
+      "from": {
+        "componentId": "refractory",
+        "portId": "heat-capacity"
+      },
+      "to": {
+        "componentId": "burner",
+        "portId": "policy.capacity"
+      }
+    },
+    {
+      "id": "info-refractory-required-temperature-to-burner-policy-required",
+      "name": "Required temperature",
+      "from": {
+        "componentId": "refractory",
+        "portId": "required-temperature"
+      },
+      "to": {
+        "componentId": "burner",
+        "portId": "policy.required"
+      }
+    },
+    {
+      "id": "info-refractory-maximum-temperature-to-burner-policy-maximum",
+      "name": "Maximum temperature",
+      "from": {
+        "componentId": "refractory",
+        "portId": "maximum-temperature"
+      },
+      "to": {
+        "componentId": "burner",
+        "portId": "policy.maximum"
+      }
+    },
+    {
+      "id": "info-burner-maximum-heat-to-burner-policy-power-limit",
+      "name": "Burner heat limit",
+      "from": {
+        "componentId": "burner",
+        "portId": "maximum-heat"
+      },
+      "to": {
+        "componentId": "burner",
+        "portId": "policy.power-limit"
+      }
+    },
+    {
+      "id": "info-preheat-period-remaining-hours-to-burner-policy-remaining",
+      "name": "Heating time remaining",
+      "from": {
+        "sourceId": "preheat-period",
+        "portId": "remaining-hours"
+      },
+      "to": {
+        "componentId": "burner",
+        "portId": "policy.remaining"
       }
     }
   ]

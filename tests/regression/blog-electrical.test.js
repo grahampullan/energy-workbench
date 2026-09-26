@@ -8,7 +8,7 @@ import { electricalBusDefinition } from "../../src/components/electrical/bus.js"
 import { electricalGridDefinition } from "../../src/components/electrical/grid.js";
 import { electricalLoadDefinition } from "../../src/components/electrical/load.js";
 import { electricalPvDefinition } from "../../src/components/electrical/pv.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import { integrateStepPowerkWh } from
   "../../src/core/energy-integration.js";
 import {
@@ -17,8 +17,6 @@ import {
   validateScenario,
   validateVariant
 } from "../../src/core/validation/validate-documents.js";
-import { createPvBatterySelfConsumptionPolicy } from
-  "../../src/policies/pv-battery-self-consumption.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
 const exampleDirectory = new URL("../../examples/blog-electrical/", import.meta.url);
@@ -54,10 +52,6 @@ const registry = createComponentRegistry([
   electricalLoadDefinition,
   electricalPvDefinition
 ]);
-const policy = createPvBatterySelfConsumptionPolicy({
-  batteryComponentId: "battery",
-  balancingComponentId: "grid"
-});
 const variantsByCase = {
   baseline: null,
   doublePv: doublePvVariant,
@@ -147,7 +141,6 @@ const runsByCase = Object.fromEntries(
     runScenario({
       model: applyVariant(model, variant),
       scenario,
-      policy,
       registry
     })
   ])

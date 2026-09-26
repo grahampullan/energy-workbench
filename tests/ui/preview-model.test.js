@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { electricalBatteryDefinition } from
   "../../src/components/electrical/battery.js";
-import { createComponentRegistry } from "../../src/core/component-registry.js";
+import { createComponentRegistry } from "../helpers/registry.js";
 import {
   applyParameterOverrides,
   parameterOverrideKey,

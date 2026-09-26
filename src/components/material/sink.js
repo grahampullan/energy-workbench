@@ -12,6 +12,17 @@ export const materialSinkDefinition = {
   type: "material.sink",
   version: "0.1.0",
   name: "Material sink",
+  explanation: {
+    title: "Material leaving the model",
+    summary: "The sink records the material flow and specific enthalpy supplied by its upstream component.",
+    equations: [{ label: "Received enthalpy", tex: String.raw`\dot H=\dot m h` }],
+    symbols: [
+      { tex: String.raw`\dot m`, description: "Received mass-flow rate", unit: "kg/s" },
+      { tex: "h", description: "Received specific enthalpy", unit: "kJ/kg" },
+      { tex: String.raw`\dot H`, description: "Received material enthalpy rate", unit: "kW" }
+    ],
+    notes: ["This boundary has no inventory, heat loss, or processing model. The upstream component determines the actual discharge."]
+  },
 
   parameters: {},
   initialState: {},

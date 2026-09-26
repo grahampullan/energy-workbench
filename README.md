@@ -36,7 +36,9 @@ public model examples run headlessly and in the browser on the same contracts,
 with reviewed results recorded by regression tests.
 
 The browser workbench can load any committed example through the same
-runtime. It presents the saved topology, live electrical, thermal, and material
+runtime. **About example**, beside the example selector, opens a concise
+description of the selected example's setup and operation. The workbench
+presents the saved topology, live electrical, thermal, and material
 flows, a definition-driven component inspector, run KPIs, linked power- and
 mass-flow charts, integrated-energy results, component temperature charts, and
 timestep scrubbing. Scenario inputs are hidden by default and can be overlaid

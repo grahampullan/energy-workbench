@@ -48,12 +48,49 @@ import {
 
 const DEFAULT_EXAMPLE_ID = "blog-electrical";
 const EXAMPLES = Object.freeze({
-  "blog-electrical": { label: "PV and battery", root: "/examples/blog-electrical", initialComponentType: "electrical.battery", createKpis: createElectricalRunKpis },
-  "coupled-thermal": { label: "Coupled thermal", root: "/examples/coupled-thermal", initialComponentType: "thermal.store", createKpis: createCoupledThermalRunKpis },
-  "batch-heating-synthetic": { label: "Batch heating", root: "/examples/batch-heating-synthetic", initialComponentType: "thermal.store", createKpis: createBatchHeatingRunKpis },
-  "material-inventory-synthetic": { label: "Material inventory", root: "/examples/material-inventory-synthetic", initialComponentType: "thermal.store", createKpis: createMaterialInventoryRunKpis },
-  "ladle-cycle-historical": { label: "Ladle · historical", root: "/examples/ladle-cycle-synthetic", initialComponentId: "refractory", createKpis: createLadleRunKpis },
-  "ladle-cycle-minimum-fuel": { label: "Ladle · temperature-led", root: "/examples/ladle-cycle-synthetic", modelFile: "model-temperature-led.json", initialComponentId: "refractory", createKpis: createLadleRunKpis }
+  "blog-electrical": {
+    label: "PV and battery",
+    description: "Solar PV and a battery supply an electrical load through a shared bus. The battery stores surplus solar power and covers shortfalls; the grid supplies or absorbs the remaining power.",
+    root: "/examples/blog-electrical",
+    initialComponentType: "electrical.battery",
+    createKpis: createElectricalRunKpis
+  },
+  "coupled-thermal": {
+    label: "Coupled thermal",
+    description: "An electric heater warms a hot-water store to supply a changing heat demand. The heater follows demand, while the store supplies heat within its limits and loses heat to the surroundings. Any unmet demand is reported.",
+    root: "/examples/coupled-thermal",
+    initialComponentType: "thermal.store",
+    createKpis: createCoupledThermalRunKpis
+  },
+  "batch-heating-synthetic": {
+    label: "Batch heating",
+    description: "An electric heater warms a fixed batch of material according to a power schedule. The model tracks its temperature as heat is added and lost to the surroundings, and checks whether the required final temperature is reached.",
+    root: "/examples/batch-heating-synthetic",
+    initialComponentType: "thermal.store",
+    createKpis: createBatchHeatingRunKpis
+  },
+  "material-inventory-synthetic": {
+    label: "Material inventory",
+    description: "Material enters a store, is heated, then leaves according to a discharge schedule. The model tracks how much material and heat remain, and limits discharge to the material available.",
+    root: "/examples/material-inventory-synthetic",
+    initialComponentType: "thermal.store",
+    createKpis: createMaterialInventoryRunKpis
+  },
+  "ladle-cycle-historical": {
+    label: "Ladle · historical",
+    description: "A preheated ladle receives molten metal, holds it and discharges it for casting. The burner follows a fixed heating schedule. Heat passes between the metal and lining and is lost to the surroundings.",
+    root: "/examples/ladle-cycle-synthetic",
+    initialComponentId: "refractory",
+    createKpis: createLadleRunKpis
+  },
+  "ladle-cycle-minimum-fuel": {
+    label: "Ladle · temperature-led",
+    description: "A ladle is preheated, filled with molten metal and discharged for casting. The burner adjusts its power using the lining temperature and time remaining to aim for the required temperature. Metal arrival and discharge follow the same schedules as the historical example, allowing their fuel use to be compared.",
+    root: "/examples/ladle-cycle-synthetic",
+    modelFile: "model-temperature-led.json",
+    initialComponentId: "refractory",
+    createKpis: createLadleRunKpis
+  }
 });
 
 function componentIdForType(model, type) {
@@ -152,6 +189,12 @@ function showFatalError(error) {
 
 async function startWorkbench() {
   const example = selectedExample();
+  const exampleDescription = element("example-description");
+  element("example-description-title").textContent = example.label;
+  element("example-description-text").textContent = example.description;
+  const aboutExample = element("about-example");
+  aboutExample.addEventListener("click", () => exampleDescription.showModal());
+  aboutExample.disabled = false;
   const [loadedModel, scenario, layout] = await Promise.all([
     loadJson(`${example.root}/${example.modelFile ?? "model.json"}`),
     loadJson(`${example.root}/scenario.json`),

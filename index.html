@@ -19,7 +19,7 @@
           </div>
         </div>
         <div class="app-header-tools">
-          <div class="project-actions" aria-label="Model file actions">
+          <div class="project-actions" aria-label="Example and model file actions">
             <label class="example-picker" for="example-select">
               <span>Example</span>
               <select id="example-select">
@@ -31,6 +31,13 @@
                 <option value="ladle-cycle-minimum-fuel">Ladle · temperature-led</option>
               </select>
             </label>
+            <button
+              id="about-example"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="example-description"
+              disabled
+            >About example</button>
             <input
               id="open-model-file"
               type="file"
@@ -111,6 +118,20 @@
         </aside>
       </section>
     </main>
+
+    <dialog
+      id="example-description"
+      class="example-description"
+      aria-labelledby="example-description-title"
+      aria-describedby="example-description-text"
+    >
+      <p class="eyebrow">About this example</p>
+      <h2 id="example-description-title"></h2>
+      <p id="example-description-text"></p>
+      <form method="dialog">
+        <button class="secondary-button" autofocus>Close</button>
+      </form>
+    </dialog>
 
     <template id="fatal-error-template">
       <section class="fatal-error" role="alert">

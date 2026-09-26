@@ -1,97 +1,112 @@
 # Energy Workbench
 
-An interactive engineering environment for approximate, time-resolved energy
-models.
+Explore electricity, heat, and material flows over time. Adjust component
+parameters and operating rules, inspect the equations, and compare the results.
+The browser and Node tests share one deterministic simulation, with explicit
+timesteps and checks on energy and material balances.
 
-The project has passed its Push 1 gate and now has a public Push 2 synthetic
-ladle cycle on the validated electrical–thermal–material foundation.
+## Getting started
 
-## Project contracts
-
-- [Architecture](ARCHITECTURE.md)
-- [Code shape profile](CODE_SHAPE_PROFILE.md)
-- [Architecture decisions](docs/adr/README.md)
-- [Project gates and Push 2 status](docs/project-gates.md)
-- [Forward-time and topology-resolution plan](docs/forward-time-and-resolution-plan.md)
-- [Component development](docs/component-development.md)
-- [Legacy electrical regression](docs/regression/blog-electrical.md)
-- [Coupled thermal reference](docs/regression/coupled-thermal.md)
-- [Batch-heating reference](docs/regression/batch-heating.md)
-- [Material-inventory reference](docs/regression/material-inventory.md)
-- [Synthetic ladle-cycle reference](docs/regression/ladle-cycle.md)
-
-JSON Schemas for the initial study documents live in `src/core/schemas`.
-
-The executable runtime supports deterministic fixed-timestep runs on an
-electrical bus with a repeatable terminal, fixed load and PV profiles,
-branching, policy-controlled battery storage and generation, and a residual
-grid boundary with import and export limits. It also supports the Push 1B
-coupled topology: an electric heater, thermal store, heat demand, and ambient
-boundary, with standing loss owned by an explicit `thermal.heat-transfer`
-component. Push 2 reuses that same `thermal.store` definition for a fixed-mass
-batch, a material inventory, and separate refractory and molten-metal bodies.
-The synthetic ladle cycle adds a fuel burner, explicit thermal contacts and
-losses, process modes, and historical and temperature-led policies. All five
-public model examples run headlessly and in the browser on the same contracts,
-with reviewed results recorded by regression tests.
-
-The browser workbench can load any committed example through the same
-runtime. **About example**, beside the example selector, opens a concise
-description of the selected example's setup and operation. The workbench
-presents the saved topology, live electrical, thermal, and material
-flows, a definition-driven component inspector, run KPIs, linked power- and
-mass-flow charts, integrated-energy results, component temperature charts, and
-timestep scrubbing. Scenario inputs are hidden by default and can be overlaid
-with **Show scenario inputs**; temperature requirement lines remain visible.
-The inspector's **Equations** view shows each component's governing
-equations, symbols, and units, together with its relevant
-active-policy rules. The **Policy** view shows the selected rule and the source
-of every input, with controls to choose a compatible policy, settings and input
-connections. Changes are validated and run before they update the working model.
-For a balancing component, such as the PV example's grid, a **Role** tab shows
-its physical role and the connected source of its power requirement. Its role
-is also shown separately from policy rules in **Equations** and from operating
-policies in the operation selector.
-Selecting a component reveals its information inputs as dashed arrows;
-**Show information connections** reveals the full information layer. Schedule
-sources appear as named cards. Input buttons trace their sources in the viewer.
-These static explanations remain unchanged during
-timestep scrubbing. KaTeX, its styles, and its fonts are bundled locally.
-Numeric parameter controls create temporary preview runs which can be reset or
-applied to the in-memory working model.
-Components can also be moved and resized as temporary layout changes;
-reloading restores the saved layout. The applied working model can be
-downloaded and opened again as JSON, including its policies and information
-connections, while a completed preview can be
-downloaded separately as a named parameter variant.
-
-## Development
+Use Node.js 22, the version used for testing, and npm. From the repository root:
 
 ```sh
-npm install
-npm test
-```
-
-Browser regression tests cover all examples and the select, preview,
-reset/apply, save, and reload workflow:
-
-```sh
-npx playwright install chromium
-npm run test:browser
-```
-
-Alternatively, use an installed Google Chrome with
-`PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. `npm run check` runs both the
-Node tests and the browser checks, including the browser build.
-
-Start the browser workbench at `http://127.0.0.1:4173`:
-
-```sh
+npm ci
 npm start
 ```
 
-`npm start` creates an ignored browser bundle and then starts the local static
-server. Use `npm run build` when only the bundle is needed.
+Open [the workbench](http://127.0.0.1:4173). It starts with the PV and battery
+example. `npm start` builds the browser bundle and starts a local static server.
 
-Regenerate the new-contract blog-example documents from the preserved legacy
-input with `npm run generate:blog-example`.
+## Explore a model
+
+1. Choose an **Example**. **About example** explains its setup and operation.
+2. Select a component in **Model**. The inspector shows its **Controls**,
+   **Equations**, and **Policy** or **Role**.
+3. Change a parameter to preview its effect. **Reset preview** restores the
+   working model; **Apply** keeps the change in the current session.
+4. In **Results**, choose a quantity and scrub the chart to select a timestep.
+   Hover over a chart line or model connection to highlight its flow and components.
+5. **Save model** downloads the applied model as JSON. **Open model** reloads a
+   model compatible with the selected example's component layout. **Save variant**
+   downloads preview parameter changes as a separate JSON document.
+
+Solid connections carry energy or material. Dashed connections supply policy
+inputs; selecting a component reveals them. **Show information connections**
+reveals them all. The inspector lets you edit a policy and its inputs together.
+
+Policies request operation; components enforce physical limits. A balancing
+role, such as the grid's, supplies or absorbs the remaining power required.
+
+Scenario-input curves are hidden until **Show scenario inputs** is enabled.
+Temperature requirement lines remain visible. Component and schedule cards can
+be moved; layout changes are temporary and reset when the page reloads.
+
+## Examples
+
+Six examples are available. The links describe their models and reviewed
+regression results. The process examples use synthetic data.
+
+| Example | What it shows |
+| --- | --- |
+| [PV and battery](docs/regression/blog-electrical.md) | A battery stores surplus solar power and covers shortfalls; the grid balances the remainder. |
+| [Coupled thermal](docs/regression/coupled-thermal.md) | An electric heater and hot-water store supply changing heat demand, with losses and unmet demand reported. |
+| [Batch heating](docs/regression/batch-heating.md) | A power schedule heats a fixed batch, with a check on its final temperature. |
+| [Material inventory](docs/regression/material-inventory.md) | Material enters, is heated, and leaves a store; discharge is limited to available inventory. |
+| [Ladle · historical](docs/regression/ladle-cycle.md) | A fixed burner schedule preheats a ladle before molten-metal arrival, holding, and discharge. |
+| [Ladle · temperature-led](docs/regression/ladle-cycle.md) | The burner responds to lining temperature and time remaining, allowing fuel use to be compared with the fixed schedule. |
+
+## Development and checks
+
+```sh
+npm test                         # Node tests and numerical regressions
+npx playwright install chromium # Browser setup, after installing dependencies
+npm run check                    # Node tests, browser build, and browser tests
+```
+
+To use an installed Google Chrome instead of Playwright's Chromium:
+
+```sh
+PLAYWRIGHT_CHANNEL=chrome npm run check
+```
+
+`npm run test:browser` builds and runs just the browser checks. They cover all
+examples and the select, preview, reset/apply, save, and reload workflow.
+
+After changing browser code, run `npm run build` and refresh the page. Generated
+bundles are ignored by Git. `npm run generate:blog-example` regenerates the
+electrical example from its preserved legacy inputs.
+
+## Versioning
+
+- **Application:** [package.json](package.json) identifies a release, tagged as
+  `vX.Y.Z`. During `0.x` development, minor releases introduce
+  features or changed contracts; patch releases contain compatible corrections.
+  Versions advance at release milestones, not on every commit.
+- **Documents:** `schemaVersion` identifies the JSON format and changes with its
+  contract, independently of the application version.
+- **Components:** models pin an exact `definitionVersion`. Engineering contract
+  changes require coordinated definition and model updates; internal refactoring
+  and presentation changes do not. See [definition versions and saved-model
+  updates](docs/component-development.md#definition-versions).
+
+Record a study's model, scenario, any variant, and application release or Git
+commit together. Component versions alone do not identify the whole simulation.
+
+## Project contracts
+
+- [Architecture](ARCHITECTURE.md): system boundaries and invariants.
+- [Code shape](CODE_SHAPE.md) and [repository profile](CODE_SHAPE_PROFILE.md):
+  simplicity, ownership, UI, and testing conventions.
+- [Component development](docs/component-development.md): equations, ports,
+  information inputs, policies, and extension tests.
+- [JSON schemas](src/core/schemas): persisted document formats.
+- [Time and resolution](docs/forward-time-and-resolution-plan.md): numerical
+  conventions, dependency ordering, and planned extensions.
+- [Architecture decisions](docs/adr/README.md): decision history.
+- [Project gates](docs/project-gates.md): evaluation status and development scope.
+
+The [example specifications](#examples) define the reviewed engineering behaviour.
+Current models support electrical power, directed heat transfer, and material
+flow with enthalpy, with one electrical balancing role per model. They use
+explicit timestep calculations; general iterative solving and optimisation are
+outside the current scope.

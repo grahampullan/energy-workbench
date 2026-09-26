@@ -252,6 +252,7 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
       const {
         stateField,
         outputField,
+        initialLimitField,
         thresholdParameter,
         thresholdLabel
       } = chart;
@@ -261,6 +262,7 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
         thresholdLabel !== undefined;
       if (
         usesState === usesOutput ||
+        (usesOutput && typeof initialLimitField !== "string") ||
         (
           hasThreshold &&
           (
@@ -273,47 +275,30 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
           `Component ${component.id} temperature-chart metadata is invalid`
         );
       }
-      let values;
-      let stepValueOffset;
-      if (usesState) {
-        const initialTemperatureC = stateForComponent(
-          results.initialStates,
-          component.id,
-          "Run results initial states"
-        )[stateField];
-        if (!Number.isFinite(initialTemperatureC)) {
-          throw new TypeError(
-            `Component ${component.id} initial temperature must be finite`
-          );
-        }
-        values = [{
-          stepIndex: -1,
-          elapsedSeconds: 0,
-          temperatureC: initialTemperatureC
-        }, ...results.steps.map((step, stepIndex) => ({
+      const initialTemperatureC = usesState
+        ? stateForComponent(
+            results.initialStates,
+            component.id,
+            "Run results initial states"
+          )[stateField]
+        : results.steps[0].components.find(
+            ({ componentId }) => componentId === component.id
+          )?.operatingLimits?.[initialLimitField];
+      if (!Number.isFinite(initialTemperatureC)) {
+        throw new TypeError(`Component ${component.id} initial temperature must be finite`);
+      }
+      const values = [{
+        stepIndex: -1,
+        elapsedSeconds: 0,
+        temperatureC: initialTemperatureC
+      }, ...results.steps.map((step, stepIndex) => {
+        const result = step.components.find(({ componentId }) => componentId === component.id);
+        return {
           stepIndex,
           elapsedSeconds: step.elapsedSeconds + timeStepSeconds,
-          temperatureC: stateForComponent(
-            step.components,
-            component.id,
-            `Run results step ${stepIndex}`
-          )[stateField]
-        }))];
-        stepValueOffset = 1;
-      } else {
-        values = results.steps.map((step, stepIndex) => {
-          const componentResult = step.components.find(
-            (candidate) => candidate.componentId === component.id
-          );
-          const temperatureC = componentResult?.outputs?.[outputField];
-          return {
-            stepIndex,
-            elapsedSeconds: step.elapsedSeconds + timeStepSeconds,
-            temperatureC
-          };
-        });
-        stepValueOffset = 0;
-      }
+          temperatureC: usesState ? result?.state?.[stateField] : result?.outputs?.[outputField]
+        };
+      })];
       if (values.some(({ temperatureC }) => !Number.isFinite(temperatureC))) {
         throw new TypeError(
           `Component ${component.id} temperature series must be finite`
@@ -330,7 +315,7 @@ function createTemperatureSeries({ model, registry, results, timeStepSeconds }) 
           ? componentParameter(component, definition, thresholdParameter)
           : null,
         thresholdLabel: hasThreshold ? thresholdLabel : null,
-        stepValueOffset,
+        stepValueOffset: 1,
         values
       };
     });

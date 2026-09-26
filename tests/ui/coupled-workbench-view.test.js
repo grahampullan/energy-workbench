@@ -97,13 +97,14 @@ test("coupled chart includes electrical and thermal connection flows", () => {
   assert.equal(storeTemperature.label, "Hot-water store temperature");
   assert.equal(storeTemperature.thresholdC, 70);
   assert.equal(storeTemperature.thresholdLabel, "Minimum useful");
-  assert.equal(storeTemperature.values.length, 12);
+  assert.equal(storeTemperature.values.length, 13);
+  assert.equal(storeTemperature.values[0].temperatureC, 80);
   assert.deepEqual(
     storeTemperature.values.map((point) => point.elapsedSeconds),
-    Array.from({ length: 12 }, (_, index) => (index + 1) * 1800)
+    Array.from({ length: 13 }, (_, index) => index * 1800)
   );
   assertSeriesClose(
-    storeTemperature.values.map((point) => point.temperatureC),
+    storeTemperature.values.slice(1).map((point) => point.temperatureC),
     expectedResults.series.storeTemperatureC
   );
 });

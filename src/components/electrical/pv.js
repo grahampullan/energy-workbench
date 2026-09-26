@@ -56,6 +56,8 @@ export const electricalPvDefinition = {
 
   initialState: {},
 
+  seriesParameters: ["generationSeriesId"],
+
   ports: [
     {
       id: "electricity-out",

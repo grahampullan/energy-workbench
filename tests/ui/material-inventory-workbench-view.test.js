@@ -106,13 +106,16 @@ test("material-inventory UI documents and chart series are complete", () => {
   assert.equal(chart.temperatureSeries.length, 1);
   const [temperature] = chart.temperatureSeries;
   assert.equal(temperature.id, "inventory:temperature");
-  assert.equal(temperature.stepValueOffset, 0);
+  assert.equal(temperature.stepValueOffset, 1);
   assert.equal(temperature.thresholdC, 0);
   assert.equal(temperature.thresholdLabel, "Minimum useful");
-  assert.equal(temperature.values.length, 160);
+  assert.equal(temperature.values.length, 161);
+  assert.deepEqual(temperature.values[0], {
+    stepIndex: -1, elapsedSeconds: 0, temperatureC: 0
+  });
   for (const checkpoint of expectedResults.checkpoints) {
     assert.ok(Math.abs(
-      temperature.values[checkpoint.stepIndex].temperatureC
+      temperature.values[checkpoint.stepIndex + temperature.stepValueOffset].temperatureC
         - checkpoint.temperatureC
     ) <= 1e-12);
   }

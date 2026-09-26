@@ -13,7 +13,7 @@ rather than rewriting its history.
 | [0002](0002-json-study-documents.md) | JSON study documents | Accepted |
 | [0003](0003-component-and-runtime-contract.md) | Component and runtime contract | Partly superseded by 0015 |
 | [0004](0004-preview-commands-and-history.md) | Preview, commands, and history | Accepted |
-| [0005](0005-runtime-preparation.md) | Runtime preparation | Accepted |
+| [0005](0005-runtime-preparation.md) | Runtime preparation | Context access narrowed by 0024 |
 | [0006](0006-fixed-timestep-electrical-runtime.md) | Fixed-timestep electrical runtime | Partly superseded by 0015 |
 | [0007](0007-single-electrical-bus.md) | Single electrical bus | Partly superseded by 0015 and 0018 |
 | [0008](0008-residual-grid-and-fixed-pv.md) | Residual grid and fixed PV | Partly superseded by 0015 |
@@ -31,4 +31,5 @@ rather than rewriting its history.
 | [0020](0020-explicit-heat-transfer.md) | Explicit passive heat transfer | Accepted |
 | [0021](0021-synthetic-ladle-process-slice.md) | Synthetic ladle process slice | Accepted |
 | [0022](0022-connected-component-policies.md) | Component policies with explicit information connections | Role classification superseded by 0023 |
-| [0023](0023-physical-boundaries-and-policy-inputs.md) | Physical boundaries, policy inputs, and balancing roles | Accepted definition; implementation gaps recorded |
+| [0023](0023-physical-boundaries-and-policy-inputs.md) | Physical boundaries, policy inputs, and balancing roles | Physical access enforced and role encoding accepted by 0024 |
+| [0024](0024-connection-local-physical-access.md) | Enforce connection-local physical access | Accepted |

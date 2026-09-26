@@ -6,7 +6,7 @@
     {
       "id": "burner",
       "type": "thermal.fuel-burner",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Preheat burner",
       "parameters": {
         "maximumFuelInputPowerkW": 800,
@@ -34,7 +34,7 @@
     {
       "id": "refractory",
       "type": "thermal.store",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Ladle lining",
       "parameters": {
         "maximumMassKg": 1500,
@@ -53,7 +53,7 @@
     {
       "id": "metal",
       "type": "thermal.store",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Metal in ladle",
       "parameters": {
         "maximumMassKg": 6000,
@@ -76,7 +76,7 @@
     {
       "id": "metal-refractory-contact",
       "type": "thermal.heat-transfer",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Lining surface heat transfer",
       "parameters": {
         "conductancekWPerK": 0.15
@@ -86,7 +86,7 @@
     {
       "id": "refractory-loss",
       "type": "thermal.heat-transfer",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Refractory heat loss",
       "parameters": {
         "conductancekWPerK": 0.02
@@ -96,7 +96,7 @@
     {
       "id": "metal-loss",
       "type": "thermal.heat-transfer",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Metal heat loss",
       "parameters": {
         "conductancekWPerK": 0.01

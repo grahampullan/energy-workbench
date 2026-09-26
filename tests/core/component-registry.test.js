@@ -143,3 +143,28 @@ test("component registry accepts only declared editor visual roles", () => {
     /editor\.visualRole is invalid/u
   );
 });
+
+test("physical ports explicitly declare the limits and target fields they publish", () => {
+  const withBoundary = (boundary) => createTestComponentDefinition({
+    ports: [{ id: "power", flowType: "electricity.active-power", direction: "out", boundary }]
+  });
+  assert.doesNotThrow(() => createComponentRegistry([withBoundary({
+    operatingLimits: ["maximumPowerkW"], target: ["powerkW"]
+  })]));
+  for (const boundary of [null, { state: ["storedEnergykWh"] },
+    { operatingLimits: "all" }, { target: ["powerkW", "powerkW"] },
+    { operatingLimits: [null] }, { target: ["*"] }]) {
+    assert.throws(() => createComponentRegistry([withBoundary(boundary)]), /boundary/);
+  }
+});
+
+test("scenario access declarations must reference distinct string parameters", () => {
+  const definition = createTestComponentDefinition({
+    parameters: { profileId: { unit: "series-id", default: "demand" },
+      powerkW: { unit: "kW", default: 10 } }
+  });
+  assert.doesNotThrow(() => createComponentRegistry([{ ...definition, seriesParameters: ["profileId"] }]));
+  for (const seriesParameters of ["all", ["unknown"], ["powerkW"], ["profileId", "profileId"], [null]]) {
+    assert.throws(() => createComponentRegistry([{ ...definition, seriesParameters }]), /seriesParameters/);
+  }
+});

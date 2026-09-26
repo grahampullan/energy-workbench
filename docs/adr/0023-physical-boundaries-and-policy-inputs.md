@@ -2,6 +2,9 @@
 
 Status: Accepted definition; implementation gaps identified below.
 
+Follow-up: [0024](0024-connection-local-physical-access.md) implements physical
+access restrictions and supersedes the role-storage migration expectation.
+
 ## Context
 
 The PV battery receives generation and demand through information connections.

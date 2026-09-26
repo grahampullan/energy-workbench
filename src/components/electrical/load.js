@@ -57,6 +57,8 @@ export const electricalLoadDefinition = {
 
   initialState: {},
 
+  seriesParameters: ["demandSeriesId"],
+
   ports: [
     {
       id: "electricity-in",

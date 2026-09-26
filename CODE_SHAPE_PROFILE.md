@@ -25,8 +25,7 @@ system boundaries and `CODE_SHAPE.md` for general defaults.
    not duplicate component physics in policies or runtime modules.
 5. Keep operating policies limited to their owning component's requested target.
    Give them only immutable connected information inputs and settings. Treat
-   balancing as explicit physical configuration; the current `electrical.balance`
-   policy encoding is a documented migration gap, not a pattern for new policies.
+   balancing as explicit physical configuration within the operation catalogue.
    Keep public information outputs with the owning component definition; never
    let a policy inspect the model or global state. Physical resolution may use
    only declared boundary data from its connected ports, not arbitrary telemetry.

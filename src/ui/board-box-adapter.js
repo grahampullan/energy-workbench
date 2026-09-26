@@ -48,6 +48,11 @@ export function bindNumberParameterControls({
       }
       return;
     }
+    // Browsers emit change again on blur. Re-running an unchanged preview can
+    // disable Apply between pointer-down and click, swallowing the click.
+    if (value === currentValue) {
+      return;
+    }
     observable.state = { value, source };
     onChange(value, { final });
   }
@@ -179,12 +184,15 @@ class InformationSourceComponent extends BoardBoxComponent {
   }
 }
 
-function addArrowMarkers(svg, connectionIds, connectionColours) {
-  svg
-    .append("defs")
-    .selectAll("marker")
-    .data(connectionIds)
-    .join("marker")
+function renderArrowMarkers(defs, connectionIds, connectionColours) {
+  const markers = defs
+    .selectAll("marker.flow-arrow")
+    .data(connectionIds, (id) => id)
+    .join((enter) => {
+      const marker = enter.append("marker").attr("class", "flow-arrow");
+      marker.append("path").attr("d", "M 0 0 L 10 5 L 0 10 z");
+      return marker;
+    })
     .attr("id", (connectionId) =>
       `flow-arrow-${connectionColours.indexFor(connectionId)}`
     )
@@ -193,9 +201,8 @@ function addArrowMarkers(svg, connectionIds, connectionColours) {
     .attr("refY", 5)
     .attr("markerWidth", 7)
     .attr("markerHeight", 7)
-    .attr("orient", "auto-start-reverse")
-    .append("path")
-    .attr("d", "M 0 0 L 10 5 L 0 10 z")
+    .attr("orient", "auto-start-reverse");
+  markers.select("path")
     .attr("fill", (connectionId) =>
       connectionColours.colourFor(connectionId)
     );
@@ -294,9 +301,6 @@ export function createTopologyBoard({
   const positionsByComponentId = new Map(
     layout.components.map((position) => [position.componentId, position])
   );
-  const connectionColours = createConnectionColourScale(
-    model.connections.map(({ id }) => id)
-  );
   const context = new Context();
   const board = new Board({
     targetId,
@@ -310,16 +314,12 @@ export function createTopologyBoard({
     .append("svg")
     .attr("class", "connection-layer")
     .attr("aria-hidden", "true");
-  addArrowMarkers(
-    svg,
-    model.connections.map(({ id }) => id),
-    connectionColours
-  );
+  const defs = svg.append("defs");
   const connectionContent = svg
     .append("g")
     .attr("class", "connection-content");
 
-  svg.select("defs").append("marker")
+  defs.append("marker")
     .attr("id", "information-arrow").attr("viewBox", "0 0 10 10")
     .attr("refX", 9).attr("refY", 5).attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto")
     .append("path").attr("d", "M0 0 L10 5 L0 10 z").attr("fill", "#6d6586");
@@ -331,15 +331,18 @@ export function createTopologyBoard({
     .map(({ id }) => id));
   const connectionRenderer = createFrameRenderer({
     render() {
+      const view = getView();
+      const connectionIds = view.connections.map(({ id }) => id);
+      const connectionColours = createConnectionColourScale(connectionIds);
+      renderArrowMarkers(defs, connectionIds, connectionColours);
       renderConnections(
         connectionContent,
         boxesByComponentId,
-        getView(),
+        view,
         verticalBoundaryComponentIds,
         connectionColours,
         onConnectionHighlight
       );
-      const view = getView();
       const visible = visibleInformationConnections(view.informationConnections, view.selectedComponentId, view.showInformationConnections, view.highlightedConnectionId);
       const sourceIds = new Set(visible.map(({ from }) => from.sourceId));
       const endpoints = new Map([...boxesByComponentId, ...[...boxesBySourceId].filter(([id]) => sourceIds.has(id))]);

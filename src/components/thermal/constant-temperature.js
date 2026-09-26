@@ -92,11 +92,14 @@ export const constantTemperatureDefinition = {
 
   initialState: {},
 
+  seriesParameters: ["temperatureSeriesId"],
+
   ports: [{
     id: "heat-in",
     flowType: THERMAL_HEAT_FLOW_TYPE,
     direction: "in",
-    cardinality: "many"
+    cardinality: "many",
+    boundary: { operatingLimits: ["temperatureC", "fixedTemperatureBoundary"] }
   }],
 
   outputs: {

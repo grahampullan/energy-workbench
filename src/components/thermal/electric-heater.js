@@ -23,7 +23,7 @@ function parameterValue(component, parameter) {
 
 export const electricHeaterDefinition = {
   type: "thermal.electric-heater",
-  version: "0.2.0",
+  version: "0.3.0",
   name: "Electric heater",
   information: {
     outputs: {
@@ -78,7 +78,10 @@ export const electricHeaterDefinition = {
     {
       id: "heat-out",
       flowType: THERMAL_HEAT_FLOW_TYPE,
-      direction: "out"
+      direction: "out",
+      boundary: {
+        operatingLimits: ["feasibleHeatOutputkW", "supplyTemperatureC"]
+      }
     }
   ],
 
@@ -118,7 +121,7 @@ export const electricHeaterDefinition = {
 
   resolution: {
     describe(runtimeComponent, context) {
-      if (context.balancingComponentId === runtimeComponent.id) {
+      if (context.role === "electrical-balance") {
         throw resolutionError(
           "runtime.unsupported-balancing-component",
           "The coupled electric heater cannot be the electrical balancing component"
@@ -151,23 +154,34 @@ export const electricHeaterDefinition = {
       return {};
     },
 
-    getOperatingLimits(runtimeComponent) {
+    getOperatingLimits(runtimeComponent, stepContext, target = null) {
       const {
         efficiency,
         maximumElectricalInputPowerkW,
         supplyTemperatureC
       } = runtimeComponent.parameters;
-      return {
+      const limits = {
         minimumPowerkW: -maximumElectricalInputPowerkW,
         maximumPowerkW: 0,
         heatOutputPerElectricalInput: efficiency,
         maximumHeatOutputkW: maximumElectricalInputPowerkW * efficiency,
         supplyTemperatureC
       };
+      if (target !== null) {
+        if (!Number.isFinite(target.powerkW)) {
+          throw new TypeError("Electric-heater target must provide finite powerkW");
+        }
+        const electricalInputPowerkW = Math.min(
+          maximumElectricalInputPowerkW,
+          Math.max(0, -target.powerkW)
+        );
+        limits.feasibleHeatOutputkW = electricalInputPowerkW * efficiency;
+      }
+      return limits;
     },
 
     resolve(runtimeComponent, context) {
-      if (context.balancingComponentId === runtimeComponent.id) {
+      if (context.role === "electrical-balance") {
         throw resolutionError(
           "runtime.unsupported-balancing-component",
           "The coupled electric heater cannot be the electrical balancing component"
@@ -201,6 +215,7 @@ export const electricHeaterDefinition = {
       if (
         powerkW < context.operatingLimits.minimumPowerkW - context.tolerancekW ||
         powerkW > context.operatingLimits.maximumPowerkW + context.tolerancekW ||
+        heatFlow.heatFlowkW > context.operatingLimits.feasibleHeatOutputkW + context.tolerancekW ||
         Math.abs(heatFlow.sourceTemperatureC - supplyTemperatureC) > context.tolerancekW ||
         Math.abs(heatFlow.deliveryTemperatureC - supplyTemperatureC) > context.tolerancekW
       ) {

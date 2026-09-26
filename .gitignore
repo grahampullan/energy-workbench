@@ -2,5 +2,7 @@ dev_notes/
 node_modules/
 build/
 coverage/
+test-results/
+playwright-report/
 results/
 .DS_Store

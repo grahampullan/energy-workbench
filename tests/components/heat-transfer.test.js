@@ -5,6 +5,8 @@ import { heatTransferDefinition } from
   "../../src/components/thermal/heat-transfer.js";
 import { thermalStoreDefinition } from
   "../../src/components/thermal/store.js";
+import { constantTemperatureDefinition } from
+  "../../src/components/thermal/constant-temperature.js";
 import { createComponentRegistry } from "../helpers/registry.js";
 import { runScenario } from "../../src/runtime/run-scenario.js";
 
@@ -118,4 +120,80 @@ test("heat-transfer conductance must be finite and non-negative", () => {
   assert.ok(result.diagnostics.some(
     ({ code }) => code === "thermal.heat-transfer.conductance"
   ));
+});
+
+function parallelFixture({ fixedSink = false, timeStepSeconds = 3600 } = {}) {
+  const data = fixture({ conductancekWPerK: 10, timeStepSeconds });
+  const contact = structuredClone(data.model.components[1]);
+  contact.id = "second-contact";
+  data.model.components.push(contact);
+  data.model.connections.push(...data.model.connections.map((connection) => ({
+    ...connection,
+    id: `second-${connection.id}`,
+    from: { ...connection.from, componentId: connection.from.componentId === "contact"
+      ? contact.id : connection.from.componentId },
+    to: { ...connection.to, componentId: connection.to.componentId === "contact"
+      ? contact.id : connection.to.componentId }
+  })));
+  if (fixedSink) {
+    data.model.components[2] = {
+      id: "cold", name: "Ambient", type: constantTemperatureDefinition.type,
+      definitionVersion: constantTemperatureDefinition.version,
+      parameters: { temperatureSeriesId: "ambient" }, initialState: {}
+    };
+    for (const connection of data.model.connections) {
+      if (connection.to.componentId === "cold") connection.to.portId = "heat-in";
+    }
+    data.scenario.series = [{
+      id: "ambient", name: "Ambient", unit: "°C",
+      data: { kind: "inline", values: [20] }
+    }];
+  }
+  data.registry = createComponentRegistry([
+    heatTransferDefinition, thermalStoreDefinition, constantTemperatureDefinition
+  ]);
+  return data;
+}
+
+test("parallel heat paths reject an excessive timestep before committing impossible temperatures", () => {
+  for (const fixedSink of [true, false]) {
+    const result = runScenario(parallelFixture({ fixedSink }));
+    assert.equal(result.completed, false);
+    assert.equal(result.results, null);
+    const diagnostic = result.diagnostics.find(({ code }) =>
+      code === "runtime.thermal-timestep-too-large"
+    );
+    assert.ok(diagnostic, JSON.stringify(result.diagnostics));
+    assert.match(diagnostic.message, /at most 90 seconds; reduce timeStepSeconds/u);
+  }
+});
+
+test("refined parallel exchange conserves energy and stays within equilibrium bounds", () => {
+  for (const fixedSink of [true, false]) {
+    const data = parallelFixture({ fixedSink, timeStepSeconds: 90 });
+    data.scenario.time.stepCount = 40;
+    if (fixedSink) data.scenario.series[0].data.values = Array(40).fill(20);
+    const result = runScenario(data);
+    assert.equal(result.completed, true, JSON.stringify(result.diagnostics));
+    let previousHotTemperature = 80;
+    for (const step of result.results.steps) {
+      const hotTemperature = component(step, "hot").outputs.temperatureC;
+      const coldTemperature = component(step, "cold").outputs.temperatureC;
+      assert.ok(hotTemperature >= coldTemperature - 1e-9);
+      assert.ok(hotTemperature <= previousHotTemperature + 1e-9);
+      const transferredkWh = ["contact", "second-contact"].reduce((sum, id) =>
+        sum + component(step, id).outputs.heatFlowkW * 90 / 3600, 0
+      );
+      assertClose(previousHotTemperature - hotTemperature, transferredkWh);
+      if (!fixedSink) assertClose(hotTemperature + coldTemperature, 100);
+      previousHotTemperature = hotTemperature;
+    }
+    data.model.connections.reverse();
+    const reordered = runScenario(data);
+    assert.equal(reordered.completed, true);
+    assert.deepEqual(
+      reordered.results.steps.map((step) => component(step, "hot").state),
+      result.results.steps.map((step) => component(step, "hot").state)
+    );
+  }
 });

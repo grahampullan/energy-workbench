@@ -26,8 +26,8 @@ function transferTopology(runtimeComponent, context) {
   const source = singleConnection(runtimeComponent, context, "source");
   const sink = singleConnection(runtimeComponent, context, "sink");
   if (
-    source.to.component !== runtimeComponent ||
-    sink.from.component !== runtimeComponent
+    source.to.componentId !== runtimeComponent.id ||
+    sink.from.componentId !== runtimeComponent.id
   ) {
     throw resolutionError(
       "runtime.unsupported-heat-transfer-topology",
@@ -37,14 +37,8 @@ function transferTopology(runtimeComponent, context) {
   return { source, sink };
 }
 
-function otherComponent(runtimeComponent, connection) {
-  return connection.from.component === runtimeComponent
-    ? connection.to.component
-    : connection.from.component;
-}
-
-function thermalBoundary(context, component, label) {
-  const limits = context.getOperatingLimits(component.id);
+function thermalBoundary(context, connection, label) {
+  const limits = context.getBoundary(connection.id).operatingLimits;
   const temperatureC = limits?.temperatureC;
   const fixedTemperature = limits?.fixedTemperatureBoundary === true;
   const capacity = limits?.thermalCapacitykWhPerK;
@@ -141,7 +135,7 @@ function requireCommand(command) {
 
 export const heatTransferDefinition = {
   type: "thermal.heat-transfer",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Heat transfer",
   explanation: {
     title: "Directed thermal contact",
@@ -182,12 +176,14 @@ export const heatTransferDefinition = {
     {
       id: "source",
       flowType: THERMAL_HEAT_FLOW_TYPE,
-      direction: "in"
+      direction: "in",
+      boundary: { operatingLimits: ["conductancekWPerK"] }
     },
     {
       id: "sink",
       flowType: THERMAL_HEAT_FLOW_TYPE,
-      direction: "out"
+      direction: "out",
+      boundary: { operatingLimits: ["conductancekWPerK"] }
     }
   ],
 
@@ -251,12 +247,12 @@ export const heatTransferDefinition = {
       const topology = transferTopology(runtimeComponent, context);
       const source = thermalBoundary(
         context,
-        otherComponent(runtimeComponent, topology.source),
+        topology.source,
         "Heat-transfer source"
       );
       const sink = thermalBoundary(
         context,
-        otherComponent(runtimeComponent, topology.sink),
+        topology.sink,
         "Heat-transfer sink"
       );
       const heatFlowkW = resolvedHeatFlowkW(

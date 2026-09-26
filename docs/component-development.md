@@ -4,6 +4,37 @@ A component extension is one registered `ComponentDefinition` object plus
 focused tests. Keep the public contract declarative and deterministic; classes
 or closures may be private implementation details.
 
+## Definition versions
+
+Models identify each component by `type` and an exact `definitionVersion`.
+The registry does not select a newer definition automatically. When a component's
+ports, parameters, equations, or feasibility rules change, update its definition
+version and the affected model references together. Internal refactoring and
+presentation-only changes do not require a component version change.
+
+During `0.x` development, advance the minor version for a changed engineering
+contract. Use a patch version for compatible corrections. Component versions
+are independent of the application release and JSON schema versions; preserve
+the application release or Git commit with study inputs to identify the complete
+runtime and policy implementation.
+
+The current thermal contract updates are:
+
+| Component | Previous | Current | Change |
+| --- | --- | --- | --- |
+| `thermal.store` | `0.2.0` | `0.3.0` | Consumes feasible thermal requests and checks the timestep for combined passive exchange. |
+| `thermal.electric-heater` | `0.2.0` | `0.3.0` | Owns conversion of the electrical request and publishes feasible heat output. |
+| `thermal.fuel-burner` | `0.1.0` | `0.2.0` | Publishes feasible heat output through the same thermal boundary contract. |
+| `thermal.heat-transfer` | `0.1.0` | `0.2.0` | Publishes conductance for the connected store's combined-exchange check. |
+
+The committed examples use these versions. For an existing saved model, keep
+the original, update these `definitionVersion` fields together, and rerun its
+checks. Parameters and initial-state fields are unchanged. A coarse thermal
+timestep may now be rejected with a diagnostic giving the permitted duration.
+Old definitions are not registered by the current workbench; use the original
+Git revision when reproducing an earlier run. Historical ADRs retain the
+versions they describe.
+
 ## Definition shape
 
 ```js
@@ -135,7 +166,9 @@ the first runtime slice.
 - Initial-state declarations own units and defaults. Component validation owns
   state constraints that depend on parameters or other state fields.
 - Ports declare compatibility through `flowType` and permitted direction. A
-  connection stores only endpoint references and does not duplicate either.
+  persisted connection stores identity, name, and `from`/`to` component-port
+  references only; it does not duplicate type or direction. Runtime connections
+  resolve the endpoints and derive their `flowType` from the ports.
 - A port accepts one connection by default. Set `cardinality: "many"` only when
   the component physically represents a collector whose one logical boundary
   can accept any number of independent connections.
@@ -146,6 +179,10 @@ the first runtime slice.
   initial-state defaults filled. It returns a JSON-compatible plain object,
   stored as `RuntimeComponent.modelData`, for run-local coefficients and other
   component-owned prepared data.
+- `seriesParameters` lists the parameter names that select the component's
+  scenario profiles, for example `["generationSeriesId"]`. Preparation receives
+  `{ scenario: { time, series } }` with only those series and no model. The
+  optional scenario argument to `initialise` has the same restricted shape.
 - `initialise` creates state for one run; it does not modify the persisted
   component.
 - `getOperatingLimits(runtimeComponent, stepContext, target)` reports what is
@@ -165,6 +202,43 @@ the first runtime slice.
 
 The policy requests operation. It does not set independent port flows or bypass
 component limits.
+
+## Physical boundary access
+
+`resolution.describe` and `model.resolve` receive immutable connection records:
+`{ id, name, flowType, from, to }`. Each endpoint contains only
+`{ componentId, portId, direction, role }`. It has no component object,
+parameters, state, definition, or list of other connections. `context.role`
+identifies the owning component's role; no global balancing-component lookup
+is exposed.
+
+Each definition's physical port explicitly lists the fields it publishes:
+
+```js
+boundary: {
+  operatingLimits: ["maximumHeatOutputkW", "supplyTemperatureC"],
+  target: ["heatOutputkW"]
+}
+```
+
+`context.getBoundary(connectionId)` returns a detached, immutable
+`{ operatingLimits, target }` from the opposite port, containing only its
+listed fields. Undeclared limits are absent; an unpublished or unavailable
+target is `null`. A port with no `boundary` declaration publishes no fields.
+The owning component still receives its full `context.operatingLimits` and
+`context.target`. Runtime only copies the declared fields; component equations
+continue to interpret their physical meaning.
+
+Reading an unconnected boundary fails explicitly. Target prerequisites may
+refer only to the owning component or targets published by connected ports.
+`context.getConnectionFlow(connectionId)` is available during resolution only
+for connected flows declared in `requires.connectionFlows`. It returns the
+settled flow in the persisted reference direction. Reading an undeclared flow
+fails even if another component has already settled it.
+
+Timestep callbacks receive their own `state` and current values for their
+declared scenario profiles. They never receive the global state map or other
+scenario profiles. Policies retain their separate information-input contract.
 
 ## Inspector equation descriptions
 
@@ -242,6 +316,12 @@ plots use zero-order-hold steps and extend through the run's final boundary;
 calculated state plots may connect boundary samples with straight visual
 segments.
 
+Temperature-chart metadata uses either `stateField` or `outputField`. An
+output-derived temperature also declares `initialLimitField`, naming its
+start-of-step capability in the first result. Both paths include time zero and
+all end-of-step samples. The UI reads those values without deriving temperature
+from energy or mass.
+
 - The runtime evaluates every component's current operating limits once before
   requesting policy operation.
 - Each component persists its selected `policy: { type, settings }`. Register
@@ -251,12 +331,12 @@ segments.
   `policy.request(inputs, settings)` receives exactly two immutable plain
   objects and returns only the owning component's target. Every runtime value,
   including own-component capabilities, must arrive through a named input.
-- `electrical.balance` currently encodes a static balancing role in the policy
+- `electrical.balance` encodes a static balancing role in the policy
   catalogue and returns null. Conceptually this is physical configuration, not
   an operating policy. Its component resolves actual balancing power through
   physical ports. The inspector labels this as a physical role, with separate
-  role choices and explanations. Separating role storage and registration is a
-  pending migration; at most one such role is supported in the current runtime. See the
+  role choices and explanations. Sharing the policy field and catalogue is an
+  accepted representation. At most one such role is supported in the current runtime. See the
   [abstraction definitions](../ARCHITECTURE.md#components-connections-policies-and-roles).
 - The runtime checks each component's resolution declaration after the policy
   request, rejects missing or conflicting flow ownership and same-step cycles,
@@ -285,6 +365,11 @@ Each connection result has the shape
 `{ powerkW }`; its value is signed from the persisted `from` endpoint towards
 `to`. Endpoint mismatch is a `runtime.connection-balance` diagnostic, not a
 result field.
+
+Core `FlowType` contracts define the supported fields, units, and validation.
+Their type prefixes identify the engineering domain; do not add separate
+`domain` or `medium` fields. These are fixed core contracts, not pluggable
+physics definitions.
 
 Each timestep result also contains `resolutionPlan`. Its `stages` are arrays
 of component IDs that can resolve at the same dependency depth. The full plan
@@ -347,8 +432,8 @@ A directed `material.mass-flow` port reports exactly:
 ```
 
 Mass flow is finite and non-negative in the declared direction. Specific
-enthalpy is finite; its reference state belongs to the component model. The
-transported enthalpy rate is
+enthalpy is finite and may be negative; its reference state belongs to the
+component model. The transported enthalpy rate is
 `massFlowKgPerSecond * specificEnthalpyKjPerKg` in kW. Do not duplicate
 temperature on this connection or infer composition, pressure, phase, or
 mixing in generic connection execution.
@@ -359,10 +444,11 @@ mixing in generic connection execution.
 instance is a closed fixed-mass thermal body or a flowing material inventory.
 Do not add an equipment-specific mode flag.
 
-The store keeps only mass and contained enthalpy as state. It derives
-temperature using constant specific heat capacity and an enthalpy-reference
-temperature. Start-of-step mass and specific enthalpy limit and characterise
-outflow. An empty store has zero contained enthalpy and reports its reference
+The store keeps only `massKg` and `containedEnthalpykWh` as state. Cumulative
+transfers are result integrations. It derives temperature using constant
+specific heat capacity and an enthalpy-reference temperature. Start-of-step
+mass and specific enthalpy limit and characterise outflow. An empty store has
+zero contained enthalpy and reports its reference
 temperature. Before heat exchange is resolved, the store reserves the requested
 withdrawal, capped by current inventory. It publishes the thermal capacity of
 the remaining mass, at the current temperature, so heat-transfer components
@@ -391,13 +477,25 @@ Q = K * max(0, Tsource - Tsink)
 ```
 
 It requires one source connection and one sink connection. A finite source or
-sink publishes current temperature and thermal capacity; a fixed-temperature
-boundary publishes that role explicitly. Over a coarse timestep, transfer is
-capped at finite-body equilibrium and at the sink maximum temperature. Connect
+sink publishes `temperatureC`, `thermalCapacitykWhPerK`, and any
+`maximumTemperatureC` limit; a fixed-temperature boundary instead publishes its
+temperature and `fixedTemperatureBoundary: true`. Over a coarse timestep,
+transfer is capped at finite-body equilibrium and at the sink maximum temperature. Connect
 a store's `passive-heat-out` to the transfer's `source`, then connect the
 transfer's `sink` to another store's `passive-heat-in` or to a
 constant-temperature boundary. The store
 accounts for settled passive heat but does not calculate `K * ΔT`.
+
+When more than one passive connection carries heat, the store checks the
+combined explicit exchange before accepting flows. Transfer ports publish
+their conductance. The conservative timestep bound is
+`2 * dt * sum(conductance) <= remainingThermalCapacity`, using hours and kWh/K
+internally. The factor of two allows both finite boundaries to change
+temperature. An excessive timestep fails with `runtime.thermal-timestep-too-large`
+and the maximum permitted duration; no state is committed. This avoids spending
+the same capacity independently along several paths, without an iterative
+solver or order-dependent allocation. A single active path retains its existing
+equilibrium cap.
 
 The current definition represents one well-mixed material with constant
 specific heat capacity and no phase change or stratification. An equipment
@@ -416,7 +514,11 @@ grid -> electric heater -> thermal store (hot-water instance) -> heat demand
 
 The heater selects `thermal.follow-demand`. Explicit information connections
 supply requested heat from the demand component and efficiency from the heater
-itself. The policy requests electrical input from those two inputs. Component resolution then follows the visible topology:
+itself. The policy requests electrical input from those two inputs. The heater
+refines its capabilities using that target, applying its electrical rating and
+conversion efficiency. Its thermal port publishes only `feasibleHeatOutputkW`
+and `supplyTemperatureC`; the store never reads electrical targets or performs
+heater conversion. Component resolution then follows the visible topology:
 
 1. the heat-transfer component settles passive source and sink flows from the
    current store and prescribed Ambient temperatures;
@@ -438,8 +540,10 @@ component that owns their allocation or mixing equation.
 ### Fuel burner
 
 `thermal.fuel-burner` has one thermal output. A policy requests
-`{ heatOutputkW }`; the receiving store reconciles that target with source and
-sink capabilities and determines the accepted thermal connection flow. The
+`{ heatOutputkW }`; the burner caps it at its heat rating and publishes
+`feasibleHeatOutputkW` and `supplyTemperatureC` on its thermal port. The receiving
+store uses the same thermal boundary contract as for an electric heater and
+determines the accepted connection flow. The
 burner then applies its own efficiency and direct-emissions factor to that
 accepted flow. Its reported fuel input is therefore actual fuel use, not the
 unconstrained policy request.
@@ -516,7 +620,9 @@ start-of-step state or pre-policy calculations. Readers cannot consume actual
 flows or proposed next states. Component information inputs declare quantity,
 unit, label, and optional `cardinality: "many"`; the information graph must be
 acyclic. Outputs may fan out. Policies are terminal consumers, so own-component
-state-to-policy connections are valid.
+state-to-policy connections are valid. Missing inputs, invalid references,
+incompatible quantities or units, and duplicate sources for a single-input
+port fail validation explicitly.
 
 Persist an information connection independently of physical connections:
 

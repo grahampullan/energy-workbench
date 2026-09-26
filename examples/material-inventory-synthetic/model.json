@@ -32,7 +32,7 @@
     {
       "id": "heater",
       "type": "thermal.electric-heater",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Electric heater",
       "parameters": {
         "maximumElectricalInputPowerkW": 10,
@@ -50,7 +50,7 @@
     {
       "id": "inventory",
       "type": "thermal.store",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Heated inventory",
       "parameters": {
         "maximumMassKg": 120,

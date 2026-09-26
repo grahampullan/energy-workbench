@@ -34,9 +34,7 @@ function heatSourceDefinition({ type, name, heatFlowkW, sourceTemperatureC }) {
     model: {
       resolve(runtimeComponent, context) {
         const [connection] = context.connections;
-        const ambientLimits = context.getOperatingLimits(
-          connection.to.component.id
-        );
+        const ambientLimits = context.getBoundary(connection.id).operatingLimits;
         const flow = createThermalFlow({
           heatFlowkW,
           sourceTemperatureC,

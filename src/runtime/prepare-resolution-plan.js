@@ -1,5 +1,6 @@
 import { freezeJsonValue } from "../core/json-value.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
+import { createPhysicalContext } from "./physical-context.js";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -57,12 +58,7 @@ function describeComponents({
     try {
       returnedDescription = component.definition.resolution.describe(
         component,
-        Object.freeze({
-          target: operation.targets[component.id] ?? null,
-          balancingComponentId: operation.balancingComponentId,
-          operatingLimits: limitsByComponentId.get(component.id),
-          connections: Object.freeze(connectionsFor(runtimeModel, component))
-        })
+        createPhysicalContext({ runtimeModel, component, operation, limitsByComponentId })
       );
     } catch (error) {
       diagnostics.push(diagnostic(
@@ -108,8 +104,21 @@ function determineConnectionOwnership({
     const connectedIds = new Set(
       connectionsFor(runtimeModel, description.component).map(({ id }) => id)
     );
+    const targetOwners = new Set([componentId]);
+    for (const connection of connectionsFor(runtimeModel, description.component)) {
+      const remote = connection.from.component === description.component ? connection.to : connection.from;
+      const port = remote.component.definition.ports.find(({ id }) => id === remote.port.id);
+      if (port.boundary?.target?.length) targetOwners.add(remote.component.id);
+    }
     for (const targetId of description.requires.targets) {
-      if (!Object.hasOwn(operation.targets, targetId)) {
+      if (!targetOwners.has(targetId)) {
+        diagnostics.push(diagnostic(
+          "runtime.component-resolution-declaration-contract",
+          `${componentId} requires a target not published through its connections: ${targetId}`,
+          stepIndex,
+          `/components/${componentId}/resolution/requires/targets`
+        ));
+      } else if (!Object.hasOwn(operation.targets, targetId)) {
         diagnostics.push(diagnostic(
           "runtime.missing-policy-target",
           `Resolution of ${componentId} requires a policy target for ${targetId}`,

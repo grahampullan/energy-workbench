@@ -21,7 +21,7 @@
     {
       "id": "heater",
       "type": "thermal.electric-heater",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Electric heater",
       "parameters": {
         "maximumElectricalInputPowerkW": 100,
@@ -37,7 +37,7 @@
     {
       "id": "store",
       "type": "thermal.store",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Hot-water store",
       "parameters": {
         "maximumMassKg": 10000,
@@ -56,7 +56,7 @@
     {
       "id": "store-loss",
       "type": "thermal.heat-transfer",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Heat loss",
       "parameters": {
         "conductancekWPerK": 0.05

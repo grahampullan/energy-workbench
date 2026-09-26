@@ -137,11 +137,11 @@ test("prepareRuntimeModel resolves defaults, component data, ports, and connecti
   assert.deepEqual(receivedComponent.parameters, { ratedPowerkW: 100 });
   assert.deepEqual(receivedComponent.initialState, { availableEnergykWh: 25 });
   assert.equal(Object.isFrozen(receivedComponent), true);
-  assert.notEqual(receivedContext.model, fixture.model);
+  assert.equal(receivedContext.model, undefined);
   assert.notEqual(receivedContext.scenario, fixture.scenario);
-  assert.equal(Object.isFrozen(receivedContext.model), true);
   assert.equal(Object.isFrozen(receivedContext.scenario), true);
-  assert.equal(receivedContext.model.components[0].parameters.ratedPowerkW, 100);
+  assert.deepEqual(receivedContext.scenario.series, []);
+  assert.deepEqual(receivedContext.scenario.time, fixture.scenario.time);
 
   const [connection] = result.runtimeModel.connections;
   assert.equal(connection.flowType, "electricity.active-power");

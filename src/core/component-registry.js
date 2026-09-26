@@ -145,6 +145,17 @@ function assertPorts(ports, definitionType) {
     if (portIds.has(port.id)) {
       throw new TypeError(`${definitionType} declares duplicate port ID: ${port.id}`);
     }
+    if (port.boundary !== undefined) {
+      assertRecord(port.boundary, `${definitionType}.${port.id}.boundary`);
+      for (const [kind, fields] of Object.entries(port.boundary)) {
+        if (!["operatingLimits", "target"].includes(kind) ||
+          !Array.isArray(fields) || fields.some((field) => typeof field !== "string") ||
+          new Set(fields).size !== fields.length) {
+          throw new TypeError(`${definitionType}.${port.id}.boundary must declare unique operatingLimits or target fields`);
+        }
+        fields.forEach((field) => assertFieldName(field, `${definitionType}.${port.id}.boundary.${kind}`));
+      }
+    }
     portIds.add(port.id);
   }
 }
@@ -240,6 +251,14 @@ function assertComponentDefinition(definition) {
 
   assertRecord(definition.parameters, `${definition.type}.parameters`);
   assertParameterSpecifications(definition.parameters, definition.type);
+  if (definition.seriesParameters !== undefined) {
+    if (!Array.isArray(definition.seriesParameters) ||
+      new Set(definition.seriesParameters).size !== definition.seriesParameters.length ||
+      definition.seriesParameters.some((id) => typeof id !== "string" || !Object.hasOwn(definition.parameters, id) ||
+        typeof definition.parameters[id].default !== "string")) {
+      throw new TypeError(`${definition.type}.seriesParameters must name distinct string parameters`);
+    }
+  }
   assertRecord(definition.initialState, `${definition.type}.initialState`);
   assertInitialStateSpecifications(definition.initialState, definition.type);
   assertPorts(definition.ports, definition.type);

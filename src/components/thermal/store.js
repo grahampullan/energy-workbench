@@ -58,12 +58,12 @@ function thermalCapacitykWhPerK(runtimeComponent, state) {
 function connectionsForPort(runtimeComponent, context, portId) {
   return context.connections.filter((connection) =>
     (
-      connection.from.component === runtimeComponent &&
-      connection.from.port.id === portId
+      connection.from.componentId === runtimeComponent.id &&
+      connection.from.portId === portId
     ) ||
     (
-      connection.to.component === runtimeComponent &&
-      connection.to.port.id === portId
+      connection.to.componentId === runtimeComponent.id &&
+      connection.to.portId === portId
     )
   );
 }
@@ -77,12 +77,6 @@ function optionalConnection(runtimeComponent, context, portId) {
     );
   }
   return connections[0] ?? null;
-}
-
-function otherComponent(runtimeComponent, connection) {
-  return connection.from.component === runtimeComponent
-    ? connection.to.component
-    : connection.from.component;
 }
 
 function storeTopology(runtimeComponent, context) {
@@ -110,15 +104,15 @@ function storeTopology(runtimeComponent, context) {
   );
 
   if (
-    (materialIn && materialIn.to.component !== runtimeComponent) ||
-    (materialOut && materialOut.from.component !== runtimeComponent) ||
-    heatIn.some((connection) => connection.to.component !== runtimeComponent) ||
-    (heatOut && heatOut.from.component !== runtimeComponent) ||
+    (materialIn && materialIn.to.componentId !== runtimeComponent.id) ||
+    (materialOut && materialOut.from.componentId !== runtimeComponent.id) ||
+    heatIn.some((connection) => connection.to.componentId !== runtimeComponent.id) ||
+    (heatOut && heatOut.from.componentId !== runtimeComponent.id) ||
     passiveHeatIn.some(
-      (connection) => connection.to.component !== runtimeComponent
+      (connection) => connection.to.componentId !== runtimeComponent.id
     ) ||
     passiveHeatOut.some(
-      (connection) => connection.from.component !== runtimeComponent
+      (connection) => connection.from.componentId !== runtimeComponent.id
     )
   ) {
     throw resolutionError(
@@ -137,9 +131,9 @@ function storeTopology(runtimeComponent, context) {
   };
 }
 
-function finiteCapability(limits, field, { positive = false } = {}) {
+function finiteCapability(limits, field) {
   const value = limits?.[field];
-  if (!Number.isFinite(value) || (positive ? value <= 0 : value < 0)) {
+  if (!Number.isFinite(value) || value < 0) {
     throw resolutionError(
       "runtime.thermal-capability-contract",
       `Thermal capability ${field} is missing or invalid`
@@ -177,63 +171,17 @@ function requestedMaterialOutflow(runtimeComponent, context, connected) {
   return value;
 }
 
-function requestedHeatInputs(runtimeComponent, context, connections) {
+function requestedHeatInputs(context, connections) {
   return connections.map((connection) => {
-    const source = otherComponent(runtimeComponent, connection);
-    const target = context.getTarget(source.id);
-    if (!target) {
-      throw resolutionError(
-        "runtime.missing-policy-target",
-        `Policy did not provide a heat-source target for ${source.id}`
-      );
-    }
-    const limits = context.getOperatingLimits(source.id);
-    const maximumHeatOutputkW = finiteCapability(
+    const { operatingLimits: limits } = context.getBoundary(connection.id);
+    const requestedHeatFlowkW = finiteCapability(
       limits,
-      "maximumHeatOutputkW"
+      "feasibleHeatOutputkW"
     );
     if (!Number.isFinite(limits.supplyTemperatureC)) {
       throw resolutionError(
         "runtime.thermal-capability-contract",
         "Thermal capability supplyTemperatureC is missing or invalid"
-      );
-    }
-    let requestedHeatFlowkW;
-    if (Number.isFinite(target.heatOutputkW) && target.heatOutputkW >= 0) {
-      requestedHeatFlowkW = Math.min(
-        maximumHeatOutputkW,
-        target.heatOutputkW
-      );
-    } else if (Number.isFinite(target.powerkW)) {
-      const conversion = finiteCapability(
-        limits,
-        "heatOutputPerElectricalInput",
-        { positive: true }
-      );
-      const minimumPowerkW = limits?.minimumPowerkW;
-      const maximumPowerkW = limits?.maximumPowerkW;
-      if (
-        !Number.isFinite(minimumPowerkW) ||
-        !Number.isFinite(maximumPowerkW) ||
-        minimumPowerkW > maximumPowerkW
-      ) {
-        throw resolutionError(
-          "runtime.thermal-capability-contract",
-          "A power-targeted heat source must publish valid power limits"
-        );
-      }
-      const requestedPowerkW = Math.min(
-        maximumPowerkW,
-        Math.max(minimumPowerkW, target.powerkW)
-      );
-      requestedHeatFlowkW = Math.min(
-        maximumHeatOutputkW,
-        -requestedPowerkW * conversion
-      );
-    } else {
-      throw resolutionError(
-        "runtime.missing-policy-target",
-        `Policy target for ${source.id} must provide non-negative heatOutputkW or finite powerkW`
       );
     }
     return {
@@ -249,8 +197,7 @@ function resolveHeatOutput(runtimeComponent, context, connection) {
   if (!connection) {
     return zeroThermalFlow(temperatureC);
   }
-  const consumer = otherComponent(runtimeComponent, connection);
-  const limits = context.getOperatingLimits(consumer.id);
+  const limits = context.getBoundary(connection.id).operatingLimits;
   const demandHeatFlowkW = finiteCapability(limits, "maximumHeatFlowkW");
   if (!Number.isFinite(limits.minimumDeliveryTemperatureC)) {
     throw resolutionError(
@@ -291,6 +238,30 @@ function sumHeatFlowkW(flows) {
   );
 }
 
+function checkPassiveExchangeTimestep(runtimeComponent, context, stepContext, flows) {
+  const activeConnections = Object.entries(flows)
+    .filter(([, flow]) => flow.heatFlowkW > 0);
+  // A single transfer caps itself at equilibrium. With several active paths,
+  // their combined explicit exchange must also respect the store's capacity.
+  // Reserve half the temperature response for each end of a finite-body
+  // exchange. This conservative bound avoids oscillation without redispatch.
+  if (activeConnections.length < 2) {
+    return;
+  }
+  const totalConductancekWPerK = activeConnections.reduce((total, [id]) => {
+    const { operatingLimits } = context.getBoundary(id);
+    return total + finiteCapability(operatingLimits, "conductancekWPerK");
+  }, 0);
+  const capacitykWhPerK = context.operatingLimits.thermalCapacitykWhPerK;
+  const maximumSeconds = capacitykWhPerK / (2 * totalConductancekWPerK) * 3600;
+  if (stepContext.timeStepSeconds > maximumSeconds + TOLERANCE) {
+    throw resolutionError(
+      "runtime.thermal-timestep-too-large",
+      `${runtimeComponent.id}: combined passive heat exchange requires a timestep of at most ${maximumSeconds} seconds; reduce timeStepSeconds`
+    );
+  }
+}
+
 function resolveStore(runtimeComponent, context, stepContext) {
   const topology = storeTopology(runtimeComponent, context);
   const passiveHeatInFlows = settledThermalFlows(
@@ -304,6 +275,10 @@ function resolveStore(runtimeComponent, context, stepContext) {
   if (passiveHeatInFlows === null || passiveHeatOutFlows === null) {
     return null;
   }
+  checkPassiveExchangeTimestep(runtimeComponent, context, stepContext, {
+    ...passiveHeatInFlows,
+    ...passiveHeatOutFlows
+  });
   const currentSpecificEnthalpy = context.operatingLimits.specificEnthalpyKjPerKg;
   const materialInFlow = topology.materialIn
     ? context.getConnectionFlow(topology.materialIn.id)
@@ -326,7 +301,6 @@ function resolveStore(runtimeComponent, context, stepContext) {
     specificEnthalpyKjPerKg: currentSpecificEnthalpy
   });
   const requestedInputs = requestedHeatInputs(
-    runtimeComponent,
     context,
     topology.heatIn
   );
@@ -436,7 +410,7 @@ function requireCommand(command) {
 
 export const thermalStoreDefinition = {
   type: "thermal.store",
-  version: "0.2.0",
+  version: "0.3.0",
   name: "Thermal store",
   information: {
     outputs: {
@@ -455,7 +429,8 @@ export const thermalStoreDefinition = {
       { label: "Enthalpy balance", tex: String.raw`\begin{aligned}H_{n+1}&=H_n+\dot H_{\mathrm{net}}\Delta t\\\dot H_{\mathrm{net}}&=\dot m_{\mathrm{in}}h_{\mathrm{in}}-\dot m_{\mathrm{out}}h_{\mathrm{out}}\\&\quad+\dot Q_{\mathrm{in}}-\dot Q_{\mathrm{out}}\end{aligned}` },
       { label: "Temperature and outgoing material", tex: String.raw`\begin{aligned}T_n&=T_{\mathrm{ref}}+\frac{H_n}{m_n c_p}\\h_{\mathrm{out}}&=\frac{H_n}{m_n}\qquad(m_n>0)\end{aligned}` },
       { label: "Inventory-limited discharge", tex: String.raw`\dot m_{\mathrm{out}}=\min\!\left(\dot m_{\mathrm{requested}},\frac{m_n}{\Delta t}\right)` },
-      { label: "Capacity available for heat exchange", tex: String.raw`\begin{aligned}m_{\mathrm{remaining}}&=m_n-\dot m_{\mathrm{out}}\Delta t\\C_{\mathrm{remaining}}&=m_{\mathrm{remaining}}c_p\end{aligned}` }
+      { label: "Capacity available for heat exchange", tex: String.raw`\begin{aligned}m_{\mathrm{remaining}}&=m_n-\dot m_{\mathrm{out}}\Delta t\\C_{\mathrm{remaining}}&=m_{\mathrm{remaining}}c_p\end{aligned}` },
+      { label: "Timestep limit for multiple passive exchanges", tex: String.raw`2\Delta t\sum_{i=1}^{N}G_i\leq C_{\mathrm{remaining}}\qquad(N>1)` }
     ],
     symbols: [
       { tex: "n", description: "Timestep index; n denotes the start and n+1 the end", unit: "" },
@@ -468,7 +443,9 @@ export const thermalStoreDefinition = {
       { tex: String.raw`T,\ T_{\mathrm{ref}}`, description: "Store temperature and enthalpy-reference temperature", unit: "°C" },
       { tex: "c_p", description: "Constant specific heat capacity", unit: "kJ/(kg K)" },
       { tex: "C", description: "Thermal capacity", unit: "kJ/K" },
-      { tex: String.raw`\Delta t`, description: "Timestep duration", unit: "s" }
+      { tex: String.raw`\Delta t`, description: "Timestep duration", unit: "s" },
+      { tex: "G_i", description: "Conductance of each active passive heat-transfer connection", unit: "kW/K" },
+      { tex: "N", description: "Number of passive connections carrying heat", unit: "1" }
     ],
     notes: [
       "Temperature is uniform and specific heat is constant. Phase changes and spatial temperature gradients are not represented.",
@@ -556,13 +533,19 @@ export const thermalStoreDefinition = {
       id: "passive-heat-in",
       flowType: THERMAL_HEAT_FLOW_TYPE,
       direction: "in",
-      cardinality: "many"
+      cardinality: "many",
+      boundary: {
+        operatingLimits: ["temperatureC", "thermalCapacitykWhPerK", "maximumTemperatureC"]
+      }
     },
     {
       id: "passive-heat-out",
       flowType: THERMAL_HEAT_FLOW_TYPE,
       direction: "out",
-      cardinality: "many"
+      cardinality: "many",
+      boundary: {
+        operatingLimits: ["temperatureC", "thermalCapacitykWhPerK", "maximumTemperatureC"]
+      }
     }
   ],
 
@@ -591,6 +574,7 @@ export const thermalStoreDefinition = {
     summaryOutput: "temperatureC",
     temperatureChart: {
       outputField: "temperatureC",
+      initialLimitField: "temperatureC",
       thresholdParameter: "minimumUsefulTemperatureC",
       thresholdLabel: "Minimum useful"
     },
@@ -748,14 +732,8 @@ export const thermalStoreDefinition = {
   resolution: {
     describe(runtimeComponent, context) {
       const topology = storeTopology(runtimeComponent, context);
-      const targets = new Set(topology.heatIn.map((connection) =>
-        otherComponent(runtimeComponent, connection).id
-      ));
-      if (topology.materialOut) {
-        targets.add(runtimeComponent.id);
-      }
       return resolutionDescription({
-        targets: [...targets],
+        targets: topology.materialOut ? [runtimeComponent.id] : [],
         connectionFlows: [
           ...(topology.materialIn ? [topology.materialIn.id] : []),
           ...topology.passiveHeatIn.map((connection) => connection.id),

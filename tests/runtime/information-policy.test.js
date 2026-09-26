@@ -130,6 +130,31 @@ test("policy settings, conflicting roles and physically unavailable policies fai
   assert.equal(componentPolicyView(data.model, refractory, registry, data.scenario).available.length, 0);
 });
 
+test("policy choices and validation agree when a required physical connection is removed", async () => {
+  const data = await fixture("material-inventory-synthetic");
+  const store = data.model.components.find(({ policy }) => policy?.type === "material.follow-schedule");
+  const offered = () => componentPolicyView(data.model, store, registry, data.scenario)
+    .available.some(({ type }) => type === "material.follow-schedule");
+  assert.equal(offered(), true);
+  data.model.connections = data.model.connections.filter(({ from }) =>
+    from.componentId !== store.id || from.portId !== "material-out"
+  );
+  assert.equal(offered(), false);
+  assert.ok(codes(validateModel(data.model, { registry })).includes("model.policy-port-required"));
+});
+
+test("policy source choices exclude matching units with a different physical quantity", async () => {
+  const data = await fixture("coupled-thermal");
+  const heater = data.model.components.find(({ id }) => id === "heater");
+  const view = componentPolicyView(data.model, heater, registry, data.scenario);
+  const heatSources = view.optionsFor({ quantity: "heat-rate", unit: "kW" });
+  assert.ok(heatSources.some(({ from }) => from.componentId === "heat-demand"));
+  assert.equal(view.optionsFor({ quantity: "active-power", unit: "kW" })
+    .some(({ from }) => from.componentId === "heat-demand"), false);
+  assert.equal(view.optionsFor({ quantity: "heat-rate", unit: "W" })
+    .some(({ from }) => from.componentId === "heat-demand"), false);
+});
+
 test("viewer reveals selected inputs and upstream dependencies without mixing physical connections", async () => {
   const data = await fixture("blog-electrical");
   const connections = informationView(data.model, registry);

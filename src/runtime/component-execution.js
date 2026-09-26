@@ -8,6 +8,8 @@ import {
   flowValidationMessage
 } from "../core/flow-types.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
+import { createPhysicalContext } from "./physical-context.js";
+import { componentScenario, componentStepContext } from "./component-context.js";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -19,19 +21,6 @@ function runtimeDiagnostic(code, message, path = "") {
 
 function cloneAndFreeze(value) {
   return freezeJsonValue(cloneJsonValue(value));
-}
-
-function componentStepContext(stepContext, component) {
-  return Object.freeze({
-    ...stepContext,
-    state: stepContext.states[component.id]
-  });
-}
-
-function componentConnections(runtimeModel, component) {
-  return Object.freeze(runtimeModel.connections.filter((connection) =>
-    connection.from.component === component || connection.to.component === component
-  ));
 }
 
 function hasExactFields(value, declaredFields) {
@@ -46,7 +35,9 @@ export function initialiseComponentStates(runtimeModel, scenario, diagnostics) {
   runtimeModel.components.forEach((component, componentIndex) => {
     let returnedState;
     try {
-      returnedState = component.definition.model.initialise(component, scenario);
+      returnedState = component.definition.model.initialise(
+        component, componentScenario(component, component.definition, scenario)
+      );
     } catch (error) {
       diagnostics.push(runtimeDiagnostic(
         "runtime.component-initialisation-failed",
@@ -163,21 +154,20 @@ function resolutionContext({
   operation,
   limitsByComponentId,
   connectionFlows,
+  requiredFlows,
   tolerancekW
 }) {
+  const physical = createPhysicalContext({ runtimeModel, component, operation, limitsByComponentId });
+  const connectedIds = new Set(physical.connections.map(({ id }) => id));
   return Object.freeze({
-    target: operation.targets[component.id] ?? null,
-    balancingComponentId: operation.balancingComponentId,
-    operatingLimits: limitsByComponentId.get(component.id),
-    connections: componentConnections(runtimeModel, component),
+    ...physical,
     tolerancekW,
-    getTarget(componentId) {
-      return operation.targets[componentId] ?? null;
-    },
-    getOperatingLimits(componentId) {
-      return limitsByComponentId.get(componentId);
-    },
     getConnectionFlow(connectionId) {
+      if (!connectedIds.has(connectionId) || !requiredFlows.includes(connectionId)) {
+        const error = new Error(`${component.id} cannot read flow ${connectionId} without a connected, declared prerequisite`);
+        error.code = "runtime.undeclared-flow-access";
+        throw error;
+      }
       return connectionFlows.get(connectionId);
     }
   });
@@ -311,6 +301,7 @@ export function resolveRuntimeComponents(
             operation,
             limitsByComponentId,
             connectionFlows,
+            requiredFlows: planComponentsById.get(component.id).requires.connectionFlows,
             tolerancekW
           }),
           componentStepContext(stepContext, component)

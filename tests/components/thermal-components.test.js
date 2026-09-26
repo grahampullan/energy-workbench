@@ -146,6 +146,21 @@ test("electric heater rejects zero efficiency and invalid actual power direction
   );
 });
 
+test("electric heater publishes feasible thermal output from its own power target and limits", () => {
+  const component = preparedComponent(electricHeaterDefinition, {
+    parameters: { maximumElectricalInputPowerkW: 100, efficiency: 0.8 }
+  });
+  for (const [powerkW, expectedHeatOutputkW] of [[-50, 40], [-200, 80], [0, 0], [20, 0]]) {
+    const limits = electricHeaterDefinition.model.getOperatingLimits(
+      component, stepContext(component), { powerkW }
+    );
+    assert.equal(limits.feasibleHeatOutputkW, expectedHeatOutputkW);
+  }
+  assert.throws(() => electricHeaterDefinition.model.getOperatingLimits(
+    component, stepContext(component), { powerkW: NaN }
+  ), /target must provide finite powerkW/u);
+});
+
 test("heat demand distinguishes served, unmet, and low-temperature heat", () => {
   const component = preparedComponent(heatDemandDefinition, {
     parameters: {

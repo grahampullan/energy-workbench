@@ -9,7 +9,8 @@
     "start": "npm run build && node scripts/serve-workbench.js",
     "generate:blog-example": "node scripts/generate-blog-electrical-example.js",
     "test": "node --test",
-    "check": "npm test && npm run build"
+    "test:browser": "npm run build && playwright test",
+    "check": "npm test && npm run test:browser"
   },
   "license": "MIT",
   "dependencies": {
@@ -19,6 +20,7 @@
     "katex": "^0.18.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "esbuild": "^0.28.2"
   }
 }

@@ -72,10 +72,15 @@ export const heatDemandDefinition = {
 
   initialState: {},
 
+  seriesParameters: ["demandSeriesId"],
+
   ports: [{
     id: "heat-in",
     flowType: THERMAL_HEAT_FLOW_TYPE,
-    direction: "in"
+    direction: "in",
+    boundary: {
+      operatingLimits: ["maximumHeatFlowkW", "minimumDeliveryTemperatureC"]
+    }
   }],
 
   outputs: {

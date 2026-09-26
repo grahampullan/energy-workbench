@@ -10,15 +10,13 @@ import {
 
 function busConnections(runtimeComponent, context) {
   const balancingConnections = context.connections.filter((connection) => {
-    const otherComponent = connection.from.component === runtimeComponent
-      ? connection.to.component
-      : connection.from.component;
-    return otherComponent.id === context.balancingComponentId;
+    const remote = connection.from.componentId === runtimeComponent.id ? connection.to : connection.from;
+    return remote.role === "electrical-balance";
   });
   if (balancingConnections.length !== 1) {
     throw resolutionError(
       "runtime.electrical-balancing-connection",
-      `Bus ${runtimeComponent.id} requires exactly one connection to balancing component ${context.balancingComponentId}`
+      `Bus ${runtimeComponent.id} requires exactly one connection to a balancing component`
     );
   }
 

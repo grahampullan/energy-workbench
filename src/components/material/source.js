@@ -61,6 +61,8 @@ export const materialSourceDefinition = {
     }
   },
   initialState: {},
+  seriesParameters: ["massFlowSeriesId"],
+
   ports: [{
     id: "material-out",
     flowType: MATERIAL_MASS_FLOW_TYPE,
@@ -100,7 +102,7 @@ export const materialSourceDefinition = {
   resolution: {
     describe(runtimeComponent, context) {
       const connection = singleConnection(runtimeComponent, context, "material-out");
-      if (connection.from.component !== runtimeComponent) {
+      if (connection.from.componentId !== runtimeComponent.id) {
         throw resolutionError(
           "runtime.unsupported-material-topology",
           `${runtimeComponent.id}.material-out must be the connection source`

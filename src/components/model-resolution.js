@@ -17,8 +17,8 @@ export function resolutionDescription({
 
 export function singleConnection(component, context, portId) {
   const matches = context.connections.filter((connection) =>
-    (connection.from.component === component && connection.from.port.id === portId) ||
-    (connection.to.component === component && connection.to.port.id === portId)
+    (connection.from.componentId === component.id && connection.from.portId === portId) ||
+    (connection.to.componentId === component.id && connection.to.portId === portId)
   );
   if (matches.length !== 1) {
     throw resolutionError(

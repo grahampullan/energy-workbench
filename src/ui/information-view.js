@@ -1,4 +1,21 @@
-import { informationPort, policySettings, scheduleOutput } from "../core/information-model.js";
+import {
+  compatibleInformationPorts,
+  informationPort,
+  policyCompatibilityIssues,
+  policySettings,
+  scheduleOutput
+} from "../core/information-model.js";
+
+function connectedComponentNames(model, componentId) {
+  const neighbourIds = new Set(model.connections.flatMap(({ from, to }) => {
+    if (from.componentId === componentId) return [to.componentId];
+    if (to.componentId === componentId) return [from.componentId];
+    return [];
+  }));
+  return model.components
+    .filter(({ id }) => neighbourIds.has(id))
+    .map(({ id, name }) => ({ id, name }));
+}
 
 export function informationView(model, registry) {
   const names = new Map([...model.components, ...(model.informationSources ?? [])].map(({ id, name }) => [id, name]));
@@ -16,17 +33,19 @@ export function informationView(model, registry) {
 
 export function componentPolicyView(model, component, registry, scenario) {
   const definition = registry.getPolicy?.(component.policy?.type);
-  const connections = informationView(model, registry).filter(({ to }) => to.componentId === component.id && to.portId.startsWith("policy."));
-  const available = (registry.listPolicies?.() ?? []).filter(({ componentTypes, requiredPorts = [] }) => componentTypes.includes(component.type) && requiredPorts.every((portId) => model.connections.some(({ from, to }) => [from, to].some((endpoint) => endpoint.componentId === component.id && endpoint.portId === portId))));
+  const connections = informationView(model, registry).filter(({ to }) =>
+    to.componentId === component.id && to.portId.startsWith("policy.")
+  );
+  const available = (registry.listPolicies?.() ?? []).filter((policy) =>
+    policyCompatibilityIssues(component, policy, model.connections).length === 0
+  );
   return {
     configuration: component.policy ?? null,
     definition: definition?.role ? null : definition,
     role: definition?.role ? definition : null,
     available: available.filter((candidate) => !candidate.role),
     availableRoles: available.filter((candidate) => candidate.role),
-    requestSources: definition?.role ? [...new Set(model.connections.flatMap(({ from, to }) =>
-      from.componentId === component.id ? [to.componentId] : to.componentId === component.id ? [from.componentId] : []
-    ))].map((id) => ({ id, name: model.components.find((candidate) => candidate.id === id).name })) : [],
+    requestSources: definition?.role ? connectedComponentNames(model, component.id) : [],
     connections,
     settings: definition ? policySettings(definition, component.policy) : {},
     sources: model.informationSources ?? [],
@@ -35,17 +54,23 @@ export function componentPolicyView(model, component, registry, scenario) {
       for (const source of model.components) {
         const outputs = registry.get(source.type, source.definitionVersion)?.information?.outputs ?? {};
         for (const [portId, output] of Object.entries(outputs)) {
-          if (output.quantity === port.quantity && output.unit === port.unit) options.push({
-            label: `${source.name} · ${output.label}`, from: { componentId: source.id, portId }
-          });
+          if (compatibleInformationPorts(output, port)) {
+            options.push({
+              label: `${source.name} · ${output.label}`,
+              from: { componentId: source.id, portId }
+            });
+          }
         }
       }
       for (const source of model.informationSources ?? []) {
         for (const portId of ["value", "enabled", "remaining-hours"]) {
           const output = scheduleOutput(source, portId);
-          if (output?.quantity === port.quantity && output.unit === port.unit) options.push({
-            label: `${source.name} · ${output.label}`, from: { sourceId: source.id, portId }
-          });
+          if (compatibleInformationPorts(output, port)) {
+            options.push({
+              label: `${source.name} · ${output.label}`,
+              from: { sourceId: source.id, portId }
+            });
+          }
         }
       }
       // Selecting a scenario creates a named, persisted schedule source; the

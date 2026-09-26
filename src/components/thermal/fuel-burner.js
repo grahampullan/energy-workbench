@@ -24,7 +24,7 @@ function parameterValue(component, parameter) {
 
 function heatConnection(runtimeComponent, context) {
   const connection = singleConnection(runtimeComponent, context, "heat-out");
-  if (connection.from.component !== runtimeComponent) {
+  if (connection.from.componentId !== runtimeComponent.id) {
     throw resolutionError(
       "runtime.unsupported-fuel-burner-topology",
       `${runtimeComponent.id}.heat-out must be the connection source`
@@ -50,7 +50,7 @@ function requireCommand(command) {
 
 export const fuelBurnerDefinition = {
   type: "thermal.fuel-burner",
-  version: "0.1.0",
+  version: "0.2.0",
   name: "Fuel burner",
   information: {
     outputs: {
@@ -112,7 +112,10 @@ export const fuelBurnerDefinition = {
   ports: [{
     id: "heat-out",
     flowType: THERMAL_HEAT_FLOW_TYPE,
-    direction: "out"
+    direction: "out",
+    boundary: {
+      operatingLimits: ["feasibleHeatOutputkW", "supplyTemperatureC"]
+    }
   }],
 
   outputs: {
@@ -170,17 +173,24 @@ export const fuelBurnerDefinition = {
       return {};
     },
 
-    getOperatingLimits(runtimeComponent) {
+    getOperatingLimits(runtimeComponent, stepContext, target = null) {
       const {
         maximumFuelInputPowerkW,
         efficiency,
         supplyTemperatureC
       } = runtimeComponent.parameters;
-      return {
+      const limits = {
         maximumFuelInputPowerkW,
         maximumHeatOutputkW: maximumFuelInputPowerkW * efficiency,
         supplyTemperatureC
       };
+      if (target !== null) {
+        if (!Number.isFinite(target.heatOutputkW) || target.heatOutputkW < 0) {
+          throw new TypeError("Fuel-burner target must provide finite, non-negative heatOutputkW");
+        }
+        limits.feasibleHeatOutputkW = Math.min(target.heatOutputkW, limits.maximumHeatOutputkW);
+      }
+      return limits;
     },
 
     resolve(runtimeComponent, context) {
@@ -199,12 +209,8 @@ export const fuelBurnerDefinition = {
       if (heatFlow === undefined) {
         return null;
       }
-      const maximumRequestedHeatOutputkW = Math.min(
-        context.target.heatOutputkW,
-        context.operatingLimits.maximumHeatOutputkW
-      );
       if (
-        heatFlow.heatFlowkW > maximumRequestedHeatOutputkW + context.tolerancekW ||
+        heatFlow.heatFlowkW > context.operatingLimits.feasibleHeatOutputkW + context.tolerancekW ||
         Math.abs(
           heatFlow.sourceTemperatureC -
           context.operatingLimits.supplyTemperatureC

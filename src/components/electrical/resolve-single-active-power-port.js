@@ -10,12 +10,12 @@ export function clamp(value, minimum, maximum) {
 
 export function connectionFlowForComponentPower(component, connection, powerkW) {
   return {
-    powerkW: connection.from.component === component ? powerkW : -powerkW
+    powerkW: connection.from.componentId === component.id ? powerkW : -powerkW
   };
 }
 
 export function componentPowerFromConnection(component, connection, flow) {
-  const powerkW = connection.from.component === component
+  const powerkW = connection.from.componentId === component.id
     ? flow.powerkW
     : -flow.powerkW;
   return powerkW === 0 ? 0 : powerkW;
@@ -25,7 +25,7 @@ export function singlePortActivePowerResolution(portId) {
   return {
     describe(component, context) {
       const connection = singleConnection(component, context, portId);
-      if (context.balancingComponentId === component.id) {
+      if (context.role === "electrical-balance") {
         return resolutionDescription({ connectionFlows: [connection.id] });
       }
       const { minimumPowerkW, maximumPowerkW } = context.operatingLimits;
@@ -41,7 +41,7 @@ export function resolveSinglePortActivePower(component, context, portId) {
   const connection = singleConnection(component, context, portId);
   const { minimumPowerkW, maximumPowerkW } = context.operatingLimits;
 
-  if (context.balancingComponentId === component.id) {
+  if (context.role === "electrical-balance") {
     const flow = context.getConnectionFlow(connection.id);
     if (flow === undefined) {
       return null;

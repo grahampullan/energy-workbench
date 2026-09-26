@@ -1,5 +1,34 @@
 import { createDiagnostic } from "./validation/validation-result.js";
 
+export function compatibleInformationPorts(output, input) {
+  return Boolean(output && input &&
+    output.quantity === input.quantity && output.unit === input.unit);
+}
+
+export function policyCompatibilityIssues(component, policy, connections) {
+  const issues = [];
+  if (!policy.componentTypes.includes(component.type)) {
+    issues.push({
+      code: "incompatible-policy",
+      message: `${policy.name} cannot control ${component.type}`
+    });
+  }
+  const connectedPorts = new Set(connections.flatMap(({ from, to }) =>
+    [from, to]
+      .filter(({ componentId }) => componentId === component.id)
+      .map(({ portId }) => portId)
+  ));
+  for (const portId of policy.requiredPorts ?? []) {
+    if (!connectedPorts.has(portId)) {
+      issues.push({
+        code: "policy-port-required",
+        message: `${policy.name} requires a connected ${portId} port`
+      });
+    }
+  }
+  return issues;
+}
+
 export function scheduleOutput(source, portId) {
   if (portId === "value" && source.activeValue === undefined) {
     return { label: source.name, quantity: source.quantity, unit: source.unit };
@@ -66,11 +95,8 @@ export function validateInformationModel(model, registry) {
     const policy = registry.getPolicy?.(component.policy.type);
     const path = `/components/${model.components.indexOf(component)}/policy`;
     if (!policy) { report("unknown-policy", `Unknown policy: ${component.policy.type}`, path); continue; }
-    if (!policy.componentTypes.includes(component.type)) report("incompatible-policy", `${policy.name} cannot control ${component.type}`, path);
-    for (const portId of policy.requiredPorts ?? []) {
-      if (!model.connections.some(({ from, to }) => [from, to].some((endpoint) => endpoint.componentId === component.id && endpoint.portId === portId))) {
-        report("policy-port-required", `${policy.name} requires a connected ${portId} port`, path);
-      }
+    for (const issue of policyCompatibilityIssues(component, policy, model.connections)) {
+      report(issue.code, issue.message, path);
     }
     if (policy.role === "electrical-balance") balancing.push(component.id);
     for (const name of Object.keys(component.policy.settings)) {
@@ -95,7 +121,7 @@ export function validateInformationModel(model, registry) {
     const to = informationPort(model, registry, connection.to, "inputs");
     if (!from) report("information-source-port", `Unknown information output: ${connection.from.componentId ?? connection.from.sourceId}.${connection.from.portId}`, path);
     if (!to) report("information-target-port", `Unknown information input: ${connection.to.componentId}.${connection.to.portId}`, path);
-    if (from && to && (from.quantity !== to.quantity || from.unit !== to.unit)) {
+    if (from && to && !compatibleInformationPorts(from, to)) {
       report("information-type", `Cannot connect ${from.quantity} (${from.unit}) to ${to.quantity} (${to.unit})`, path);
     }
     const key = `${connection.to.componentId}/${connection.to.portId}`;

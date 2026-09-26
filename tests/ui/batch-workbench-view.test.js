@@ -87,8 +87,12 @@ test("batch workbench chart exposes flow and required-temperature results", () =
   assert.equal(temperature.label, "Batch temperature");
   assert.equal(temperature.thresholdC, 120);
   assert.equal(temperature.thresholdLabel, "Minimum useful");
+  assert.deepEqual(temperature.values[0], {
+    stepIndex: -1, elapsedSeconds: 0, temperatureC: 20
+  });
+  assert.equal(temperature.stepValueOffset, 1);
   assertSeriesClose(
-    temperature.values.map((point) => point.temperatureC),
+    temperature.values.slice(1).map((point) => point.temperatureC),
     expectedResults.series.batchTemperatureC
   );
   assert.deepEqual(
@@ -105,6 +109,24 @@ test("batch workbench chart exposes flow and required-temperature results", () =
       values: Array.from({ length: 16 }, () => 20)
     }]
   );
+});
+
+test("a one-step temperature chart includes both initial and final state samples", () => {
+  const oneStepScenario = structuredClone(scenario);
+  oneStepScenario.time.stepCount = 1;
+  for (const series of oneStepScenario.series) {
+    series.data.values = [series.data.values[0]];
+  }
+  const oneStepRun = runScenario({ model, scenario: oneStepScenario, registry });
+  assert.equal(oneStepRun.completed, true);
+  const chart = createResultsChartModel({
+    model, registry, results: oneStepRun.results, scenario: oneStepScenario
+  });
+  const [temperature] = chart.temperatureSeries;
+  assert.deepEqual(temperature.values.map(({ elapsedSeconds }) => elapsedSeconds), [0, 900]);
+  assert.equal(temperature.values[0].temperatureC, 20);
+  assert.equal(temperature.values[1].temperatureC,
+    oneStepRun.results.steps[0].components.find(({ componentId }) => componentId === "batch").outputs.temperatureC);
 });
 
 test("batch workbench inspector exposes editable model inputs and live results", () => {

@@ -8,6 +8,7 @@ import {
   validateScenario
 } from "../core/validation/validate-documents.js";
 import { createDiagnostic } from "../core/validation/validation-result.js";
+import { componentScenario } from "./component-context.js";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -117,14 +118,12 @@ function prepareComponent(component, definition, context, componentIndex, diagno
 }
 
 function buildRuntimeComponents(model, scenario, registry, diagnostics) {
-  const context = Object.freeze({ model, scenario });
-
   return model.components.map((component, componentIndex) => {
     const definition = registry.get(component.type, component.definitionVersion);
     const modelData = prepareComponent(
       component,
       definition,
-      context,
+      Object.freeze({ scenario: componentScenario(component, definition, scenario) }),
       componentIndex,
       diagnostics
     );

@@ -72,6 +72,18 @@ npm install
 npm test
 ```
 
+Browser regression tests cover all examples and the select, preview,
+reset/apply, save, and reload workflow:
+
+```sh
+npx playwright install chromium
+npm run test:browser
+```
+
+Alternatively, use an installed Google Chrome with
+`PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. `npm run check` runs both the
+Node tests and the browser checks, including the browser build.
+
 Start the browser workbench at `http://127.0.0.1:4173`:
 
 ```sh

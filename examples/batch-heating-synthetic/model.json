@@ -21,7 +21,7 @@
     {
       "id": "heater",
       "type": "thermal.electric-heater",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Electric heater",
       "parameters": {
         "maximumElectricalInputPowerkW": 50,
@@ -39,7 +39,7 @@
     {
       "id": "batch",
       "type": "thermal.store",
-      "definitionVersion": "0.2.0",
+      "definitionVersion": "0.3.0",
       "name": "Batch",
       "parameters": {
         "maximumMassKg": 1000,
@@ -58,7 +58,7 @@
     {
       "id": "batch-loss",
       "type": "thermal.heat-transfer",
-      "definitionVersion": "0.1.0",
+      "definitionVersion": "0.2.0",
       "name": "Heat loss",
       "parameters": {
         "conductancekWPerK": 0.1

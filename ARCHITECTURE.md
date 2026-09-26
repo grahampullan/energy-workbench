@@ -3,7 +3,7 @@
 This is the normative architecture contract for Energy Workbench. Keep it
 focused on system boundaries and invariants. API details belong in the
 [component guide](docs/component-development.md), example behaviour in
-[regression specifications](README.md#project-contracts), and decision history
+[regression specifications](docs/regression), and decision history
 in [ADRs](docs/adr/README.md). Product scope and sequencing belong in the roadmap.
 
 ## One model, one runtime
@@ -193,7 +193,7 @@ general hooks, equation systems, or optimisation layers.
   fields, component equations, policies, and extension tests.
 - [Numerical contract and resolution plan](docs/forward-time-and-resolution-plan.md):
   timestep accounting, dependency analysis, and planned extensions.
-- [Regression specifications](README.md#project-contracts): example topologies,
+- [Regression specifications](docs/regression): example topologies,
   schedules, assumptions, and reviewed results.
 - [Code shape profile](CODE_SHAPE_PROFILE.md): repository, UI, and review defaults.
 - [ADRs](docs/adr/README.md): decisions and their supersession history.

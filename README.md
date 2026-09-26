@@ -1,11 +1,65 @@
 # Energy Workbench
 
-Explore electricity, heat, and material flows over time. Adjust component
-parameters and operating rules, inspect the equations, and compare the results.
-The browser and Node tests share one deterministic simulation, with explicit
-timesteps and checks on energy and material balances.
+Energy Workbench helps you understand how an energy system behaves over time
+and explore how equipment choices and operating decisions affect it. It brings
+electricity, heat, and material flows into one interactive model, with the
+equations and operating rules visible alongside the results.
 
-## Getting started
+## How it works
+
+A model is a graph: components are its nodes, and connections are its links.
+The graph shows both where energy and material move and what information is
+used to make operating decisions.
+
+- **Components** represent equipment such as solar panels, batteries, heaters,
+  and thermal stores. Each defines its own equations and physical limits and
+  keeps track of quantities such as stored energy, mass, or temperature.
+- **Physical links** carry electricity, heat, or material between component
+  ports. They appear as solid lines.
+- **Information links** carry values used by policies, such as available solar
+  power, temperature, or a schedule. They appear as dashed arrows and can connect
+  components that have no physical link.
+- **Policies** choose how a component should operate using its connected
+  information inputs and settings. A battery policy might request charging when
+  solar power exceeds demand. The battery's physical limits determine how much
+  it can actually accept.
+
+A scenario supplies inputs that change with time, such as solar power and heat
+demand. The simulation advances through timesteps, calculates flows, checks
+energy and material balances, and updates component states. The model diagram
+and charts show the results together, so you can follow a flow through the
+system and see how it changes over time.
+
+### Checking and running a model
+
+Before a run, the workbench checks that components and ports exist, links are
+compatible, and required policy inputs are connected. It also checks that the
+information needed by policies can be calculated without circular dependencies.
+
+At each timestep it then:
+
+1. **Reads inputs and chooses operation.** Current scenario inputs and existing
+   component states supply information to policies, which request operation.
+2. **Builds a calculation order.** Each component declares which flows it
+   calculates and which flows or targets it needs first. Every physical link
+   must have exactly one component responsible for calculating its flow, all
+   required targets must be available, and the calculations must have an order
+   without circular dependencies. Missing or competing flow calculations are
+   reported as errors.
+3. **Calculates flows and checks them.** Components enforce their physical
+   limits. Both ends of each connection must agree on the flow.
+4. **Advances the state.** Stored energy, mass, and other states are updated
+   only after the checks pass.
+
+The physical graph may contain loops; the calculations within a timestep must
+have a clear order. Feedback using an existing state, such as a battery's
+charge, is allowed. The runtime does not solve simultaneous circular
+dependencies by iteration.
+
+A valid calculation order does not guarantee that every operating condition is
+feasible. Running the scenario checks feasibility as inputs and states change.
+
+## Try it
 
 Use Node.js 22, the version used for testing, and npm. From the repository root:
 
@@ -15,9 +69,7 @@ npm start
 ```
 
 Open [the workbench](http://127.0.0.1:4173). It starts with the PV and battery
-example. `npm start` builds the browser bundle and starts a local static server.
-
-## Explore a model
+example.
 
 1. Choose an **Example**. **About example** explains its setup and operation.
 2. Select a component in **Model**. The inspector shows its **Controls**,
@@ -26,25 +78,15 @@ example. `npm start` builds the browser bundle and starts a local static server.
    working model; **Apply** keeps the change in the current session.
 4. In **Results**, choose a quantity and scrub the chart to select a timestep.
    Hover over a chart line or model connection to highlight its flow and components.
-5. **Save model** downloads the applied model as JSON. **Open model** reloads a
-   model compatible with the selected example's component layout. **Save variant**
-   downloads preview parameter changes as a separate JSON document.
+5. Enable **Show information connections** to see all policy inputs, or select
+   a component to see the inputs relevant to it.
 
-Solid connections carry energy or material. Dashed connections supply policy
-inputs; selecting a component reveals them. **Show information connections**
-reveals them all. The inspector lets you edit a policy and its inputs together.
+**Save model** downloads your applied model as JSON. **Open model** reloads a
+model compatible with the selected example's component layout.
 
-Policies request operation; components enforce physical limits. A balancing
-role, such as the grid's, supplies or absorbs the remaining power required.
+### Examples
 
-Scenario-input curves are hidden until **Show scenario inputs** is enabled.
-Temperature requirement lines remain visible. Component and schedule cards can
-be moved; layout changes are temporary and reset when the page reloads.
-
-## Examples
-
-Six examples are available. The links describe their models and reviewed
-regression results. The process examples use synthetic data.
+Six examples are available. The process examples use synthetic data.
 
 | Example | What it shows |
 | --- | --- |
@@ -54,59 +96,3 @@ regression results. The process examples use synthetic data.
 | [Material inventory](docs/regression/material-inventory.md) | Material enters, is heated, and leaves a store; discharge is limited to available inventory. |
 | [Ladle · historical](docs/regression/ladle-cycle.md) | A fixed burner schedule preheats a ladle before molten-metal arrival, holding, and discharge. |
 | [Ladle · temperature-led](docs/regression/ladle-cycle.md) | The burner responds to lining temperature and time remaining, allowing fuel use to be compared with the fixed schedule. |
-
-## Development and checks
-
-```sh
-npm test                         # Node tests and numerical regressions
-npx playwright install chromium # Browser setup, after installing dependencies
-npm run check                    # Node tests, browser build, and browser tests
-```
-
-To use an installed Google Chrome instead of Playwright's Chromium:
-
-```sh
-PLAYWRIGHT_CHANNEL=chrome npm run check
-```
-
-`npm run test:browser` builds and runs just the browser checks. They cover all
-examples and the select, preview, reset/apply, save, and reload workflow.
-
-After changing browser code, run `npm run build` and refresh the page. Generated
-bundles are ignored by Git. `npm run generate:blog-example` regenerates the
-electrical example from its preserved legacy inputs.
-
-## Versioning
-
-- **Application:** [package.json](package.json) identifies a release, tagged as
-  `vX.Y.Z`. During `0.x` development, minor releases introduce
-  features or changed contracts; patch releases contain compatible corrections.
-  Versions advance at release milestones, not on every commit.
-- **Documents:** `schemaVersion` identifies the JSON format and changes with its
-  contract, independently of the application version.
-- **Components:** models pin an exact `definitionVersion`. Engineering contract
-  changes require coordinated definition and model updates; internal refactoring
-  and presentation changes do not. See [definition versions and saved-model
-  updates](docs/component-development.md#definition-versions).
-
-Record a study's model, scenario, any variant, and application release or Git
-commit together. Component versions alone do not identify the whole simulation.
-
-## Project contracts
-
-- [Architecture](ARCHITECTURE.md): system boundaries and invariants.
-- [Code shape](CODE_SHAPE.md) and [repository profile](CODE_SHAPE_PROFILE.md):
-  simplicity, ownership, UI, and testing conventions.
-- [Component development](docs/component-development.md): equations, ports,
-  information inputs, policies, and extension tests.
-- [JSON schemas](src/core/schemas): persisted document formats.
-- [Time and resolution](docs/forward-time-and-resolution-plan.md): numerical
-  conventions, dependency ordering, and planned extensions.
-- [Architecture decisions](docs/adr/README.md): decision history.
-- [Project gates](docs/project-gates.md): evaluation status and development scope.
-
-The [example specifications](#examples) define the reviewed engineering behaviour.
-Current models support electrical power, directed heat transfer, and material
-flow with enthalpy, with one electrical balancing role per model. They use
-explicit timestep calculations; general iterative solving and optimisation are
-outside the current scope.

@@ -87,7 +87,7 @@
       "id": "refractory-loss",
       "type": "thermal.heat-transfer",
       "definitionVersion": "0.2.0",
-      "name": "Refractory heat loss",
+      "name": "Lining heat loss",
       "parameters": {
         "conductancekWPerK": 0.02
       },
@@ -185,7 +185,7 @@
     },
     {
       "id": "refractory-to-loss",
-      "name": "Refractory boundary to heat loss",
+      "name": "Lining boundary to heat loss",
       "from": {
         "componentId": "refractory",
         "portId": "passive-heat-out"
@@ -197,7 +197,7 @@
     },
     {
       "id": "refractory-loss-to-ambient",
-      "name": "Refractory heat loss to Ambient",
+      "name": "Lining heat loss to Ambient",
       "from": {
         "componentId": "refractory-loss",
         "portId": "sink"

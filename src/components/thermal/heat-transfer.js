@@ -166,7 +166,7 @@ export const heatTransferDefinition = {
       unit: "kW/K",
       default: 0.1,
       hardBounds: { minimum: 0 },
-      editor: { minimum: 0, maximum: 1000, step: 0.01 }
+      editor: { minimum: 0, maximum: 1, step: 0.01 }
     }
   },
 
